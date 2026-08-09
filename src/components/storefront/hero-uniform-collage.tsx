@@ -105,7 +105,7 @@ export function HeroUniformCollage({ href }: HeroUniformCollageProps) {
         className="hero-garment-reveal-desktop hero-garment-shell relative z-20 col-span-2 block rounded-[2rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gloria-700 focus-visible:ring-offset-4 lg:absolute lg:left-[54%] lg:top-[-7%] lg:h-[104%] lg:w-[34%]"
         aria-label={`Ver uniformes de ${heroProducts[0].label}`}
       >
-        <span className="hero-school-link relative z-40 mx-auto flex min-h-9 w-fit items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-gloria-950 lg:absolute lg:left-[-9%] lg:top-[21%] lg:min-h-11 lg:text-sm">
+        <span className="hero-school-link relative z-40 mx-auto flex min-h-9 w-fit items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-gloria-950 lg:absolute lg:left-[30%] lg:top-[16%] lg:min-h-11 lg:text-sm xl:top-[8%]">
           <span className="text-gloria-700">{heroProducts[0].number}</span>
           <span className="size-2 rounded-full bg-gloria-600" />
           <span className="lg:hidden">{heroProducts[0].mobileLabel}</span>
