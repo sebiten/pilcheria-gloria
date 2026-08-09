@@ -8,18 +8,18 @@ interface HeroUniformCollageProps {
 
 const heroProducts = [
   {
-    src: "/images/uniforms/catalog/coronel-arias-chomba.png",
-    alt: "Chomba escolar de la Escuela Coronel Arias",
-    label: "Coronel Arias",
+    src: "/images/uniforms/catalog/dorrego-chomba-hero.webp",
+    alt: "Chomba escolar de la Escuela Coronel Manuel Dorrego",
+    label: "Dorrego",
     garment: "Chomba",
   },
   {
-    src: "/images/uniforms/catalog/etha-remera.webp",
+    src: "/images/uniforms/catalog/etha-remera-hero.webp",
     alt: "Remera escolar ETHA",
     label: "E.T.H.A.",
   },
   {
-    src: "/images/uniforms/catalog/normal-remera.webp",
+    src: "/images/uniforms/catalog/normal-remera-hero.webp",
     alt: "Remera de la Escuela Normal Superior",
     label: "Escuela Normal",
   },
@@ -29,7 +29,7 @@ export function HeroUniformCollage({ href }: HeroUniformCollageProps) {
   return (
     <Link
       href={href}
-      className="group relative isolate mx-auto min-h-[31rem] w-full max-w-[46rem] sm:min-h-[42rem]"
+      className="group relative isolate mx-auto block min-h-[31rem] w-full max-w-[46rem] sm:min-h-[42rem]"
       aria-label="Abrir tienda de uniformes escolares"
     >
       <div
@@ -55,16 +55,16 @@ export function HeroUniformCollage({ href }: HeroUniformCollageProps) {
       </svg>
 
       <div className="absolute left-[4%] top-[13%] z-20 h-[69%] w-[49%] -rotate-[7deg] rounded-[2.6rem_1rem_4.8rem_1.3rem] bg-white p-1.5 shadow-[0_30px_65px_-25px_oklch(0.2_0.045_136/0.55)] transition duration-700 group-hover:-translate-y-2 group-hover:-rotate-3 sm:p-2">
-        <div className="relative size-full overflow-hidden rounded-[2.25rem_0.7rem_4.4rem_1rem] bg-[#17151a]">
+        <div className="relative size-full overflow-hidden rounded-[2.25rem_0.7rem_4.4rem_1rem] bg-gradient-to-br from-gloria-50 via-white to-gloria-100">
           <Image
             src={heroProducts[0].src}
             alt={heroProducts[0].alt}
             fill
             preload
-            className="object-cover transition duration-700 group-hover:scale-[1.025]"
+            className="object-contain transition duration-700 group-hover:scale-[1.025]"
             sizes="(max-width: 1024px) 50vw, 27vw"
           />
-          <span className="absolute inset-2 rounded-[1.8rem_0.5rem_3.8rem_0.8rem] border border-dashed border-white/45" />
+          <span className="absolute inset-2 rounded-[1.8rem_0.5rem_3.8rem_0.8rem] border border-dashed border-gloria-700/25" />
           <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-[0.62rem] font-black uppercase tracking-[0.1em] text-gloria-950 shadow sm:left-4 sm:top-4 sm:text-xs">
             <span className="hidden sm:inline">
               {heroProducts[0].garment} · Escuela{` `}
@@ -75,16 +75,16 @@ export function HeroUniformCollage({ href }: HeroUniformCollageProps) {
       </div>
 
       <div className="absolute right-[4%] top-[5%] z-10 h-[46%] w-[43%] rotate-[7deg] rounded-[1rem_3.8rem_1.2rem_2.8rem] bg-white p-1.5 shadow-[0_24px_55px_-28px_oklch(0.2_0.045_136/0.48)] transition duration-700 group-hover:translate-x-1 group-hover:rotate-3 sm:p-2">
-        <div className="relative size-full overflow-hidden rounded-[0.7rem_3.45rem_0.9rem_2.45rem] bg-[#17151a]">
+        <div className="relative size-full overflow-hidden rounded-[0.7rem_3.45rem_0.9rem_2.45rem] bg-gradient-to-br from-gloria-50 via-white to-gloria-100">
           <Image
             src={heroProducts[1].src}
             alt={heroProducts[1].alt}
             fill
             loading="eager"
-            className="object-cover transition duration-700 group-hover:scale-[1.025]"
+            className="object-contain transition duration-700 group-hover:scale-[1.025]"
             sizes="(max-width: 1024px) 44vw, 24vw"
           />
-          <span className="absolute inset-2 rounded-[0.5rem_2.9rem_0.7rem_2rem] border border-dashed border-white/45" />
+          <span className="absolute inset-2 rounded-[0.5rem_2.9rem_0.7rem_2rem] border border-dashed border-gloria-700/25" />
           <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-[0.62rem] font-black uppercase tracking-[0.1em] text-gloria-950 shadow sm:left-4 sm:top-4 sm:text-xs">
             {heroProducts[1].label}
           </span>
@@ -92,16 +92,16 @@ export function HeroUniformCollage({ href }: HeroUniformCollageProps) {
       </div>
 
       <div className="absolute bottom-[5%] right-[2%] z-30 h-[43%] w-[47%] rotate-[4deg] rounded-[3.4rem_1rem_3rem_1.2rem] bg-white p-1.5 shadow-[0_30px_65px_-26px_oklch(0.2_0.045_136/0.55)] transition duration-700 group-hover:translate-y-1 group-hover:rotate-1 sm:p-2">
-        <div className="relative size-full overflow-hidden rounded-[3rem_0.7rem_2.65rem_0.9rem] bg-[#17151a]">
+        <div className="relative size-full overflow-hidden rounded-[3rem_0.7rem_2.65rem_0.9rem] bg-gradient-to-br from-gloria-50 via-white to-gloria-100">
           <Image
             src={heroProducts[2].src}
             alt={heroProducts[2].alt}
             fill
             loading="eager"
-            className="object-cover transition duration-700 group-hover:scale-[1.025]"
+            className="object-contain transition duration-700 group-hover:scale-[1.025]"
             sizes="(max-width: 1024px) 48vw, 26vw"
           />
-          <span className="absolute inset-2 rounded-[2.5rem_0.5rem_2.1rem_0.7rem] border border-dashed border-white/45" />
+          <span className="absolute inset-2 rounded-[2.5rem_0.5rem_2.1rem_0.7rem] border border-dashed border-gloria-700/25" />
           <span className="absolute bottom-3 right-3 rounded-full bg-white/95 px-3 py-1.5 text-[0.62rem] font-black uppercase tracking-[0.1em] text-gloria-950 shadow sm:bottom-4 sm:right-4 sm:text-xs">
             {heroProducts[2].label}
           </span>
