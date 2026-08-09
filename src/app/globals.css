@@ -84,6 +84,66 @@
   .animate-gloria-float {
     animation: gloria-float 8s ease-in-out infinite;
   }
+
+  .hero-fabric-texture {
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        transparent 0 3px,
+        oklch(0.44 0.11 132 / 0.035) 3px 4px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0 3px,
+        oklch(0.44 0.11 132 / 0.025) 3px 4px
+      );
+    mask-image: linear-gradient(to bottom, black 0%, black 82%, transparent 100%);
+    opacity: 0.42;
+  }
+
+  .hero-garment-reveal {
+    animation: hero-garment-reveal 780ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .hero-thread-path {
+    animation: hero-thread-draw 950ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    stroke-dashoffset: 1;
+  }
+
+  .hero-school-link {
+    text-shadow:
+      0 1px 0 var(--color-gloria-50),
+      0 0 10px var(--color-gloria-50);
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero-stage-inner {
+    min-height: clamp(44rem, calc(100svh - 4.5rem), 57rem);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hero-garment-shell:hover .hero-garment-art,
+  .hero-garment-shell:focus-within .hero-garment-art {
+    scale: 1.02;
+    translate: 0 -6px;
+  }
+
+  .hero-school-link:hover,
+  .hero-school-link:focus-visible {
+    color: var(--color-gloria-700);
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-scroll-drift {
+      animation: hero-scroll-drift linear both;
+      animation-range: 0 85svh;
+      animation-timeline: scroll(root);
+    }
+  }
 }
 
 @media (max-width: 767px) {
@@ -185,6 +245,34 @@
   }
 }
 
+@keyframes hero-garment-reveal {
+  from {
+    opacity: 0;
+    scale: 0.96;
+    translate: 0 24px;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes hero-thread-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes hero-scroll-drift {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 0 -1.5rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -196,5 +284,15 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .hero-garment-art,
+  .hero-scroll-drift {
+    scale: 1 !important;
+    translate: 0 0 !important;
+  }
+
+  .hero-thread-path {
+    stroke-dashoffset: 0 !important;
   }
 }

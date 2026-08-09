@@ -10,6 +10,7 @@ interface PaymentConfidenceProps {
   amount?: number;
   compact?: boolean;
   className?: string;
+  variant?: "default" | "hero-band";
 }
 
 export function PaymentBrandLogos({
@@ -51,6 +52,7 @@ export function PaymentConfidence({
   amount,
   compact = false,
   className,
+  variant = "default",
 }: PaymentConfidenceProps) {
   const installmentAmount =
     typeof amount === "number" && amount > 0
@@ -59,6 +61,8 @@ export function PaymentConfidence({
   const title = installmentAmount
     ? `${MERCADO_PAGO_PROMO_INSTALLMENTS} cuotas sin interés de ${installmentAmount}`
     : `Hasta ${MERCADO_PAGO_PROMO_INSTALLMENTS} cuotas sin interés`;
+
+  const isHeroBand = variant === "hero-band";
 
   if (compact) {
     return (
@@ -87,19 +91,53 @@ export function PaymentConfidence({
 
   return (
     <section
-      className={cn("border-b border-border bg-white", className)}
+      className={cn(
+        "relative border-b",
+        isHeroBand
+          ? "z-20 border-gloria-800 bg-gloria-950 text-white"
+          : "border-border bg-white",
+        className
+      )}
       aria-label="Medios de pago"
     >
-      <div className="container mx-auto grid gap-5 px-4 py-6 lg:grid-cols-[1fr_auto_auto] lg:items-center">
+      {isHeroBand ? (
+        <>
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-0 top-2 border-t border-dashed border-gloria-200/25"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-0 bottom-2 border-t border-dashed border-gloria-200/20"
+          />
+        </>
+      ) : null}
+
+      <div className="container relative mx-auto grid gap-5 px-4 py-7 lg:grid-cols-[1fr_auto_auto] lg:items-center">
         <div className="flex items-center gap-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gloria-500 text-gloria-950">
+          <span
+            className={cn(
+              "flex size-11 shrink-0 items-center justify-center rounded-full bg-gloria-500 text-gloria-950",
+              isHeroBand && "ring-4 ring-white/8"
+            )}
+          >
             <CreditCard className="size-5" aria-hidden="true" />
           </span>
           <div>
-            <p className="font-display text-xl leading-tight text-gloria-950 sm:text-2xl">
+            <p
+              className={cn(
+                "font-display text-xl leading-tight sm:text-2xl",
+                isHeroBand ? "text-white" : "text-gloria-950"
+              )}
+            >
               {title}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p
+              className={cn(
+                "mt-1 text-sm",
+                isHeroBand ? "text-gloria-100/70" : "text-muted-foreground"
+              )}
+            >
               Con tarjetas seleccionadas. También podés pagar con débito o
               dinero disponible en Mercado Pago.
             </p>
@@ -108,8 +146,21 @@ export function PaymentConfidence({
 
         <PaymentBrandLogos />
 
-        <div className="flex items-center gap-2 border-t border-border pt-4 text-sm font-semibold text-gloria-900 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-          <ShieldCheck className="size-5 text-gloria-700" aria-hidden="true" />
+        <div
+          className={cn(
+            "flex items-center gap-2 border-t pt-4 text-sm font-semibold lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0",
+            isHeroBand
+              ? "border-white/15 text-gloria-100"
+              : "border-border text-gloria-900"
+          )}
+        >
+          <ShieldCheck
+            className={cn(
+              "size-5",
+              isHeroBand ? "text-gloria-300" : "text-gloria-700"
+            )}
+            aria-hidden="true"
+          />
           Pago protegido por Mercado Pago
         </div>
       </div>

@@ -64,53 +64,72 @@ export default async function HomePage() {
   ];
 
   return (
-    <main className="overflow-hidden bg-background">
-      <section className="relative isolate border-b border-border bg-gloria-50">
-        <div className="absolute -left-32 top-16 size-72 rounded-full bg-gloria-200/70 blur-3xl" />
-        <div className="container relative mx-auto grid min-h-[calc(100svh-4.5rem)] items-center gap-10 px-4 py-10 lg:grid-cols-[0.9fr_1.1fr] lg:py-14">
-          <div className="animate-gloria-rise z-10 max-w-2xl">
-            <p className="mb-5 text-sm font-bold uppercase tracking-[0.2em] text-gloria-700">
-              Uniformes escolares en Ledesma
-            </p>
-            <h1 className="font-display text-balance text-5xl leading-[0.94] tracking-[-0.045em] text-gloria-950 sm:text-7xl lg:text-[5.4rem]">
-              El uniforme de su escuela, en el talle que necesita.
+    <main className="bg-background">
+      <section className="hero-stage relative isolate border-b border-gloria-200 bg-gloria-50">
+        <div aria-hidden="true" className="hero-fabric-texture absolute inset-0" />
+        <div className="hero-stage-inner container relative mx-auto px-4 pb-9 pt-8 sm:px-6 sm:pb-11 sm:pt-10 lg:px-4 lg:py-10">
+          <div className="relative">
+            <div className="relative z-50 flex items-center justify-between gap-4">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-gloria-700 sm:text-sm">
+                Uniformes escolares en Ledesma
+              </p>
+              <p className="hidden text-xs font-extrabold uppercase tracking-[0.16em] text-gloria-800 lg:block">
+                Libertador General San Martín · Jujuy
+              </p>
+            </div>
+
+            <h1 className="mt-5 max-w-full font-display text-[clamp(2.8rem,12.5vw,4.15rem)] leading-[0.84] tracking-[-0.06em] text-gloria-950 sm:mt-6 sm:max-w-[90%] lg:mt-7 lg:max-w-none lg:text-[clamp(6rem,9vw,9.3rem)] lg:leading-[0.8]">
+              <span className="relative z-10 block">Tu escuela.</span>
+              <span className="relative z-40 block pl-[4vw] lg:pl-[8vw]">
+                Tu uniforme.
+              </span>
+              <span className="relative z-10 block pl-[1vw] lg:pl-[3vw]">
+                Tu talle.
+              </span>
             </h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-              Consulte el stock publicado o escríbanos por talles y escuelas que
-              todavía no aparecen online. En el local tenemos más modelos disponibles.
+          </div>
+
+          <HeroUniformCollage href={catalogHref} />
+
+          <div className="relative z-50 -mt-3 max-w-lg lg:absolute lg:bottom-[6%] lg:left-[30%] lg:mt-0 lg:w-[31rem]">
+            <p className="max-w-md text-sm font-medium leading-6 text-gloria-900 sm:text-base sm:leading-7">
+              Elegí la escuela, la prenda y el talle. Si todavía no aparece
+              online, la buscamos en el negocio.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <Button
                 size="lg"
-                className="min-h-12 rounded-full bg-gloria-500 px-7 text-gloria-950 hover:bg-gloria-400"
+                className="group min-h-12 rounded-full bg-gloria-500 px-7 text-gloria-950 shadow-[0_16px_32px_-18px_oklch(0.2_0.045_136/0.5)] transition-transform hover:-translate-y-0.5 hover:bg-gloria-400"
                 asChild
               >
                 <Link href={catalogHref}>
-                  Ver tienda de uniformes
-                  <ArrowRight className="ml-2 size-4" />
+                  Elegir uniforme
+                  <ArrowRight className="ml-2 size-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
               {whatsappUrl ? (
                 <Button
                   size="lg"
                   variant="outline"
-                  className="min-h-12 rounded-full border-gloria-300 bg-white px-7 text-gloria-800"
+                  className="min-h-12 rounded-full border-gloria-300 bg-gloria-50 px-6 text-gloria-800 hover:bg-gloria-100"
                   asChild
                 >
                   <a href={whatsappUrl} target="_blank" rel="noreferrer">
                     <MessageCircle className="mr-2 size-4" />
-                    Consultar talle o escuela
+                    Consultar por WhatsApp
                   </a>
                 </Button>
               ) : null}
             </div>
-            <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-gloria-900">
+
+            <div className="mt-5 flex flex-col gap-2 text-xs font-bold text-gloria-900 sm:flex-row sm:flex-wrap sm:gap-x-5 sm:gap-y-2 sm:text-sm">
               <span className="inline-flex items-center gap-2">
-                <Ruler className="size-4 text-gloria-600" />
+                <Ruler className="size-4 shrink-0 text-gloria-600" />
                 Talles infantil, juvenil y adulto
               </span>
               <span className="inline-flex items-center gap-2">
-                <MapPin className="size-4 text-gloria-600" />
+                <MapPin className="size-4 shrink-0 text-gloria-600" />
                 {pickupConfigured
                   ? `Retiro coordinado en ${settings.address_line}`
                   : "Retiro coordinado"}
@@ -118,11 +137,14 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <HeroUniformCollage href={catalogHref} />
+          <span
+            aria-hidden="true"
+            className="absolute bottom-0 left-1/2 h-8 border-l-2 border-dashed border-gloria-700/40 lg:h-12"
+          />
         </div>
       </section>
 
-      <PaymentConfidence />
+      <PaymentConfidence variant="hero-band" />
       <SchoolUniformsCarousel whatsappPhone={settings.whatsapp_phone} />
 
       <section className="border-y border-border bg-white py-16 sm:py-20">
