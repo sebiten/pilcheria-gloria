@@ -124,6 +124,26 @@ export async function seedCheckoutSmokeProduct(): Promise<SeededProduct> {
     throw variantError ?? new Error("No se pudo crear la variante e2e");
   }
 
+  const { data: ownSource, error: sourceError } = await supabase
+    .from("inventory_sources")
+    .select("id, priority")
+    .eq("code", "own")
+    .single();
+  if (sourceError || !ownSource) {
+    throw sourceError ?? new Error("No se encontró el origen propio e2e");
+  }
+
+  const { error: offerError } = await supabase.from("variant_offers").insert({
+    variant_id: variant.id,
+    source_id: ownSource.id,
+    availability_mode: "finite",
+    sale_price: 125000,
+    stock_quantity: 5,
+    priority: ownSource.priority,
+    active: true,
+  });
+  if (offerError) throw offerError;
+
   return {
     categoryId: category.id,
     productId: product.id,

@@ -139,6 +139,7 @@ export default async function AccountOrderDetailPage({
                       <th className="h-12 px-4 text-left font-medium">Cantidad</th>
                       <th className="h-12 px-4 text-left font-medium">Unitario</th>
                       <th className="h-12 px-4 text-left font-medium">Subtotal</th>
+                      <th className="h-12 px-4 text-left font-medium">Preparación</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -152,6 +153,11 @@ export default async function AccountOrderDetailPage({
                         <td className="p-4">{formatPrice(Number(item.unit_price))}</td>
                         <td className="p-4">
                           {formatPrice(Number(item.unit_price) * item.quantity)}
+                        </td>
+                        <td className="p-4">
+                          {item.availability_mode === "on_demand"
+                            ? "24–48 horas"
+                            : "Entrega inmediata"}
                         </td>
                       </tr>
                     ))}
@@ -172,6 +178,11 @@ export default async function AccountOrderDetailPage({
                     <p className="text-muted-foreground">Cantidad: {item.quantity}</p>
                     <p className="text-muted-foreground">
                       Unitario: {formatPrice(Number(item.unit_price))}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {item.availability_mode === "on_demand"
+                        ? "Preparación en 24–48 horas"
+                        : "Entrega inmediata"}
                     </p>
                     <p className="mt-2 font-medium">
                       Subtotal: {formatPrice(Number(item.unit_price) * item.quantity)}

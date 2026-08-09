@@ -18,6 +18,7 @@ const checkoutSchema = z.object({
     )
     .min(1)
     .max(20),
+  expectedSubtotal: z.number().finite().nonnegative(),
   shippingMethod: z.enum(["pickup", "local_delivery"]),
   shippingAddress: z.object({
     name: z.string().trim().min(2).max(120),
@@ -39,7 +40,7 @@ const checkoutSchema = z.object({
 });
 
 const SAFE_CHECKOUT_ERROR =
-  /carrito|producto|variante|stock|cantidad|total|cup[oó]n|subtotal|retiro|entrega|direcci[oó]n|tel[eé]fono|tienda todav[ií]a|intento de compra/i;
+  /carrito|producto|variante|stock|cantidad|precio|total|cup[oó]n|subtotal|retiro|entrega|direcci[oó]n|tel[eé]fono|tienda todav[ií]a|intento de compra/i;
 
 export async function POST(request: Request) {
   try {

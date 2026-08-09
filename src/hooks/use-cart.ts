@@ -51,6 +51,10 @@ export const useCartStore = create<CartStore>()((set, get) => ({
 
   addItem: (product: ProductWithDetails, variantId: string | null, quantity = 1) => {
     set((state) => {
+      const selectedVariant = variantId
+        ? product.variants.find((item) => item.id === variantId)
+        : null;
+      const quantityLimit = selectedVariant?.maxQuantity ?? 10;
       const existingIndex = state.items.findIndex(
         (item) =>
           item.product_id === product.id &&
@@ -59,7 +63,14 @@ export const useCartStore = create<CartStore>()((set, get) => ({
 
       if (existingIndex > -1) {
         const newItems = [...state.items];
-        newItems[existingIndex].quantity += quantity;
+        newItems[existingIndex] = {
+          ...newItems[existingIndex],
+          product,
+          quantity: Math.min(
+            newItems[existingIndex].quantity + quantity,
+            quantityLimit
+          ),
+        };
         return { items: newItems, isOpen: true };
       }
 
@@ -70,7 +81,7 @@ export const useCartStore = create<CartStore>()((set, get) => ({
           {
             product_id: product.id,
             variant_id: variantId || null,
-            quantity,
+            quantity: Math.min(quantity, quantityLimit),
             product,
           },
         ],

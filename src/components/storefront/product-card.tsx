@@ -14,7 +14,7 @@ const FALLBACK_IMAGE =
 
 function getAvailableVariants(product: ProductWithDetails) {
   return product.variants.filter(
-    (variant) => variant.active !== false && Number(variant.stock ?? 0) > 0
+    (variant) => variant.active !== false && variant.available
   );
 }
 
@@ -28,11 +28,11 @@ function getDisplayPrice(product: ProductWithDetails) {
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
   const availableVariants = getAvailableVariants(product);
-  const totalStock = availableVariants.reduce(
-    (total, variant) => total + Number(variant.stock ?? 0),
-    0
-  );
-  const sizes = new Set(availableVariants.map((variant) => variant.size)).size;
+  const sizes = new Set(
+    availableVariants.map(
+      (variant) => `${variant.sizeSystem ?? "legacy"}:${variant.size}`
+    )
+  ).size;
   const price = getDisplayPrice(product);
   const compareAtPrice = Number(product.compareAtPrice ?? 0);
   const isOffer = compareAtPrice > price;
@@ -66,7 +66,9 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             ) : null}
           </div>
           <span className="absolute bottom-3 left-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-foreground">
-            {totalStock > 0 ? `${sizes || 1} talle${sizes === 1 ? "" : "s"}` : "Agotado"}
+            {availableVariants.length > 0
+              ? `${sizes || 1} talle${sizes === 1 ? "" : "s"}`
+              : "Agotado"}
           </span>
         </div>
 

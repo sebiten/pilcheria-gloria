@@ -11,6 +11,15 @@ export type OrderStatus =
 
 export type CouponType = "percentage" | "fixed";
 
+export type SizeSystem = "infant" | "adult";
+export type FulfillmentSpeed = "immediate" | "24_48_hours";
+
+export interface PricingTier {
+  unitPrice: number;
+  availableQuantity: number | null;
+  fulfillment: FulfillmentSpeed;
+}
+
 export interface Profile {
   id: string;
   clerk_user_id: string;
@@ -59,10 +68,17 @@ export interface ProductVariant {
   id: string;
   product_id: string;
   size: string;
+  sizeSystem: SizeSystem | null;
   color: string | null;
   sku: string | null;
   priceOverride: number | null;
   stock: number;
+  available: boolean;
+  maxQuantity: number | null;
+  onDemandAvailable: boolean;
+  pricingTiers: PricingTier[];
+  partnerPrice: number | null;
+  partnerAvailable: boolean;
   active: boolean;
 }
 
@@ -143,6 +159,21 @@ export interface OrderItem {
   variant_id: string | null;
   quantity: number;
   unit_price: number;
+  source_code?: string | null;
+  source_name?: string | null;
+  availability_mode?: "finite" | "on_demand" | null;
+  line_subtotal?: number | null;
+  discount_allocated?: number;
+  net_amount?: number | null;
+  seller_share?: number | null;
+  partner_share?: number;
+  procurement_status?:
+    | "not_required"
+    | "awaiting_payment"
+    | "pending_collection"
+    | "collected"
+    | "cancelled";
+  procurement_collected_at?: string | null;
 }
 
 export interface OrderItemWithProduct extends OrderItem {

@@ -11,6 +11,7 @@ import {
   Settings,
   Star,
   BadgeCheck,
+  HandCoins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ const sidebarItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/dashboard/products", icon: Package, label: "Productos" },
   { href: "/dashboard/orders", icon: ShoppingCart, label: "Órdenes" },
+  { href: "/dashboard/finance", icon: HandCoins, label: "Inventario y saldos" },
   { href: "/dashboard/categories", icon: FolderTree, label: "Categorías" },
   { href: "/dashboard/brands", icon: BadgeCheck, label: "Marcas" },
   { href: "/dashboard/coupons", icon: Tags, label: "Cupones" },

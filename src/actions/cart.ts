@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { ensureUserProfile } from "@/actions/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { CartItem, ProductWithDetails } from "@/types";
+import { mapProductRow, PRODUCT_OFFERS_SELECT } from "@/lib/inventory";
 
 const cartItemInputSchema = z.object({
   product_id: z.string().uuid(),
@@ -28,53 +29,7 @@ function createCartKey(productId: string, variantId: string | null) {
 }
 
 function mapProduct(product: any): ProductWithDetails {
-  return {
-    id: product.id,
-    name: product.name,
-    slug: product.slug,
-    description: product.description,
-    basePrice: Number(product.base_price) || 0,
-    compareAtPrice: product.compare_at_price
-      ? Number(product.compare_at_price)
-      : null,
-    brand: product.brand || null,
-    categoryId: product.category_id,
-    featured: product.featured || false,
-    active: product.active !== false,
-    createdAt: product.created_at,
-    category: product.category
-      ? {
-          id: product.category.id,
-          name: product.category.name,
-          slug: product.category.slug,
-          description: product.category.description,
-          image_url: product.category.image_url,
-          parent_id: product.category.parent_id,
-          sort_order: product.category.sort_order || 0,
-          active: product.category.active !== false,
-          created_at: product.category.created_at,
-        }
-      : null,
-    images: (product.images || [])
-      .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-      .map((image: any) => ({
-        id: image.id,
-        product_id: image.product_id,
-        url: image.url,
-        alt: image.alt,
-        sort_order: image.sort_order || 0,
-      })),
-    variants: (product.variants || []).map((variant: any) => ({
-      id: variant.id,
-      product_id: variant.product_id,
-      size: variant.size || "",
-      color: variant.color || null,
-      sku: variant.sku || null,
-      priceOverride: variant.price_override ? Number(variant.price_override) : null,
-      stock: variant.stock || 0,
-      active: variant.active !== false,
-    })),
-  };
+  return mapProductRow(product);
 }
 
 function mapCartItem(row: CartRow): CartItem {
@@ -123,7 +78,7 @@ async function selectUserCart(userId: string): Promise<CartItem[]> {
         *,
         category:categories(*),
         images:product_images(*),
-        variants:product_variants(*)
+        variants:product_variants(${PRODUCT_OFFERS_SELECT})
       )
     `)
     .eq("clerk_user_id", userId)
@@ -259,6 +214,39 @@ export async function getCartItems(): Promise<CartItem[]> {
 
   await ensureUserProfile();
   return selectUserCart(userId);
+}
+
+export async function refreshCheckoutCart(
+  items: CartItemInput[]
+): Promise<CartItem[]> {
+  const parsedItems = z.array(cartItemInputSchema).min(1).max(20).parse(items);
+  const normalizedItems = normalizeCartItems(parsedItems);
+  const supabase = getSupabaseAdmin();
+  const productIds = Array.from(
+    new Set(normalizedItems.map((item) => item.product_id))
+  );
+  const { data: products, error } = await supabase
+    .from("products")
+    .select(`
+      *,
+      category:categories(*),
+      images:product_images(*),
+      variants:product_variants(${PRODUCT_OFFERS_SELECT})
+    `)
+    .in("id", productIds)
+    .eq("active", true);
+
+  if (error) throw error;
+  const productsById = new Map(
+    (products ?? []).map((product) => [product.id, mapProduct(product)])
+  );
+
+  return normalizedItems.map((item) => ({
+    product_id: item.product_id,
+    variant_id: item.variant_id,
+    quantity: item.quantity,
+    product: productsById.get(item.product_id),
+  }));
 }
 
 export async function updateCartItemQuantity(cartItemId: string, quantity: number) {

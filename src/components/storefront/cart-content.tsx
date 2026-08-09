@@ -10,7 +10,9 @@ import {
   canUseLocalDelivery,
   getCartItemCount,
   getCartItemLineTotal,
+  getCartItemPricingSegments,
 } from "@/lib/commerce";
+import { formatStorefrontVariantSize } from "@/lib/inventory";
 
 export function CartContent() {
   const { items, removeItem, updateQuantity, getTotal, setIsOpen } = useCartStore();
@@ -40,10 +42,15 @@ export function CartContent() {
           const selectedVariant = item.variant_id
             ? item.product?.variants?.find((variant) => variant.id === item.variant_id)
             : null;
-          const maxQuantity = selectedVariant ? Number(selectedVariant.stock ?? 0) : null;
+          const maxQuantity = selectedVariant
+            ? (selectedVariant.maxQuantity ?? 10)
+            : null;
           const hasReachedStockLimit =
             maxQuantity !== null && item.quantity >= maxQuantity;
-          const isUnavailableVariant = Boolean(item.variant_id && !selectedVariant);
+          const isUnavailableVariant = Boolean(
+            item.variant_id && (!selectedVariant || !selectedVariant.available)
+          );
+          const pricing = getCartItemPricingSegments(item);
 
           return (
             <div key={`${item.product_id}-${item.variant_id}`} className="flex gap-4">
@@ -64,7 +71,7 @@ export function CartContent() {
                   </h4>
                   {selectedVariant ? (
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Talle {selectedVariant.size}
+                      Talle {formatStorefrontVariantSize(selectedVariant)}
                       {selectedVariant.color
                         ? `, ${selectedVariant.color}`
                         : ""}
@@ -75,10 +82,26 @@ export function CartContent() {
                       Variante no disponible
                     </p>
                   ) : null}
-                  {maxQuantity !== null ? (
+                  {selectedVariant ? (
                     <p className="text-sm text-muted-foreground">
-                      Stock disponible: {maxQuantity}
+                      {selectedVariant.stock > 0
+                        ? "Entrega inmediata para el stock disponible"
+                        : "Preparación en 24–48 horas"}
                     </p>
+                  ) : null}
+                  {pricing.segments.length > 1 ? (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {pricing.segments.map((segment, index) => (
+                        <p
+                          key={`${segment.fulfillment}-${segment.unitPrice}-${index}`}
+                        >
+                          {segment.quantity} × {formatPrice(segment.unitPrice)} ·{" "}
+                          {segment.fulfillment === "immediate"
+                            ? "inmediata"
+                            : "24–48 h"}
+                        </p>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
 

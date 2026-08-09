@@ -88,6 +88,7 @@ test("repeated checkout request is idempotent", async ({ request }) => {
           quantity: 1,
         },
       ],
+      expectedSubtotal: 125000,
       shippingMethod: "pickup",
       shippingAddress: {
         name: "QA Gloria",

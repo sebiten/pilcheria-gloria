@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ImageIcon, Plus, Trash2, Upload } from "lucide-react";
-import type { Category, ProductWithDetails } from "@/types";
+import type { Category, ProductWithDetails, SizeSystem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,10 +18,13 @@ import { slugify } from "@/lib/utils";
 interface VariantFormValue {
   formId: string;
   size: string;
+  sizeSystem: SizeSystem | null;
   color: string;
   sku: string;
   priceOverride: number | null;
   stock: number;
+  partnerPrice: number | null;
+  partnerAvailable: boolean;
   active: boolean;
 }
 
@@ -40,10 +43,13 @@ const defaultVariants: VariantFormValue[] = [
   {
     formId: "default-variant",
     size: "S",
+    sizeSystem: null,
     color: "",
     sku: "",
     priceOverride: null,
     stock: 0,
+    partnerPrice: null,
+    partnerAvailable: false,
     active: true,
   },
 ];
@@ -59,7 +65,7 @@ function normalizeVariantValues(variants: VariantFormValue[]) {
     const color = variant.color.trim();
     if (!size) continue;
 
-    const key = `${size.toLocaleLowerCase("es-AR")}:${color.toLocaleLowerCase("es-AR")}`;
+    const key = `${variant.sizeSystem ?? "legacy"}:${size.toLocaleLowerCase("es-AR")}:${color.toLocaleLowerCase("es-AR")}`;
     const existing = normalized.get(key);
 
     if (!existing) {
@@ -77,6 +83,9 @@ function normalizeVariantValues(variants: VariantFormValue[]) {
       sku: existing.sku || variant.sku.trim(),
       priceOverride: existing.priceOverride ?? variant.priceOverride,
       stock: existing.stock + variant.stock,
+      partnerPrice: existing.partnerPrice ?? variant.partnerPrice,
+      partnerAvailable:
+        existing.partnerAvailable || variant.partnerAvailable,
       active: existing.active || variant.active,
     });
   }
@@ -144,10 +153,13 @@ export function ProductForm({
       ? product.variants.map((variant) => ({
           formId: variant.id,
           size: variant.size,
+          sizeSystem: variant.sizeSystem,
           color: variant.color ?? "",
           sku: variant.sku ?? "",
           priceOverride: variant.priceOverride,
           stock: variant.stock,
+          partnerPrice: variant.partnerPrice,
+          partnerAvailable: variant.partnerAvailable,
           active: variant.active,
         }))
       : defaultVariants
@@ -158,6 +170,15 @@ export function ProductForm({
       alt: image.alt ?? "",
     })) ?? []
   );
+  const [guideColor, setGuideColor] = useState(
+    product?.variants.find((variant) => variant.color)?.color ?? ""
+  );
+  const [guidePrices, setGuidePrices] = useState({
+    infantSmall: "",
+    infantLarge: "",
+    adultSmall: "",
+    adultLarge: "",
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -181,6 +202,85 @@ export function ProductForm({
         currentIndex === index ? { ...variant, [field]: value } : variant
       )
     );
+  };
+
+  const applyGuidePrices = () => {
+    const groups: Array<{
+      sizeSystem: SizeSystem;
+      sizes: string[];
+      price: number;
+    }> = [
+      {
+        sizeSystem: "infant",
+        sizes: ["4", "6", "8", "10"],
+        price: Number(guidePrices.infantSmall),
+      },
+      {
+        sizeSystem: "infant",
+        sizes: ["12", "14", "16"],
+        price: Number(guidePrices.infantLarge),
+      },
+      {
+        sizeSystem: "adult",
+        sizes: ["1", "2", "3", "4"],
+        price: Number(guidePrices.adultSmall),
+      },
+      {
+        sizeSystem: "adult",
+        sizes: ["5", "6"],
+        price: Number(guidePrices.adultLarge),
+      },
+    ];
+    const validGroups = groups.filter(
+      (group) => Number.isFinite(group.price) && group.price > 0
+    );
+
+    if (!validGroups.length) {
+      setError("Ingresá al menos un precio de la guía");
+      return;
+    }
+
+    setError(null);
+    setVariants((current) => {
+      const next = [...current];
+
+      for (const group of validGroups) {
+        for (const size of group.sizes) {
+          const existingIndex = next.findIndex(
+            (variant) =>
+              variant.sizeSystem === group.sizeSystem &&
+              variant.size.trim() === size &&
+              variant.color.trim().toLocaleLowerCase("es-AR") ===
+                guideColor.trim().toLocaleLowerCase("es-AR")
+          );
+
+          if (existingIndex >= 0) {
+            next[existingIndex] = {
+              ...next[existingIndex],
+              partnerPrice: group.price,
+              partnerAvailable: true,
+              active: true,
+            };
+            continue;
+          }
+
+          next.push({
+            formId: crypto.randomUUID(),
+            size,
+            sizeSystem: group.sizeSystem,
+            color: guideColor.trim(),
+            sku: "",
+            priceOverride: null,
+            stock: 0,
+            partnerPrice: group.price,
+            partnerAvailable: true,
+            active: true,
+          });
+        }
+      }
+
+      return next;
+    });
   };
 
   const handleImageFiles = async (fileList: FileList | null) => {
@@ -235,10 +335,13 @@ export function ProductForm({
         images: images.filter((image) => image.url.trim()),
         variants: normalizeVariantValues(variants).map((variant) => ({
           size: variant.size,
+          sizeSystem: variant.sizeSystem,
           color: variant.color || null,
           sku: variant.sku || null,
           priceOverride: variant.priceOverride,
           stock: variant.stock,
+          partnerPrice: variant.partnerPrice,
+          partnerAvailable: variant.partnerAvailable,
           active: variant.active,
         })),
       };
@@ -350,6 +453,51 @@ export function ProductForm({
       </Card>
 
       <Card>
+        <CardHeader>
+          <CardTitle>Guía de precios del negocio</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm leading-6 text-muted-foreground">
+            Crea o actualiza todos los talles disponibles en 24–48 horas. Los
+            precios corresponden a la última columna de la guía.
+          </p>
+          <div className="grid gap-4 md:grid-cols-5">
+            <Field label="Color / modelo">
+              <Input
+                value={guideColor}
+                onChange={(event) => setGuideColor(event.target.value)}
+                placeholder="Blanco con logo"
+              />
+            </Field>
+            {[
+              ["infantSmall", "Infantil 4–10"],
+              ["infantLarge", "Infantil 12–16"],
+              ["adultSmall", "Adulto 1–4"],
+              ["adultLarge", "Adulto 5–6"],
+            ].map(([key, label]) => (
+              <Field key={key} label={label}>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={guidePrices[key as keyof typeof guidePrices]}
+                  onChange={(event) =>
+                    setGuidePrices((current) => ({
+                      ...current,
+                      [key]: event.target.value,
+                    }))
+                  }
+                />
+              </Field>
+            ))}
+          </div>
+          <Button type="button" variant="outline" onClick={applyGuidePrices}>
+            Aplicar guía a todos los talles
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle>Talles, colores y stock</CardTitle>
           <Button
@@ -361,10 +509,13 @@ export function ProductForm({
                 {
                   formId: crypto.randomUUID(),
                   size: "",
+                  sizeSystem: null,
                   color: "",
                   sku: "",
                   priceOverride: null,
                   stock: 0,
+                  partnerPrice: null,
+                  partnerAvailable: false,
                   active: true,
                 },
               ])
@@ -378,10 +529,27 @@ export function ProductForm({
           {variants.map((variant, index) => (
             <div
               key={variant.formId}
-              className="grid gap-4 rounded-xl border p-4 md:grid-cols-[0.75fr_1fr_1fr_1fr_0.75fr_auto]"
+              className="grid gap-4 rounded-xl border p-4 md:grid-cols-2 xl:grid-cols-4"
             >
               <Field label="Talle">
                 <Input value={variant.size} onChange={(event) => updateVariant(index, "size", event.target.value)} placeholder="S, M, 42..." />
+              </Field>
+              <Field label="Escala">
+                <select
+                  value={variant.sizeSystem ?? ""}
+                  onChange={(event) =>
+                    updateVariant(
+                      index,
+                      "sizeSystem",
+                      (event.target.value || null) as SizeSystem | null
+                    )
+                  }
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">Sin escala</option>
+                  <option value="infant">Infantil</option>
+                  <option value="adult">Adulto</option>
+                </select>
               </Field>
               <Field label="Color">
                 <Input value={variant.color} onChange={(event) => updateVariant(index, "color", event.target.value)} placeholder="Azul" />
@@ -395,7 +563,29 @@ export function ProductForm({
               <Field label="Stock">
                 <Input type="number" min="0" value={variant.stock} onChange={(event) => updateVariant(index, "stock", Number(event.target.value))} />
               </Field>
+              <Field label="Precio negocio">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={variant.partnerPrice ?? ""}
+                  onChange={(event) =>
+                    updateVariant(
+                      index,
+                      "partnerPrice",
+                      event.target.value ? Number(event.target.value) : null
+                    )
+                  }
+                />
+              </Field>
               <div className="flex items-end gap-2">
+                <Check
+                  label="Disponible 24–48 h"
+                  checked={variant.partnerAvailable}
+                  onChange={(value) =>
+                    updateVariant(index, "partnerAvailable", value)
+                  }
+                />
                 <Check label="Activa" checked={variant.active} onChange={(value) => updateVariant(index, "active", value)} />
                 <Button type="button" variant="ghost" size="icon" aria-label="Eliminar variante" onClick={() => setVariants((current) => current.filter((_, currentIndex) => currentIndex !== index))}>
                   <Trash2 className="h-4 w-4" />

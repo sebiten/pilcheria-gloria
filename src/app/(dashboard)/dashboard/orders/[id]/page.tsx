@@ -13,6 +13,7 @@ import {
 import { OrderStatusForm } from "./order-status-form";
 import { requireAdmin } from "@/actions/auth";
 import { getStoreSettings } from "@/actions/store-settings";
+import { markOrderItemCollected } from "@/actions/inventory";
 import {
   getGoogleMapsDirectionsUrl,
   getPickupAddress,
@@ -207,6 +208,9 @@ export default async function DashboardOrderDetailPage({
                   <th className="h-12 px-4 text-left font-medium">Cantidad</th>
                   <th className="h-12 px-4 text-left font-medium">Unitario</th>
                   <th className="h-12 px-4 text-left font-medium">Subtotal</th>
+                  <th className="h-12 px-4 text-left font-medium">Origen</th>
+                  <th className="h-12 px-4 text-left font-medium">Reparto</th>
+                  <th className="h-12 px-4 text-left font-medium">Retiro</th>
                 </tr>
               </thead>
               <tbody>
@@ -219,7 +223,38 @@ export default async function DashboardOrderDetailPage({
                     <td className="p-4">{item.quantity}</td>
                     <td className="p-4">{formatPrice(Number(item.unit_price))}</td>
                     <td className="p-4">
-                      {formatPrice(Number(item.unit_price) * item.quantity)}
+                      {formatPrice(Number(item.net_amount ?? Number(item.unit_price) * item.quantity))}
+                      {Number(item.discount_allocated ?? 0) > 0 ? (
+                        <span className="block text-xs text-muted-foreground">
+                          -{formatPrice(Number(item.discount_allocated))} de cupón
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="p-4">
+                      {item.source_code === "grandma_store"
+                        ? "Negocio de abuela"
+                        : "Propio"}
+                    </td>
+                    <td className="p-4 text-xs">
+                      <span className="block">Vos: {formatPrice(Number(item.seller_share ?? item.net_amount ?? 0))}</span>
+                      {Number(item.partner_share ?? 0) > 0 ? (
+                        <span className="block">Abuela: {formatPrice(Number(item.partner_share))}</span>
+                      ) : null}
+                    </td>
+                    <td className="p-4">
+                      {item.procurement_status === "pending_collection" ? (
+                        <form action={markOrderItemCollected.bind(null, item.id)}>
+                          <Button size="sm">Marcar retirada</Button>
+                        </form>
+                      ) : item.procurement_status === "collected" ? (
+                        "Retirada"
+                      ) : item.procurement_status === "awaiting_payment" ? (
+                        "Espera pago"
+                      ) : item.procurement_status === "cancelled" ? (
+                        "Cancelada"
+                      ) : (
+                        "No requiere"
+                      )}
                     </td>
                   </tr>
                 ))}

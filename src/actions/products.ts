@@ -14,20 +14,34 @@ import {
 } from "@/lib/cache/products";
 import type { Category, ProductWithDetails } from "@/types";
 import { reportDataFallback } from "@/lib/logging";
+import { mapProductRow, PRODUCT_OFFERS_SELECT } from "@/lib/inventory";
 
 const productImageSchema = z.object({
   url: z.string().url(),
   alt: z.string().trim().optional(),
 });
 
-const productVariantSchema = z.object({
-  size: z.string().trim().min(1),
-  color: z.string().trim().nullable().optional(),
-  sku: z.string().trim().nullable().optional(),
-  priceOverride: z.number().nonnegative().nullable().optional(),
-  stock: z.number().int().nonnegative().optional(),
-  active: z.boolean().optional(),
-});
+const productVariantSchema = z
+  .object({
+    size: z.string().trim().min(1),
+    sizeSystem: z.enum(["infant", "adult"]).nullable().optional(),
+    color: z.string().trim().nullable().optional(),
+    sku: z.string().trim().nullable().optional(),
+    priceOverride: z.number().nonnegative().nullable().optional(),
+    stock: z.number().int().nonnegative().optional(),
+    partnerPrice: z.number().positive().nullable().optional(),
+    partnerAvailable: z.boolean().optional(),
+    active: z.boolean().optional(),
+  })
+  .superRefine((variant, context) => {
+    if (variant.partnerAvailable && !variant.partnerPrice) {
+      context.addIssue({
+        code: "custom",
+        path: ["partnerPrice"],
+        message: "La disponibilidad en el negocio necesita un precio",
+      });
+    }
+  });
 
 const productPayloadSchema = z
   .object({
@@ -114,7 +128,7 @@ function normalizeProductVariants(variants: ProductPayload["variants"]) {
     const size = variant.size.trim();
     const color = variant.color?.trim() || null;
     const sku = variant.sku?.trim() || null;
-    const key = `${size.toLocaleLowerCase("es-AR")}:${color?.toLocaleLowerCase("es-AR") ?? ""}`;
+    const key = `${variant.sizeSystem ?? "legacy"}:${size.toLocaleLowerCase("es-AR")}:${color?.toLocaleLowerCase("es-AR") ?? ""}`;
     const existing = variantsBySize.get(key);
 
     if (!existing) {
@@ -140,64 +154,17 @@ function normalizeProductVariants(variants: ProductPayload["variants"]) {
   );
 }
 
-function mapProduct(product: any): ProductWithDetails {
-  return {
-    id: product.id,
-    name: product.name,
-    slug: product.slug,
-    description: product.description,
-    basePrice: Number(product.base_price) || 0,
-    compareAtPrice: product.compare_at_price
-      ? Number(product.compare_at_price)
-      : null,
-    brand: product.brand || null,
-    categoryId: product.category_id,
-    featured: product.featured || false,
-    active: product.active !== false,
-    createdAt: product.created_at,
-    category: product.category
-      ? {
-          id: product.category.id,
-          name: product.category.name,
-          slug: product.category.slug,
-          description: product.category.description,
-          image_url: product.category.image_url,
-          parent_id: product.category.parent_id,
-          sort_order: product.category.sort_order || 0,
-          active: product.category.active !== false,
-          created_at: product.category.created_at,
-        }
-      : null,
-    images: (product.images || [])
-      .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-      .map((image: any) => ({
-        id: image.id,
-        product_id: image.product_id,
-        url: image.url,
-        alt: image.alt,
-        sort_order: image.sort_order || 0,
-      })),
-    variants: (product.variants || []).map((variant: any) => ({
-      id: variant.id,
-      product_id: variant.product_id,
-      size: variant.size || "",
-      color: variant.color || null,
-      sku: variant.sku || null,
-      priceOverride: variant.price_override ? Number(variant.price_override) : null,
-      stock: variant.stock || 0,
-      active: variant.active !== false,
-    })),
-  };
-}
-
 function getAvailableSizeCount(product: ProductWithDetails) {
   return new Set(
     product.variants
       .filter(
         (variant) =>
-          variant.active !== false && Number(variant.stock ?? 0) > 0
+          variant.active !== false && variant.available
       )
-      .map((variant) => variant.size.trim().toLocaleLowerCase("es-AR"))
+      .map(
+        (variant) =>
+          `${variant.sizeSystem ?? "legacy"}:${variant.size.trim().toLocaleLowerCase("es-AR")}`
+      )
       .filter(Boolean)
   ).size;
 }
@@ -205,8 +172,8 @@ function getAvailableSizeCount(product: ProductWithDetails) {
 function getAvailableStock(product: ProductWithDetails) {
   return product.variants.reduce(
     (stock, variant) =>
-      variant.active !== false
-        ? stock + Number(variant.stock ?? 0)
+      variant.active !== false && variant.available
+        ? stock + Math.max(1, Number(variant.stock ?? 0))
         : stock,
     0
   );
@@ -236,7 +203,7 @@ async function fetchProduct(query: any) {
   if (error) throw error;
   if (!data) return null;
 
-  return mapProduct(data);
+  return mapProductRow(data);
 }
 
 async function replaceProductRelations(
@@ -254,6 +221,32 @@ async function replaceProductRelations(
   if (previousImagesError) throw previousImagesError;
   if (previousVariantsError) throw previousVariantsError;
 
+  const previousVariantIds = (previousVariants || []).map(
+    (variant) => variant.id
+  );
+  const previousOffersResult = previousVariantIds.length
+    ? await supabase
+        .from("variant_offers")
+        .select("*")
+        .in("variant_id", previousVariantIds)
+    : { data: [], error: null };
+  if (previousOffersResult.error) throw previousOffersResult.error;
+  const previousOffers = previousOffersResult.data || [];
+
+  const { data: sources, error: sourcesError } = await supabase
+    .from("inventory_sources")
+    .select("id, code, priority")
+    .in("code", ["own", "grandma_store"]);
+  if (sourcesError) throw sourcesError;
+
+  const ownSource = sources?.find((source) => source.code === "own");
+  const partnerSource = sources?.find(
+    (source) => source.code === "grandma_store"
+  );
+  if (!ownSource || !partnerSource) {
+    throw new Error("Faltan los orígenes de inventario configurados");
+  }
+
   const imageByUrl = new Map(
     (previousImages || []).map((image) => [image.url, image])
   );
@@ -267,31 +260,85 @@ async function replaceProductRelations(
   const variants = normalizeProductVariants(payload.variants);
   const variantByKey = new Map(
     (previousVariants || []).map((variant) => [
-      `${variant.size?.trim().toLocaleLowerCase("es-AR") ?? ""}:${
+      `${variant.size_system ?? "legacy"}:${variant.size?.trim().toLocaleLowerCase("es-AR") ?? ""}:${
         variant.color?.trim().toLocaleLowerCase("es-AR") ?? ""
       }`,
       variant,
     ])
   );
-  const desiredVariants = variants.map((variant) => {
-    const key = `${variant.size.toLocaleLowerCase("es-AR")}:${
+  const desiredVariantEntries = variants.map((variant) => {
+    const key = `${variant.sizeSystem ?? "legacy"}:${variant.size.toLocaleLowerCase("es-AR")}:${
       variant.color?.toLocaleLowerCase("es-AR") ?? ""
     }`;
     return {
+      variant,
+      row: {
       id: variantByKey.get(key)?.id ?? randomUUID(),
       product_id: productId,
       size: variant.size,
+      size_system: variant.sizeSystem ?? null,
       color: variant.color ?? null,
       sku: variant.sku ?? null,
       price_override: variant.priceOverride ?? null,
       stock: variant.stock ?? 0,
       active: variant.active ?? true,
+      },
     };
+  });
+  const desiredVariants = desiredVariantEntries.map((entry) => entry.row);
+
+  const previousOfferByKey = new Map(
+    previousOffers.map((offer) => [
+      `${offer.variant_id}:${offer.source_id}`,
+      offer,
+    ])
+  );
+  const desiredOffers = desiredVariantEntries.flatMap(({ variant, row }) => {
+    const ownExisting = previousOfferByKey.get(
+      `${row.id}:${ownSource.id}`
+    );
+    const offers: Array<Record<string, unknown>> = [
+      {
+        id: ownExisting?.id ?? randomUUID(),
+        variant_id: row.id,
+        source_id: ownSource.id,
+        availability_mode: "finite",
+        sale_price: variant.priceOverride ?? payload.basePrice,
+        stock_quantity: variant.stock ?? 0,
+        priority: ownSource.priority,
+        lead_time_min_hours: 0,
+        lead_time_max_hours: 0,
+        active: true,
+        updated_at: new Date().toISOString(),
+      },
+    ];
+
+    if (variant.partnerAvailable && variant.partnerPrice) {
+      const partnerExisting = previousOfferByKey.get(
+        `${row.id}:${partnerSource.id}`
+      );
+      offers.push({
+        id: partnerExisting?.id ?? randomUUID(),
+        variant_id: row.id,
+        source_id: partnerSource.id,
+        availability_mode: "on_demand",
+        sale_price: variant.partnerPrice,
+        stock_quantity: null,
+        priority: partnerSource.priority,
+        lead_time_min_hours: 24,
+        lead_time_max_hours: 48,
+        active: true,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    return offers;
   });
   const desiredImageIds = new Set(desiredImages.map((image) => image.id));
   const desiredVariantIds = new Set(
     desiredVariants.map((variant) => variant.id)
   );
+  const desiredOfferIds = new Set(desiredOffers.map((offer) => offer.id));
   const staleImages = (previousImages || []).filter(
     (image) => !desiredImageIds.has(image.id)
   );
@@ -310,6 +357,22 @@ async function replaceProductRelations(
       const { error } = await supabase
         .from("product_variants")
         .upsert(desiredVariants, { onConflict: "id" });
+      if (error) throw error;
+    }
+    if (desiredOffers.length > 0) {
+      const { error } = await supabase
+        .from("variant_offers")
+        .upsert(desiredOffers, { onConflict: "id" });
+      if (error) throw error;
+    }
+    const staleOfferIds = previousOffers
+      .filter((offer) => !desiredOfferIds.has(offer.id))
+      .map((offer) => offer.id);
+    if (staleOfferIds.length > 0) {
+      const { error } = await supabase
+        .from("variant_offers")
+        .update({ active: false })
+        .in("id", staleOfferIds);
       if (error) throw error;
     }
     if (staleImages.length > 0) {
@@ -343,16 +406,23 @@ async function replaceProductRelations(
     const previousImageIds = new Set(
       (previousImages || []).map((image) => image.id)
     );
-    const previousVariantIds = new Set(
+    const previousVariantIdSet = new Set(
       (previousVariants || []).map((variant) => variant.id)
     );
+    const previousOfferIds = new Set(previousOffers.map((offer) => offer.id));
     const newImageIds = desiredImages
       .filter((image) => !previousImageIds.has(image.id))
       .map((image) => image.id);
     const newVariantIds = desiredVariants
-      .filter((variant) => !previousVariantIds.has(variant.id))
+      .filter((variant) => !previousVariantIdSet.has(variant.id))
       .map((variant) => variant.id);
+    const newOfferIds = desiredOffers
+      .filter((offer) => !previousOfferIds.has(offer.id))
+      .map((offer) => offer.id);
 
+    if (newOfferIds.length > 0) {
+      await supabase.from("variant_offers").delete().in("id", newOfferIds);
+    }
     if (newImageIds.length > 0) {
       await supabase.from("product_images").delete().in("id", newImageIds);
     }
@@ -368,6 +438,11 @@ async function replaceProductRelations(
       await supabase
         .from("product_variants")
         .upsert(previousVariants || [], { onConflict: "id" });
+    }
+    if (previousOffers.length > 0) {
+      await supabase
+        .from("variant_offers")
+        .upsert(previousOffers, { onConflict: "id" });
     }
     throw error;
   }
@@ -451,7 +526,7 @@ const getProductsCached = unstable_cache(
         *,
         category:categories(*),
         images:product_images(*),
-        variants:product_variants(*)
+        variants:product_variants(${PRODUCT_OFFERS_SELECT})
       `)
       .eq("active", true)
       .order("created_at", { ascending: false });
@@ -502,12 +577,12 @@ const getProductsCached = unstable_cache(
     if (error) throw error;
 
     const products = sortProductsByAvailableSizes(
-      (data || []).map(mapProduct)
+      (data || []).map(mapProductRow)
     );
 
     return options?.limit ? products.slice(0, options.limit) : products;
   },
-  ["products-public-v5"],
+  ["products-public-v6"],
   {
     tags: [PRODUCTS_CACHE_TAG],
     revalidate: 3600,
@@ -572,13 +647,13 @@ const getProductBySlugCached = unstable_cache(
           *,
           category:categories(*),
           images:product_images(*),
-          variants:product_variants(*)
+          variants:product_variants(${PRODUCT_OFFERS_SELECT})
         `)
         .eq("slug", slug)
         .eq("active", true)
     );
   },
-  ["product-by-slug-v4"],
+  ["product-by-slug-v5"],
   {
     tags: [PRODUCT_DETAILS_CACHE_TAG],
     revalidate: 3600,
@@ -596,7 +671,7 @@ export async function getProductByIdAdmin(id: string): Promise<ProductWithDetail
         *,
         category:categories(*),
         images:product_images(*),
-        variants:product_variants(*)
+        variants:product_variants(${PRODUCT_OFFERS_SELECT})
       `)
       .eq("id", id)
   );

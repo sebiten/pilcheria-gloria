@@ -1,4 +1,8 @@
 import type { CartItem, ProductVariant } from "@/types";
+import {
+  getVariantPricingSegments,
+  getVariantQuantityTotal,
+} from "@/lib/inventory";
 
 interface ShippingSettings {
   localDeliveryCost?: number;
@@ -40,7 +44,32 @@ export function getCartItemUnitPrice(item: CartItem) {
 }
 
 export function getCartItemLineTotal(item: CartItem) {
-  return getCartItemUnitPrice(item) * item.quantity;
+  const variant = getCartItemVariant(item);
+  return variant?.pricingTiers?.length
+    ? getVariantQuantityTotal(variant, item.quantity)
+    : getCartItemUnitPrice(item) * item.quantity;
+}
+
+export function getCartItemPricingSegments(item: CartItem) {
+  const variant = getCartItemVariant(item);
+  if (!variant?.pricingTiers?.length) {
+    const unitPrice = getCartItemUnitPrice(item);
+    return {
+      fulfilled: true,
+      missingQuantity: 0,
+      segments: [
+        {
+          unitPrice,
+          availableQuantity: item.quantity,
+          fulfillment: "immediate" as const,
+          quantity: item.quantity,
+          lineTotal: unitPrice * item.quantity,
+        },
+      ],
+    };
+  }
+
+  return getVariantPricingSegments(variant, item.quantity);
 }
 
 export function getCartSubtotal(items: CartItem[]) {

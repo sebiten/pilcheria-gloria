@@ -15,9 +15,11 @@ import {
   canUseLocalDelivery,
   getCartItemCount,
   getCartItemLineTotal,
+  getCartItemPricingSegments,
   getShippingCost,
   LOCAL_DELIVERY_MIN_ITEMS,
 } from "@/lib/commerce";
+import { formatStorefrontVariantSize } from "@/lib/inventory";
 import { formatPrice } from "@/lib/utils";
 import type { Address, Profile, StoreSettings } from "@/types";
 import { PaymentConfidence } from "@/components/storefront/payment-confidence";
@@ -29,6 +31,7 @@ import {
 import { isValidArgentinaContactPhone } from "@/lib/contact";
 import { FACEBOOK_PROMOTION } from "@/lib/promotions";
 import { validateCouponForCheckout } from "@/actions/coupons";
+import { refreshCheckoutCart } from "@/actions/cart";
 
 interface CheckoutFormProps {
   addresses: Address[];
@@ -67,8 +70,9 @@ export function CheckoutForm({
 }: CheckoutFormProps) {
   const formId = "checkout-form";
   const router = useRouter();
-  const { items, getTotal } = useCartStore();
+  const { items, getTotal, setItems } = useCartStore();
   const checkoutRequestId = useRef<string | null>(null);
+  const cartRefreshStarted = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
   const defaultAddress = getDefaultAddress(addresses);
   const defaultName = splitFullName(defaultAddress?.name || profile?.full_name);
@@ -106,6 +110,23 @@ export function CheckoutForm({
     .join("|");
 
   useEffect(() => setIsMounted(true), []);
+  useEffect(() => {
+    if (!items.length || cartRefreshStarted.current) return;
+    cartRefreshStarted.current = true;
+
+    void refreshCheckoutCart(
+      items.map((item) => ({
+        product_id: item.product_id,
+        variant_id: item.variant_id,
+        quantity: item.quantity,
+      }))
+    )
+      .then(setItems)
+      .catch((refreshError) => {
+        cartRefreshStarted.current = false;
+        console.error("No se pudo actualizar el carrito:", refreshError);
+      });
+  }, [items, setItems]);
   useEffect(() => {
     const promotionCode = window.sessionStorage.getItem(
       FACEBOOK_PROMOTION.storageKey
@@ -296,6 +317,7 @@ export function CheckoutForm({
         },
         body: JSON.stringify({
           items,
+          expectedSubtotal: subtotal,
           shippingMethod: formData.shippingMethod,
           couponCode: appliedCoupon?.code,
           shippingAddress: {
@@ -617,12 +639,45 @@ export function CheckoutForm({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
-              {items.map((item) => (
-                <div key={`${item.product_id}-${item.variant_id}`} className="flex justify-between gap-4 text-sm">
-                  <span>{item.product?.name} × {item.quantity}</span>
-                  <span className="font-semibold">{formatPrice(getCartItemLineTotal(item))}</span>
-                </div>
-              ))}
+              {items.map((item) => {
+                const variant = item.variant_id
+                  ? item.product?.variants?.find(
+                      (current) => current.id === item.variant_id
+                    )
+                  : null;
+                const pricing = getCartItemPricingSegments(item);
+
+                return (
+                  <div
+                    key={`${item.product_id}-${item.variant_id}`}
+                    className="text-sm"
+                  >
+                    <div className="flex justify-between gap-4">
+                      <span>
+                        {item.product?.name}
+                        {variant
+                          ? ` · ${formatStorefrontVariantSize(variant)}`
+                          : ""}{" "}
+                        × {item.quantity}
+                      </span>
+                      <span className="font-semibold">
+                        {formatPrice(getCartItemLineTotal(item))}
+                      </span>
+                    </div>
+                    {pricing.segments.map((segment, index) => (
+                      <p
+                        key={`${segment.fulfillment}-${segment.unitPrice}-${index}`}
+                        className="mt-1 text-xs text-muted-foreground"
+                      >
+                        {segment.quantity} × {formatPrice(segment.unitPrice)} ·{" "}
+                        {segment.fulfillment === "immediate"
+                          ? "entrega inmediata"
+                          : "preparación en 24–48 h"}
+                      </p>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
             <div className="space-y-2 border-t pt-4 text-sm">
               <div className="flex justify-between">

@@ -64,11 +64,45 @@ export const productVariants = pgTable("product_variants", {
   width: numeric("width"),
   length: numeric("length"),
   size: text("size"),
+  sizeSystem: text("size_system"),
   color: text("color"),
   sku: text("sku"),
   priceOverride: numeric("price_override", { precision: 10, scale: 2 }),
   stock: integer("stock").default(0),
   active: boolean("active").default(true),
+});
+
+export const inventorySources = pgTable("inventory_sources", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  sourceType: text("source_type").notNull(),
+  sellerShareRate: numeric("seller_share_rate", {
+    precision: 5,
+    scale: 4,
+  }).notNull(),
+  priority: integer("priority").notNull().default(100),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const variantOffers = pgTable("variant_offers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  variantId: uuid("variant_id")
+    .references(() => productVariants.id, { onDelete: "cascade" })
+    .notNull(),
+  sourceId: uuid("source_id")
+    .references(() => inventorySources.id, { onDelete: "restrict" })
+    .notNull(),
+  availabilityMode: text("availability_mode").notNull(),
+  salePrice: numeric("sale_price", { precision: 10, scale: 2 }).notNull(),
+  stockQuantity: integer("stock_quantity"),
+  priority: integer("priority").notNull().default(100),
+  leadTimeMinHours: integer("lead_time_min_hours").notNull().default(0),
+  leadTimeMaxHours: integer("lead_time_max_hours").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 export const addresses = pgTable("addresses", {
@@ -117,8 +151,61 @@ export const orderItems = pgTable("order_items", {
     .notNull(),
   productId: uuid("product_id").references(() => products.id),
   variantId: uuid("variant_id").references(() => productVariants.id),
+  offerId: uuid("offer_id").references(() => variantOffers.id, {
+    onDelete: "set null",
+  }),
+  sourceId: uuid("source_id").references(() => inventorySources.id, {
+    onDelete: "set null",
+  }),
+  sourceCode: text("source_code"),
+  sourceName: text("source_name"),
+  availabilityMode: text("availability_mode"),
+  sellerShareRate: numeric("seller_share_rate", { precision: 5, scale: 4 }),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineSubtotal: numeric("line_subtotal", { precision: 10, scale: 2 }),
+  discountAllocated: numeric("discount_allocated", {
+    precision: 10,
+    scale: 2,
+  }).notNull().default("0"),
+  netAmount: numeric("net_amount", { precision: 10, scale: 2 }),
+  sellerShare: numeric("seller_share", { precision: 10, scale: 2 }),
+  partnerShare: numeric("partner_share", { precision: 10, scale: 2 })
+    .notNull()
+    .default("0"),
+  procurementStatus: text("procurement_status").notNull().default("not_required"),
+  procurementCollectedAt: timestamp("procurement_collected_at", {
+    withTimezone: true,
+  }),
+});
+
+export const partnerSettlements = pgTable("partner_settlements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sourceId: uuid("source_id")
+    .references(() => inventorySources.id, { onDelete: "restrict" })
+    .notNull(),
+  totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"),
+  paidAt: timestamp("paid_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const partnerLedgerEntries = pgTable("partner_ledger_entries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sourceId: uuid("source_id")
+    .references(() => inventorySources.id, { onDelete: "restrict" })
+    .notNull(),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+  orderItemId: uuid("order_item_id").references(() => orderItems.id, {
+    onDelete: "set null",
+  }),
+  settlementId: uuid("settlement_id").references(() => partnerSettlements.id, {
+    onDelete: "set null",
+  }),
+  entryType: text("entry_type").notNull(),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const coupons = pgTable("coupons", {
@@ -230,11 +317,30 @@ export const productImagesRelations = relations(productImages, ({ one }) => ({
   }),
 }));
 
-export const productVariantsRelations = relations(productVariants, ({ one }) => ({
+export const productVariantsRelations = relations(productVariants, ({ one, many }) => ({
   product: one(products, {
     fields: [productVariants.productId],
     references: [products.id],
   }),
+  offers: many(variantOffers),
+}));
+
+export const inventorySourcesRelations = relations(inventorySources, ({ many }) => ({
+  offers: many(variantOffers),
+  settlements: many(partnerSettlements),
+  ledgerEntries: many(partnerLedgerEntries),
+}));
+
+export const variantOffersRelations = relations(variantOffers, ({ one, many }) => ({
+  variant: one(productVariants, {
+    fields: [variantOffers.variantId],
+    references: [productVariants.id],
+  }),
+  source: one(inventorySources, {
+    fields: [variantOffers.sourceId],
+    references: [inventorySources.id],
+  }),
+  orderItems: many(orderItems),
 }));
 
 export const addressesRelations = relations(addresses, ({ one }) => ({
@@ -265,7 +371,48 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
     fields: [orderItems.variantId],
     references: [productVariants.id],
   }),
+  offer: one(variantOffers, {
+    fields: [orderItems.offerId],
+    references: [variantOffers.id],
+  }),
+  source: one(inventorySources, {
+    fields: [orderItems.sourceId],
+    references: [inventorySources.id],
+  }),
 }));
+
+export const partnerSettlementsRelations = relations(
+  partnerSettlements,
+  ({ one, many }) => ({
+    source: one(inventorySources, {
+      fields: [partnerSettlements.sourceId],
+      references: [inventorySources.id],
+    }),
+    ledgerEntries: many(partnerLedgerEntries),
+  })
+);
+
+export const partnerLedgerEntriesRelations = relations(
+  partnerLedgerEntries,
+  ({ one }) => ({
+    source: one(inventorySources, {
+      fields: [partnerLedgerEntries.sourceId],
+      references: [inventorySources.id],
+    }),
+    order: one(orders, {
+      fields: [partnerLedgerEntries.orderId],
+      references: [orders.id],
+    }),
+    orderItem: one(orderItems, {
+      fields: [partnerLedgerEntries.orderItemId],
+      references: [orderItems.id],
+    }),
+    settlement: one(partnerSettlements, {
+      fields: [partnerLedgerEntries.settlementId],
+      references: [partnerSettlements.id],
+    }),
+  })
+);
 
 export const cartItemsRelations = relations(cartItems, ({ one }) => ({
   profile: one(profiles, {
@@ -292,12 +439,20 @@ export type ProductImage = typeof productImages.$inferSelect;
 export type NewProductImage = typeof productImages.$inferInsert;
 export type ProductVariant = typeof productVariants.$inferSelect;
 export type NewProductVariant = typeof productVariants.$inferInsert;
+export type InventorySource = typeof inventorySources.$inferSelect;
+export type NewInventorySource = typeof inventorySources.$inferInsert;
+export type VariantOffer = typeof variantOffers.$inferSelect;
+export type NewVariantOffer = typeof variantOffers.$inferInsert;
 export type Address = typeof addresses.$inferSelect;
 export type NewAddress = typeof addresses.$inferInsert;
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type NewOrderItem = typeof orderItems.$inferInsert;
+export type PartnerSettlement = typeof partnerSettlements.$inferSelect;
+export type NewPartnerSettlement = typeof partnerSettlements.$inferInsert;
+export type PartnerLedgerEntry = typeof partnerLedgerEntries.$inferSelect;
+export type NewPartnerLedgerEntry = typeof partnerLedgerEntries.$inferInsert;
 export type Coupon = typeof coupons.$inferSelect;
 export type NewCoupon = typeof coupons.$inferInsert;
 export type StoreSettings = typeof storeSettings.$inferSelect;

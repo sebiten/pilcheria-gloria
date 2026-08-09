@@ -29,6 +29,12 @@ import {
 import { sendOrderEmail } from "@/lib/notifications/email";
 import { isStoreReadyForCheckout } from "@/lib/store-readiness";
 import { calculateCouponDiscount } from "@/lib/coupons/server";
+import {
+  formatStorefrontVariantSize,
+  getCheckoutOffers,
+  type CheckoutOffer,
+  type RawVariantWithOffers,
+} from "@/lib/inventory";
 
 const ORDER_STATUS_VALUES: OrderStatus[] = [
   "pending",
@@ -57,6 +63,15 @@ type ResolvedCheckoutItem = CheckoutItem & {
   slug: string;
   unitPrice: number;
   pictureUrl?: string;
+  offer: CheckoutOffer | null;
+};
+
+type FinancialCheckoutItem = ResolvedCheckoutItem & {
+  lineSubtotal: number;
+  discountAllocated: number;
+  netAmount: number;
+  sellerShare: number;
+  partnerShare: number;
 };
 
 type MercadoPagoCheckoutItem = {
@@ -143,7 +158,37 @@ async function resolveCheckoutItems(
       base_price,
       active,
       images:product_images(url, sort_order),
-      variants:product_variants(id, product_id, size, color, price_override, stock, active)
+      variants:product_variants(
+        id,
+        product_id,
+        size,
+        size_system,
+        color,
+        price_override,
+        stock,
+        active,
+        offers:variant_offers(
+          id,
+          variant_id,
+          source_id,
+          availability_mode,
+          sale_price,
+          stock_quantity,
+          priority,
+          lead_time_min_hours,
+          lead_time_max_hours,
+          active,
+          source:inventory_sources(
+            id,
+            code,
+            name,
+            source_type,
+            seller_share_rate,
+            priority,
+            active
+          )
+        )
+      )
     `)
     .in(
       "id",
@@ -183,23 +228,58 @@ async function resolveCheckoutItems(
       throw new Error(`La variante de ${product.name} ya no esta disponible`);
     }
 
-    if (variant && Number(variant.stock ?? 0) < item.quantity) {
-      throw new Error(`Stock insuficiente para ${product.name}`);
-    }
-
     const variantLabel = variant
-      ? [variant.size ? `Talle ${variant.size}` : null, variant.color]
+      ? [
+          variant.size
+            ? `Talle ${formatStorefrontVariantSize({
+                size: variant.size,
+                sizeSystem: variant.size_system ?? null,
+              })}`
+            : null,
+          variant.color,
+        ]
           .filter(Boolean)
           .join(" - ")
       : "";
-
-    resolvedItems.push({
+    const commonItem = {
       ...item,
       slug: product.slug,
       title: variantLabel ? `${product.name} - ${variantLabel}` : product.name,
-      unitPrice: Number(variant?.price_override ?? product.base_price),
       pictureUrl: sortedImages[0]?.url,
-    });
+    };
+
+    if (!variant) {
+      resolvedItems.push({
+        ...commonItem,
+        unitPrice: Number(product.base_price),
+        offer: null,
+      });
+      continue;
+    }
+
+    let remaining = item.quantity;
+    const offers = getCheckoutOffers(variant as RawVariantWithOffers);
+
+    for (const offer of offers) {
+      if (remaining <= 0) break;
+      const quantity =
+        offer.stockQuantity == null
+          ? remaining
+          : Math.min(remaining, offer.stockQuantity);
+      if (quantity <= 0) continue;
+
+      resolvedItems.push({
+        ...commonItem,
+        quantity,
+        unitPrice: offer.salePrice,
+        offer,
+      });
+      remaining -= quantity;
+    }
+
+    if (remaining > 0) {
+      throw new Error(`Stock insuficiente para ${product.name}`);
+    }
   }
 
   return resolvedItems;
@@ -216,12 +296,13 @@ function createCheckoutHash(input: {
     .map((item) => ({
       productId: item.product_id,
       variantId: item.variant_id,
+      offerId: item.offer?.id ?? null,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
     }))
     .sort((a, b) =>
-      `${a.productId}:${a.variantId ?? ""}`.localeCompare(
-        `${b.productId}:${b.variantId ?? ""}`
+      `${a.productId}:${a.variantId ?? ""}:${a.offerId ?? ""}`.localeCompare(
+        `${b.productId}:${b.variantId ?? ""}:${b.offerId ?? ""}`
       )
     );
 
@@ -327,23 +408,62 @@ async function reconcilePendingOrderPayment(order: any) {
   }
 }
 
-function buildMercadoPagoItems(
+function allocateOrderFinancials(
   items: ResolvedCheckoutItem[],
-  subtotal: number,
-  discountTotal: number,
+  discountTotal: number
+): FinancialCheckoutItem[] {
+  const lineCents = items.map((item) =>
+    Math.round(item.unitPrice * item.quantity * 100)
+  );
+  const subtotalCents = lineCents.reduce((sum, amount) => sum + amount, 0);
+  let remainingDiscountCents = Math.min(
+    Math.round(discountTotal * 100),
+    subtotalCents
+  );
+
+  return items.map((item, index) => {
+    const currentLineCents = lineCents[index];
+    const discountCents =
+      index === items.length - 1
+        ? remainingDiscountCents
+        : Math.min(
+            remainingDiscountCents,
+            Math.round(
+              subtotalCents > 0
+                ? (currentLineCents * Math.round(discountTotal * 100)) /
+                    subtotalCents
+                : 0
+            )
+          );
+    remainingDiscountCents -= discountCents;
+    const netCents = currentLineCents - discountCents;
+    const sellerShareCents = Math.round(
+      netCents * Number(item.offer?.sellerShareRate ?? 1)
+    );
+
+    return {
+      ...item,
+      lineSubtotal: currentLineCents / 100,
+      discountAllocated: discountCents / 100,
+      netAmount: netCents / 100,
+      sellerShare: sellerShareCents / 100,
+      partnerShare: (netCents - sellerShareCents) / 100,
+    };
+  });
+}
+
+function buildMercadoPagoItems(
+  items: FinancialCheckoutItem[],
   shippingCost: number
 ): MercadoPagoCheckoutItem[] {
   const preferenceItems: MercadoPagoCheckoutItem[] = items.map((item) => {
-    const proportionalDiscount =
-      discountTotal > 0 && subtotal > 0
-        ? (item.unitPrice * item.quantity * discountTotal) / subtotal
-        : 0;
-    const discountedLineTotal = item.unitPrice * item.quantity - proportionalDiscount;
-
     return {
       id: item.product_id,
       title: item.title,
-      unit_price: Math.max(0.01, Number((discountedLineTotal / item.quantity).toFixed(2))),
+      unit_price: Math.max(
+        0.01,
+        Number((item.netAmount / item.quantity).toFixed(2))
+      ),
       quantity: item.quantity,
       picture_url: item.pictureUrl,
     };
@@ -366,6 +486,7 @@ export async function createOrder({
   shippingMethod,
   shippingAddress,
   couponCode,
+  expectedSubtotal,
   checkoutRequestId,
   requestFingerprint,
 }: {
@@ -373,6 +494,7 @@ export async function createOrder({
   shippingMethod: string;
   shippingAddress: ShippingAddress;
   couponCode?: string;
+  expectedSubtotal: number;
   checkoutRequestId: string;
   requestFingerprint: string;
 }) {
@@ -388,6 +510,11 @@ export async function createOrder({
     (sum, item) => sum + item.unitPrice * item.quantity,
     0
   );
+  if (Math.abs(subtotal - expectedSubtotal) > 0.01) {
+    throw new Error(
+      "El precio o la disponibilidad cambió. Revisá el carrito antes de pagar."
+    );
+  }
   const settings = await getStoreSettings();
 
   if (
@@ -401,6 +528,10 @@ export async function createOrder({
   }
 
   const discount = await calculateCouponDiscount(couponCode, subtotal);
+  const financialItems = allocateOrderFinancials(
+    resolvedItems,
+    discount.discount
+  );
   const safeShippingMethod =
     shippingMethod === "local_delivery" ? "local_delivery" : "pickup";
 
@@ -524,12 +655,27 @@ export async function createOrder({
   }
 
   const { error: orderItemsError } = await supabase.from("order_items").insert(
-    resolvedItems.map((item) => ({
+    financialItems.map((item) => ({
       order_id: order.id,
       product_id: item.product_id,
       variant_id: item.variant_id,
+      offer_id: item.offer?.id ?? null,
+      source_id: item.offer?.sourceId ?? null,
+      source_code: item.offer?.sourceCode ?? null,
+      source_name: item.offer?.sourceName ?? null,
+      availability_mode: item.offer?.availabilityMode ?? "finite",
+      seller_share_rate: item.offer?.sellerShareRate ?? 1,
       quantity: item.quantity,
       unit_price: item.unitPrice,
+      line_subtotal: item.lineSubtotal,
+      discount_allocated: item.discountAllocated,
+      net_amount: item.netAmount,
+      seller_share: item.sellerShare,
+      partner_share: item.partnerShare,
+      procurement_status:
+        item.offer?.availabilityMode === "on_demand"
+          ? "awaiting_payment"
+          : "not_required",
     }))
   );
 
@@ -553,9 +699,7 @@ export async function createOrder({
   try {
     preference = await createPreference({
       items: buildMercadoPagoItems(
-        resolvedItems,
-        subtotal,
-        discount.discount,
+        financialItems,
         shippingCost
       ),
       payer: {

@@ -26,7 +26,7 @@ interface ProductPageProps {
 
 function getProductPrice(product: NonNullable<Awaited<ReturnType<typeof getProductBySlug>>>) {
   const availablePrices = product.variants
-    .filter((variant) => variant.active !== false && Number(variant.stock) > 0)
+    .filter((variant) => variant.active !== false && variant.available)
     .map((variant) => Number(variant.priceOverride ?? product.basePrice));
 
   return availablePrices.length
@@ -87,11 +87,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   if (!product) notFound();
 
   const activeVariants = product.variants.filter(
-    (variant) => variant.active !== false
-  );
-  const availableStock = activeVariants.reduce(
-    (sum, variant) => sum + Number(variant.stock ?? 0),
-    0
+    (variant) => variant.active !== false && variant.available
   );
   const price = getProductPrice(product);
   const compareAtPrice = Number(product.compareAtPrice ?? 0);
@@ -148,7 +144,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       priceCurrency: "ARS",
       price,
       availability:
-        availableStock > 0
+        activeVariants.length > 0
           ? "https://schema.org/InStock"
           : "https://schema.org/OutOfStock",
       itemCondition: "https://schema.org/NewCondition",
@@ -238,13 +234,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   </div>
                   <span
                     className={`mb-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
-                      availableStock > 0
+                      activeVariants.length > 0
                         ? "bg-green-100 text-green-800"
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
                     <CheckCircle2 className="size-3.5" />
-                    {availableStock > 0 ? "Disponible" : "Sin stock"}
+                    {activeVariants.length > 0 ? "Disponible" : "Sin stock"}
                   </span>
                 </div>
 
