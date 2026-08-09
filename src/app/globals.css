@@ -101,10 +101,6 @@
     opacity: 0.42;
   }
 
-  .hero-garment-reveal {
-    animation: hero-garment-reveal 780ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
   .hero-thread-path {
     animation: hero-thread-draw 950ms cubic-bezier(0.16, 1, 0.3, 1) both;
     stroke-dashoffset: 1;
@@ -115,15 +111,35 @@
       0 1px 0 var(--color-gloria-50),
       0 0 10px var(--color-gloria-50);
   }
+
+  .hero-dorrego-art {
+    scale: 1.8;
+    translate: 0 4%;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .hero-dorrego-art {
+    scale: 1.65;
+  }
 }
 
 @media (min-width: 1024px) {
   .hero-stage-inner {
     min-height: clamp(44rem, calc(100svh - 4.5rem), 57rem);
   }
+
+  .hero-dorrego-art {
+    scale: 1;
+    translate: 0 0;
+  }
+
+  .hero-garment-reveal-desktop {
+    animation: hero-garment-reveal 780ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
 }
 
-@media (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .hero-garment-shell:hover .hero-garment-art,
   .hero-garment-shell:focus-within .hero-garment-art {
     scale: 1.02;
@@ -286,7 +302,6 @@
     transition-duration: 0.01ms !important;
   }
 
-  .hero-garment-art,
   .hero-scroll-drift {
     scale: 1 !important;
     translate: 0 0 !important;

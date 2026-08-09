@@ -78,12 +78,12 @@ export default async function HomePage() {
               </p>
             </div>
 
-            <h1 className="mt-5 max-w-full font-display text-[clamp(2.8rem,12.5vw,4.15rem)] leading-[0.84] tracking-[-0.06em] text-gloria-950 sm:mt-6 sm:max-w-[90%] lg:mt-7 lg:max-w-none lg:text-[clamp(6rem,9vw,9.3rem)] lg:leading-[0.8]">
+            <h1 className="mt-5 max-w-full font-display text-[clamp(2.35rem,11.4vw,3.15rem)] leading-[0.88] tracking-[-0.055em] text-gloria-950 sm:mt-6 sm:max-w-[90%] sm:text-[clamp(3.15rem,8vw,4.15rem)] sm:leading-[0.84] lg:mt-7 lg:max-w-none lg:text-[clamp(6rem,9vw,9.3rem)] lg:leading-[0.8] lg:tracking-[-0.06em]">
               <span className="relative z-10 block">Tu escuela.</span>
-              <span className="relative z-40 block pl-[4vw] lg:pl-[8vw]">
+              <span className="relative z-40 block sm:pl-[4vw] lg:pl-[8vw]">
                 Tu uniforme.
               </span>
-              <span className="relative z-10 block pl-[1vw] lg:pl-[3vw]">
+              <span className="relative z-10 block sm:pl-[1vw] lg:pl-[3vw]">
                 Tu talle.
               </span>
             </h1>
@@ -91,7 +91,7 @@ export default async function HomePage() {
 
           <HeroUniformCollage href={catalogHref} />
 
-          <div className="relative z-50 -mt-3 max-w-lg lg:absolute lg:bottom-[6%] lg:left-[30%] lg:mt-0 lg:w-[31rem]">
+          <div className="relative z-50 mt-5 max-w-lg lg:absolute lg:bottom-[6%] lg:left-[30%] lg:mt-0 lg:w-[31rem]">
             <p className="max-w-md text-sm font-medium leading-6 text-gloria-900 sm:text-base sm:leading-7">
               Elegí la escuela, la prenda y el talle. Si todavía no aparece
               online, la buscamos en el negocio.
