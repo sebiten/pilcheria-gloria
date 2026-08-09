@@ -67,7 +67,7 @@ export default async function HomePage() {
     <main className="bg-background">
       <section className="hero-stage relative isolate border-b border-gloria-200 bg-gloria-50">
         <div aria-hidden="true" className="hero-fabric-texture absolute inset-0" />
-        <div className="hero-stage-inner container relative mx-auto px-4 pb-9 pt-8 sm:px-6 sm:pb-11 sm:pt-10 lg:px-4 lg:py-10">
+        <div className="hero-stage-inner container relative mx-auto px-4 pb-8 pt-6 sm:px-6 sm:pb-11 sm:pt-10 lg:px-4 lg:py-10">
           <div className="relative">
             <div className="relative z-50 flex items-center justify-between gap-4">
               <p className="text-xs font-black uppercase tracking-[0.2em] text-gloria-700 sm:text-sm">
@@ -78,7 +78,7 @@ export default async function HomePage() {
               </p>
             </div>
 
-            <h1 className="mt-5 max-w-full font-display text-[clamp(2.35rem,11.4vw,3.15rem)] leading-[0.88] tracking-[-0.055em] text-gloria-950 sm:mt-6 sm:max-w-[90%] sm:text-[clamp(3.15rem,8vw,4.15rem)] sm:leading-[0.84] lg:mt-7 lg:max-w-none lg:text-[clamp(6rem,9vw,9.3rem)] lg:leading-[0.8] lg:tracking-[-0.06em]">
+            <h1 className="mt-4 max-w-full font-display text-[clamp(2.35rem,11.4vw,3.15rem)] leading-[0.88] tracking-[-0.055em] text-gloria-950 sm:mt-6 sm:max-w-[90%] sm:text-[clamp(3.15rem,8vw,4.15rem)] sm:leading-[0.84] lg:mt-7 lg:max-w-none lg:text-[clamp(6rem,9vw,9.3rem)] lg:leading-[0.8] lg:tracking-[-0.06em]">
               <span className="relative z-10 block">Tu escuela.</span>
               <span className="relative z-40 block sm:pl-[4vw] lg:pl-[8vw]">
                 Tu uniforme.
@@ -89,22 +89,24 @@ export default async function HomePage() {
             </h1>
           </div>
 
-          <HeroUniformCollage href={catalogHref} />
-
-          <div className="relative z-50 mt-5 max-w-lg lg:absolute lg:bottom-[6%] lg:left-[30%] lg:mt-0 lg:w-[31rem]">
+          <div className="relative z-50 mt-4 max-w-lg lg:absolute lg:bottom-[6%] lg:left-[30%] lg:mt-0 lg:w-[31rem]">
             <p className="max-w-md text-sm font-medium leading-6 text-gloria-900 sm:text-base sm:leading-7">
-              Elegí la escuela, la prenda y el talle. Si todavía no aparece
-              online, la buscamos en el negocio.
+              <span className="lg:hidden">Elegí escuela, prenda y talle.</span>
+              <span className="hidden lg:inline">
+                Elegí la escuela, la prenda y el talle. Si todavía no aparece
+                online, la buscamos en el negocio.
+              </span>
             </p>
 
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row lg:mt-5">
               <Button
                 size="lg"
-                className="group min-h-12 rounded-full bg-gloria-500 px-7 text-gloria-950 shadow-[0_16px_32px_-18px_oklch(0.2_0.045_136/0.5)] transition-transform hover:-translate-y-0.5 hover:bg-gloria-400"
+                className="group min-h-12 w-[min(15rem,100%)] justify-between rounded-full bg-gloria-500 px-7 text-gloria-950 shadow-[0_16px_32px_-18px_oklch(0.2_0.045_136/0.5)] transition-transform hover:-translate-y-0.5 hover:bg-gloria-400 sm:w-auto sm:justify-center"
                 asChild
               >
                 <Link href={catalogHref}>
-                  Elegir uniforme
+                  <span className="lg:hidden">Ver tienda</span>
+                  <span className="hidden lg:inline">Elegir uniforme</span>
                   <ArrowRight className="ml-2 size-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
@@ -112,7 +114,7 @@ export default async function HomePage() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="min-h-12 rounded-full border-gloria-300 bg-gloria-50 px-6 text-gloria-800 hover:bg-gloria-100"
+                  className="hidden min-h-12 rounded-full border-gloria-300 bg-gloria-50 px-6 text-gloria-800 hover:bg-gloria-100 lg:inline-flex"
                   asChild
                 >
                   <a href={whatsappUrl} target="_blank" rel="noreferrer">
@@ -123,7 +125,7 @@ export default async function HomePage() {
               ) : null}
             </div>
 
-            <div className="mt-5 flex flex-col gap-2 text-xs font-bold text-gloria-900 sm:flex-row sm:flex-wrap sm:gap-x-5 sm:gap-y-2 sm:text-sm">
+            <div className="mt-5 hidden flex-col gap-2 text-xs font-bold text-gloria-900 lg:flex lg:flex-row lg:flex-wrap lg:gap-x-5 lg:gap-y-2 lg:text-sm">
               <span className="inline-flex items-center gap-2">
                 <Ruler className="size-4 shrink-0 text-gloria-600" />
                 Talles infantil, juvenil y adulto
@@ -136,6 +138,8 @@ export default async function HomePage() {
               </span>
             </div>
           </div>
+
+          <HeroUniformCollage href={catalogHref} />
 
           <span
             aria-hidden="true"

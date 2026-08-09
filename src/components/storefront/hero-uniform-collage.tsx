@@ -43,13 +43,13 @@ const garmentShadow =
 export function HeroUniformCollage({ href }: HeroUniformCollageProps) {
   return (
     <div
-      className="relative -mx-4 mt-5 grid w-[calc(100%+2rem)] grid-cols-2 items-start gap-x-4 px-4 pb-5 pt-3 sm:-mx-6 sm:w-[calc(100%+3rem)] sm:px-6 lg:absolute lg:inset-0 lg:m-0 lg:block lg:h-auto lg:w-full lg:p-0"
+      className="relative -mx-4 mt-3 h-[17rem] w-[calc(100%+2rem)] overflow-hidden sm:-mx-6 sm:mt-5 sm:h-[19rem] sm:w-[calc(100%+3rem)] lg:absolute lg:inset-0 lg:m-0 lg:block lg:h-auto lg:w-full lg:overflow-visible lg:p-0"
       role="group"
       aria-label="Uniformes destacados por escuela"
     >
       <div
         aria-hidden="true"
-        className="absolute inset-x-2 inset-y-0 rounded-[2.5rem] border border-dashed border-gloria-700/25 bg-gloria-200/45 sm:inset-x-3 lg:bottom-[4%] lg:left-[36%] lg:right-[1%] lg:top-[5%] lg:rounded-[46%_54%_42%_58%/38%_43%_57%_62%] lg:bg-gloria-200/55"
+        className="absolute -left-[8%] top-2 h-[92%] w-[116%] -rotate-2 rounded-[46%_54%_42%_58%/38%_43%_57%_62%] border border-dashed border-gloria-700/25 bg-gloria-200/50 lg:bottom-[4%] lg:left-[36%] lg:right-[1%] lg:top-[5%] lg:h-auto lg:w-auto lg:rotate-0 lg:bg-gloria-200/55"
       />
 
       <svg
@@ -102,16 +102,16 @@ export function HeroUniformCollage({ href }: HeroUniformCollageProps) {
 
       <Link
         href={getSchoolHref(href, heroProducts[0].query)}
-        className="hero-garment-reveal-desktop hero-garment-shell relative z-20 col-span-2 block rounded-[2rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gloria-700 focus-visible:ring-offset-4 lg:absolute lg:left-[54%] lg:top-[-7%] lg:h-[104%] lg:w-[34%]"
+        className="hero-garment-reveal-desktop hero-garment-shell absolute left-[21%] top-0 z-20 block h-full w-[58%] rounded-[2rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gloria-700 focus-visible:ring-offset-4 sm:left-[25%] sm:w-[50%] lg:left-[54%] lg:top-[-7%] lg:h-[104%] lg:w-[34%]"
         aria-label={`Ver uniformes de ${heroProducts[0].label}`}
       >
-        <span className="hero-school-link relative z-40 mx-auto flex min-h-9 w-fit items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-gloria-950 lg:absolute lg:left-[30%] lg:top-[16%] lg:min-h-11 lg:text-sm xl:top-[8%]">
-          <span className="text-gloria-700">{heroProducts[0].number}</span>
-          <span className="size-2 rounded-full bg-gloria-600" />
+        <span className="hero-school-link absolute left-1/2 top-2 z-40 flex min-h-8 w-fit -translate-x-1/2 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gloria-300/70 bg-gloria-50/95 px-2.5 text-[0.65rem] font-black uppercase tracking-[0.08em] text-gloria-950 shadow-sm sm:text-xs lg:left-[30%] lg:top-[16%] lg:min-h-11 lg:translate-x-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:text-sm lg:tracking-[0.12em] lg:shadow-none xl:top-[8%]">
+          <span className="hidden text-gloria-700 lg:inline">{heroProducts[0].number}</span>
+          <span className="hidden size-2 rounded-full bg-gloria-600 lg:inline" />
           <span className="lg:hidden">{heroProducts[0].mobileLabel}</span>
           <span className="hidden lg:inline">{heroProducts[0].label}</span>
         </span>
-        <span className="hero-dorrego-art hero-garment-art relative mx-auto block h-56 w-[60%] sm:h-64 sm:w-[52%] lg:size-full lg:rotate-2">
+        <span className="hero-dorrego-art hero-garment-art relative block size-full lg:rotate-2">
           <Image
             src={heroProducts[0].src}
             alt={heroProducts[0].alt}
@@ -125,15 +125,15 @@ export function HeroUniformCollage({ href }: HeroUniformCollageProps) {
 
       <Link
         href={getSchoolHref(href, heroProducts[1].query)}
-        className="hero-garment-reveal-desktop hero-garment-shell relative z-20 min-w-0 rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gloria-700 focus-visible:ring-offset-4 lg:absolute lg:bottom-[-3%] lg:left-0 lg:h-[48%] lg:w-[22%]"
+        className="hero-garment-reveal-desktop hero-garment-shell absolute bottom-[4%] left-[-1%] z-30 h-[63%] w-[42%] min-w-0 rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gloria-700 focus-visible:ring-offset-4 sm:left-[3%] sm:w-[38%] lg:bottom-[-3%] lg:left-0 lg:z-20 lg:h-[48%] lg:w-[22%]"
         aria-label={`Ver uniformes de ${heroProducts[1].label}`}
       >
-        <span className="hero-school-link relative z-40 flex min-h-9 items-center justify-center gap-2 whitespace-nowrap text-xs font-black uppercase tracking-[0.1em] text-gloria-950 lg:absolute lg:bottom-[3%] lg:left-[13%] lg:min-h-11 lg:text-sm lg:tracking-[0.12em]">
-          <span className="text-gloria-700">{heroProducts[1].number}</span>
-          <span className="size-2 rounded-full bg-gloria-600" />
+        <span className="hero-school-link absolute left-1/2 top-0 z-40 flex min-h-8 -translate-x-1/2 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gloria-300/70 bg-gloria-50/95 px-2.5 text-[0.65rem] font-black uppercase tracking-[0.08em] text-gloria-950 shadow-sm sm:text-xs lg:bottom-[3%] lg:left-[13%] lg:top-auto lg:min-h-11 lg:translate-x-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:text-sm lg:tracking-[0.12em] lg:shadow-none">
+          <span className="hidden text-gloria-700 lg:inline">{heroProducts[1].number}</span>
+          <span className="hidden size-2 rounded-full bg-gloria-600 lg:inline" />
           {heroProducts[1].mobileLabel}
         </span>
-        <span className="hero-garment-art relative block h-40 w-full lg:size-full xl:-rotate-3">
+        <span className="hero-garment-art relative block size-full -rotate-6 sm:-rotate-3 lg:rotate-0 xl:-rotate-3">
           <Image
             src={heroProducts[1].src}
             alt={heroProducts[1].alt}
@@ -146,16 +146,16 @@ export function HeroUniformCollage({ href }: HeroUniformCollageProps) {
 
       <Link
         href={getSchoolHref(href, heroProducts[2].query)}
-        className="hero-garment-reveal-desktop hero-garment-shell relative z-20 min-w-0 rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gloria-700 focus-visible:ring-offset-4 lg:absolute lg:bottom-[-2%] lg:right-0 lg:h-[49%] lg:w-[22%]"
+        className="hero-garment-reveal-desktop hero-garment-shell absolute bottom-[4%] right-[-1%] z-30 h-[63%] w-[42%] min-w-0 rounded-[1.5rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gloria-700 focus-visible:ring-offset-4 sm:right-[3%] sm:w-[38%] lg:bottom-[-2%] lg:right-0 lg:z-20 lg:h-[49%] lg:w-[22%]"
         aria-label={`Ver uniformes de ${heroProducts[2].label}`}
       >
-        <span className="hero-school-link relative z-40 flex min-h-9 items-center justify-center gap-2 whitespace-nowrap text-xs font-black uppercase tracking-[0.1em] text-gloria-950 lg:absolute lg:bottom-[1%] lg:right-[8%] lg:min-h-11 lg:text-sm">
-          <span className="text-gloria-700">{heroProducts[2].number}</span>
-          <span className="size-2 rounded-full bg-gloria-600" />
+        <span className="hero-school-link absolute left-1/2 top-0 z-40 flex min-h-8 -translate-x-1/2 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-gloria-300/70 bg-gloria-50/95 px-2.5 text-[0.65rem] font-black uppercase tracking-[0.08em] text-gloria-950 shadow-sm sm:text-xs lg:bottom-[1%] lg:left-auto lg:right-[8%] lg:top-auto lg:min-h-11 lg:translate-x-0 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:text-sm lg:tracking-[0.1em] lg:shadow-none">
+          <span className="hidden text-gloria-700 lg:inline">{heroProducts[2].number}</span>
+          <span className="hidden size-2 rounded-full bg-gloria-600 lg:inline" />
           <span className="lg:hidden">{heroProducts[2].mobileLabel}</span>
           <span className="hidden lg:inline">{heroProducts[2].label}</span>
         </span>
-        <span className="hero-garment-art relative block h-40 w-full lg:size-full xl:rotate-3">
+        <span className="hero-garment-art relative block size-full rotate-6 scale-[1.04] sm:rotate-3 lg:rotate-0 lg:scale-100 xl:rotate-3">
           <Image
             src={heroProducts[2].src}
             alt={heroProducts[2].alt}

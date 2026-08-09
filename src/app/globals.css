@@ -113,14 +113,14 @@
   }
 
   .hero-dorrego-art {
-    scale: 1.8;
-    translate: 0 4%;
+    scale: 1.45;
+    translate: 0 5%;
   }
 }
 
 @media (min-width: 640px) and (max-width: 1023px) {
   .hero-dorrego-art {
-    scale: 1.65;
+    scale: 1.35;
   }
 }
 
