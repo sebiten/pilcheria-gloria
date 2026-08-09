@@ -582,7 +582,7 @@ const getProductsCached = unstable_cache(
 
     return options?.limit ? products.slice(0, options.limit) : products;
   },
-  ["products-public-v6"],
+  ["products-public-v7"],
   {
     tags: [PRODUCTS_CACHE_TAG],
     revalidate: 3600,
@@ -653,7 +653,7 @@ const getProductBySlugCached = unstable_cache(
         .eq("active", true)
     );
   },
-  ["product-by-slug-v5"],
+  ["product-by-slug-v6"],
   {
     tags: [PRODUCT_DETAILS_CACHE_TAG],
     revalidate: 3600,

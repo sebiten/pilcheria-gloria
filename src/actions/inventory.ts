@@ -25,6 +25,7 @@ export async function getInventoryDashboard() {
     { data: pendingItems, error: pendingItemsError },
     { data: ledgerEntries, error: ledgerError },
     { data: settlements, error: settlementsError },
+    { data: pendingRefunds, error: pendingRefundsError },
   ] = await Promise.all([
     supabase
       .from("variant_offers")
@@ -35,7 +36,7 @@ export async function getInventoryDashboard() {
     supabase
       .from("order_items")
       .select(
-        "source_code, quantity, net_amount, seller_share, partner_share, order:orders!inner(status)"
+        "source_code, quantity, net_amount, seller_share, partner_share, procurement_status, order:orders!inner(status)"
       )
       .in("order.status", paidStatuses),
     supabase
@@ -57,6 +58,13 @@ export async function getInventoryDashboard() {
       .eq("source_id", grandmaSource.id)
       .order("paid_at", { ascending: false })
       .limit(30),
+    supabase
+      .from("manual_refunds")
+      .select(
+        "id, amount, status, notes, created_at, order:orders!inner(id, status, shipping_address), item:order_items!inner(id, quantity, product:products(name), variant:product_variants(size, size_system, color))"
+      )
+      .eq("status", "pending")
+      .order("created_at", { ascending: true }),
   ]);
 
   const queryError =
@@ -64,7 +72,8 @@ export async function getInventoryDashboard() {
     paidItemsError ||
     pendingItemsError ||
     ledgerError ||
-    settlementsError;
+    settlementsError ||
+    pendingRefundsError;
   if (queryError) throw queryError;
 
   const ownStock = (ownOffers ?? []).reduce(
@@ -75,7 +84,11 @@ export async function getInventoryDashboard() {
     .filter((item: any) => item.source_code === "own")
     .reduce((total, item: any) => total + Number(item.net_amount ?? 0), 0);
   const commissionEarned = (paidItems ?? [])
-    .filter((item: any) => item.source_code === "grandma_store")
+    .filter(
+      (item: any) =>
+        item.source_code === "grandma_store" &&
+        !["unavailable", "cancelled"].includes(item.procurement_status)
+    )
     .reduce((total, item: any) => total + Number(item.seller_share ?? 0), 0);
   const partnerBalance = (ledgerEntries ?? []).reduce(
     (total, entry: any) => total + Number(entry.amount ?? 0),
@@ -90,6 +103,10 @@ export async function getInventoryDashboard() {
     (total, item: any) => total + Number(item.quantity ?? 0),
     0
   );
+  const pendingRefundAmount = (pendingRefunds ?? []).reduce(
+    (total, refund: any) => total + Number(refund.amount ?? 0),
+    0
+  );
 
   return {
     source: grandmaSource,
@@ -100,10 +117,65 @@ export async function getInventoryDashboard() {
       partnerBalance,
       settlementsPaid,
       pendingCollectionQuantity,
+      pendingRefundAmount,
     },
     pendingItems: pendingItems ?? [],
+    pendingRefunds: pendingRefunds ?? [],
     settlements: settlements ?? [],
   };
+}
+
+export async function markOrderItemUnavailable(
+  orderItemId: string,
+  formData?: FormData
+) {
+  await requireAdmin();
+  const parsedId = uuidSchema.parse(orderItemId);
+  const notes = z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .parse(formData?.get("notes")?.toString() || undefined);
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.rpc("create_manual_transfer_refund", {
+    p_order_item_id: parsedId,
+    p_notes: notes ?? null,
+  });
+
+  if (error) throw error;
+  revalidatePath("/dashboard/finance");
+  revalidatePath("/dashboard/orders");
+}
+
+export async function completeManualTransferRefund(
+  refundId: string,
+  formData: FormData
+) {
+  await requireAdmin();
+  const parsedId = uuidSchema.parse(refundId);
+  const transferReference = z
+    .string()
+    .trim()
+    .min(3, "Ingresá la referencia de la transferencia")
+    .max(200)
+    .parse(formData.get("transferReference")?.toString());
+  const notes = z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .parse(formData.get("notes")?.toString() || undefined);
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.rpc("complete_manual_transfer_refund", {
+    p_refund_id: parsedId,
+    p_transfer_reference: transferReference,
+    p_notes: notes ?? null,
+  });
+
+  if (error) throw error;
+  revalidatePath("/dashboard/finance");
+  revalidatePath("/dashboard/orders");
 }
 
 export async function markOrderItemCollected(

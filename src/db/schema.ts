@@ -141,6 +141,10 @@ export const orders = pgTable("orders", {
   cancelReason: text("cancel_reason"),
   mercadopagoId: text("mercadopago_id"),
   mercadopagoStatus: text("mercadopago_status"),
+  refundStatus: text("refund_status").notNull().default("none"),
+  refundedAmount: numeric("refunded_amount", { precision: 10, scale: 2 })
+    .notNull()
+    .default("0"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -188,6 +192,23 @@ export const partnerSettlements = pgTable("partner_settlements", {
   notes: text("notes"),
   paidAt: timestamp("paid_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const manualRefunds = pgTable("manual_refunds", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: uuid("order_id")
+    .references(() => orders.id, { onDelete: "restrict" })
+    .notNull(),
+  orderItemId: uuid("order_item_id")
+    .references(() => orderItems.id, { onDelete: "restrict" })
+    .notNull(),
+  method: text("method").notNull().default("bank_transfer"),
+  status: text("status").notNull().default("pending"),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  transferReference: text("transfer_reference"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
 });
 
 export const partnerLedgerEntries = pgTable("partner_ledger_entries", {
@@ -356,9 +377,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     references: [profiles.id],
   }),
   items: many(orderItems),
+  manualRefunds: many(manualRefunds),
 }));
 
-export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+export const orderItemsRelations = relations(orderItems, ({ one, many }) => ({
   order: one(orders, {
     fields: [orderItems.orderId],
     references: [orders.id],
@@ -378,6 +400,18 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   source: one(inventorySources, {
     fields: [orderItems.sourceId],
     references: [inventorySources.id],
+  }),
+  manualRefunds: many(manualRefunds),
+}));
+
+export const manualRefundsRelations = relations(manualRefunds, ({ one }) => ({
+  order: one(orders, {
+    fields: [manualRefunds.orderId],
+    references: [orders.id],
+  }),
+  orderItem: one(orderItems, {
+    fields: [manualRefunds.orderItemId],
+    references: [orderItems.id],
   }),
 }));
 
@@ -449,6 +483,8 @@ export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type NewOrderItem = typeof orderItems.$inferInsert;
+export type ManualRefund = typeof manualRefunds.$inferSelect;
+export type NewManualRefund = typeof manualRefunds.$inferInsert;
 export type PartnerSettlement = typeof partnerSettlements.$inferSelect;
 export type NewPartnerSettlement = typeof partnerSettlements.$inferInsert;
 export type PartnerLedgerEntry = typeof partnerLedgerEntries.$inferSelect;

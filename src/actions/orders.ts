@@ -786,6 +786,15 @@ export async function getOrders() {
       items:order_items(
         *,
         product:products(*)
+      ),
+      refunds:manual_refunds(
+        id,
+        amount,
+        status,
+        method,
+        transfer_reference,
+        created_at,
+        paid_at
       )
     `)
     .eq("clerk_user_id", userId)
@@ -812,6 +821,15 @@ export async function getOrderById(id: string) {
         *,
         product:products(*),
         variant:product_variants(*)
+      ),
+      refunds:manual_refunds(
+        id,
+        amount,
+        status,
+        method,
+        transfer_reference,
+        created_at,
+        paid_at
       )
     `)
     .eq("id", id)
@@ -839,6 +857,15 @@ export async function getOrderForConfirmation(id: string, accessToken?: string) 
         *,
         product:products(*),
         variant:product_variants(*)
+      ),
+      refunds:manual_refunds(
+        id,
+        amount,
+        status,
+        method,
+        transfer_reference,
+        created_at,
+        paid_at
       )
     `)
     .eq("id", id)

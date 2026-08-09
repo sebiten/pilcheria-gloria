@@ -14,9 +14,9 @@ export function formatVariantLabel(
   const sizeSystem = variant.sizeSystem ?? variant.size_system;
   const sizePrefix =
     sizeSystem === "infant"
-      ? "Infantil"
+      ? "Primaria"
       : sizeSystem === "adult"
-        ? "Adulto"
+        ? "Secundaria"
         : null;
   const parts = [
     variant.size

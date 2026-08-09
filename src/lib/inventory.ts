@@ -243,8 +243,8 @@ export function getVariantQuantityTotal(
 }
 
 export function getSizeSystemLabel(sizeSystem: SizeSystem | null) {
-  if (sizeSystem === "infant") return "Infantil";
-  if (sizeSystem === "adult") return "Adulto";
+  if (sizeSystem === "infant") return "Primaria";
+  if (sizeSystem === "adult") return "Secundaria";
   return null;
 }
 

@@ -64,6 +64,21 @@ export default async function AccountOrderDetailPage({
         ) : null}
       </div>
 
+      {order.refund_status && order.refund_status !== "none" ? (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950">
+          <p className="font-bold">
+            {order.refund_status === "pending"
+              ? "Devolución por transferencia pendiente"
+              : "Devolución por transferencia realizada"}
+          </p>
+          <p className="mt-1 text-sm leading-6">
+            {order.refund_status === "pending"
+              ? "Una prenda no estaba disponible. Te contactaremos para pedirte los datos bancarios y devolverte su importe."
+              : `Ya transferimos ${formatPrice(Number(order.refunded_amount || 0))}.`}
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -156,7 +171,9 @@ export default async function AccountOrderDetailPage({
                         </td>
                         <td className="p-4">
                           {item.availability_mode === "on_demand"
-                            ? "24–48 horas"
+                            ? item.procurement_status === "unavailable"
+                              ? "Sin disponibilidad · devolución"
+                              : "24–48 horas"
                             : "Entrega inmediata"}
                         </td>
                       </tr>
@@ -181,7 +198,9 @@ export default async function AccountOrderDetailPage({
                     </p>
                     <p className="text-muted-foreground">
                       {item.availability_mode === "on_demand"
-                        ? "Preparación en 24–48 horas"
+                        ? item.procurement_status === "unavailable"
+                          ? "Sin disponibilidad · devolución"
+                          : "Preparación en 24–48 horas"
                         : "Entrega inmediata"}
                     </p>
                     <p className="mt-2 font-medium">

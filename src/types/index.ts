@@ -13,6 +13,7 @@ export type CouponType = "percentage" | "fixed";
 
 export type SizeSystem = "infant" | "adult";
 export type FulfillmentSpeed = "immediate" | "24_48_hours";
+export type RefundStatus = "none" | "pending" | "partial" | "refunded";
 
 export interface PricingTier {
   unitPrice: number;
@@ -149,6 +150,9 @@ export interface Order {
   cancel_reason?: string | null;
   mercadopago_id: string | null;
   mercadopago_status: string | null;
+  refund_status?: RefundStatus;
+  refunded_amount?: number;
+  refunds?: ManualRefund[];
   created_at: string;
 }
 
@@ -172,8 +176,22 @@ export interface OrderItem {
     | "awaiting_payment"
     | "pending_collection"
     | "collected"
+    | "unavailable"
     | "cancelled";
   procurement_collected_at?: string | null;
+}
+
+export interface ManualRefund {
+  id: string;
+  order_id: string;
+  order_item_id: string;
+  method: "bank_transfer";
+  status: "pending" | "paid" | "cancelled";
+  amount: number;
+  transfer_reference: string | null;
+  notes: string | null;
+  created_at: string;
+  paid_at: string | null;
 }
 
 export interface OrderItemWithProduct extends OrderItem {

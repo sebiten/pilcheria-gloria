@@ -89,6 +89,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const activeVariants = product.variants.filter(
     (variant) => variant.active !== false && variant.available
   );
+  const availablePrices = new Set(
+    activeVariants.map((variant) =>
+      Number(variant.priceOverride ?? product.basePrice)
+    )
+  );
+  const hasVariablePrice = availablePrices.size > 1;
   const price = getProductPrice(product);
   const compareAtPrice = Number(product.compareAtPrice ?? 0);
   const isOffer = compareAtPrice > price;
@@ -229,6 +235,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                       </p>
                     ) : null}
                     <p className="text-3xl font-black tracking-tight text-foreground sm:text-4xl">
+                      {hasVariablePrice ? "Desde " : ""}
                       {formatPrice(price)}
                     </p>
                   </div>

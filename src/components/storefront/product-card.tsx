@@ -34,6 +34,12 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
     )
   ).size;
   const price = getDisplayPrice(product);
+  const hasVariablePrice =
+    new Set(
+      availableVariants.map((variant) =>
+        Number(variant.priceOverride ?? product.basePrice)
+      )
+    ).size > 1;
   const compareAtPrice = Number(product.compareAtPrice ?? 0);
   const isOffer = compareAtPrice > price;
 
@@ -91,6 +97,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
                 </p>
               ) : null}
               <p className="text-lg font-black tracking-tight text-foreground sm:text-xl">
+                {hasVariablePrice ? "Desde " : ""}
                 {formatPrice(price)}
               </p>
             </div>

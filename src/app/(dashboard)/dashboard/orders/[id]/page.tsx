@@ -13,7 +13,11 @@ import {
 import { OrderStatusForm } from "./order-status-form";
 import { requireAdmin } from "@/actions/auth";
 import { getStoreSettings } from "@/actions/store-settings";
-import { markOrderItemCollected } from "@/actions/inventory";
+import {
+  markOrderItemCollected,
+  markOrderItemUnavailable,
+} from "@/actions/inventory";
+import { ConfirmSubmitButton } from "@/components/dashboard/confirm-submit-button";
 import {
   getGoogleMapsDirectionsUrl,
   getPickupAddress,
@@ -118,6 +122,14 @@ export default async function DashboardOrderDetailPage({
             <p>
               <strong>Mercado Pago:</strong> {order.mercadopago_status || "Pendiente"}
             </p>
+            {order.refund_status && order.refund_status !== "none" ? (
+              <p>
+                <strong>Devolución:</strong>{" "}
+                {order.refund_status === "pending"
+                  ? "Transferencia pendiente"
+                  : `${formatPrice(Number(order.refunded_amount || 0))} transferidos`}
+              </p>
+            ) : null}
             {order.reservation_expires_at && order.status === "pending" ? (
               <p>
                 <strong>Reserva hasta:</strong>{" "}
@@ -243,11 +255,24 @@ export default async function DashboardOrderDetailPage({
                     </td>
                     <td className="p-4" data-actions="true" data-label="Retiro">
                       {item.procurement_status === "pending_collection" ? (
-                        <form action={markOrderItemCollected.bind(null, item.id)}>
-                          <Button className="min-h-11 w-full sm:w-auto">Marcar retirada</Button>
-                        </form>
+                        <div className="grid gap-2">
+                          <form action={markOrderItemCollected.bind(null, item.id)}>
+                            <Button className="min-h-11 w-full">Marcar retirada</Button>
+                          </form>
+                          <form action={markOrderItemUnavailable.bind(null, item.id)}>
+                            <ConfirmSubmitButton
+                              variant="outline"
+                              className="min-h-11 w-full text-destructive hover:text-destructive"
+                              confirmation="Se creará una devolución pendiente por transferencia. ¿Continuar?"
+                            >
+                              No disponible
+                            </ConfirmSubmitButton>
+                          </form>
+                        </div>
                       ) : item.procurement_status === "collected" ? (
                         "Retirada"
+                      ) : item.procurement_status === "unavailable" ? (
+                        "Sin disponibilidad · devolución"
                       ) : item.procurement_status === "awaiting_payment" ? (
                         "Espera pago"
                       ) : item.procurement_status === "cancelled" ? (

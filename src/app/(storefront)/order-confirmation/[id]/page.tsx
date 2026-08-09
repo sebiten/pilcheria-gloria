@@ -67,6 +67,20 @@ export default async function OrderConfirmationPage({
           <p className="text-muted-foreground">
             {getOrderStatusDescription(order.status, order.shipping_method)}
           </p>
+          {order.refund_status && order.refund_status !== "none" ? (
+            <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+              <p className="font-semibold">
+                {order.refund_status === "pending"
+                  ? "Tenés una devolución pendiente"
+                  : "La devolución ya fue transferida"}
+              </p>
+              <p className="mt-1 text-sm leading-6">
+                {order.refund_status === "pending"
+                  ? "Te contactaremos para solicitar tus datos bancarios y devolverte el importe de la prenda sin disponibilidad."
+                  : `Importe transferido: ${formatPrice(Number(order.refunded_amount || 0))}.`}
+              </p>
+            </div>
+          ) : null}
           {order.guest_access_token ? (
             <div className="mt-5 rounded-xl border border-primary/20 bg-primary/5 p-4">
               <p className="font-semibold">
