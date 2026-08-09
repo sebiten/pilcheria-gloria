@@ -30,14 +30,14 @@ export default async function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Productos</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">Productos</h1>
           <p className="text-muted-foreground">
             {visibleProducts.length} productos en el catálogo
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="min-h-11 w-full sm:w-auto">
           <Link href="/dashboard/products/new">
             <Plus className="h-4 w-4 mr-2" />
             Nuevo producto
@@ -45,7 +45,7 @@ export default async function ProductsPage() {
         </Button>
       </div>
 
-      <div className="rounded-lg border">
+      <div className="admin-responsive-table overflow-hidden rounded-xl border bg-card">
         <div className="relative w-full overflow-auto">
           <table className="w-full caption-bottom text-sm">
             <thead className="border-b bg-muted/50">
@@ -61,9 +61,9 @@ export default async function ProductsPage() {
             <tbody>
               {visibleProducts.map((product) => (
                 <tr key={product.id} className="border-b">
-                  <td className="p-4">
+                  <td className="p-4" data-primary="true">
                     <div className="flex items-center gap-3">
-                      <div className="relative h-12 w-12 overflow-hidden rounded-md bg-muted">
+                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
                         <Image
                           src={
                             product.images?.[0]?.url ||
@@ -75,20 +75,20 @@ export default async function ProductsPage() {
                           sizes="48px"
                         />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-medium">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">{product.slug}</p>
+                        <p className="truncate text-xs text-muted-foreground">{product.slug}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="p-4">{product.brand || "Sin marca"}</td>
-                  <td className="p-4">
+                  <td className="p-4" data-label="Marca">{product.brand || "Sin marca"}</td>
+                  <td className="p-4" data-label="Categoría">
                     {product.category?.name || "Sin categoría"}
                   </td>
-                  <td className="p-4">
+                  <td className="p-4" data-label="Precio">
                     {formatPrice(Number(product.base_price))}
                   </td>
-                  <td className="p-4">
+                  <td className="p-4" data-label="Estado">
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         product.active
@@ -99,11 +99,12 @@ export default async function ProductsPage() {
                       {product.active ? "Activo" : "Inactivo"}
                     </span>
                   </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" asChild>
+                  <td className="p-4" data-actions="true" data-label="Acciones">
+                    <div className="flex items-center justify-end gap-2 md:justify-start">
+                      <Button variant="outline" size="icon" className="h-11 w-11" asChild>
                         <Link href={`/dashboard/products/${product.id}/edit`}>
                           <Pencil className="h-4 w-4" />
+                          <span className="sr-only">Editar {product.name}</span>
                         </Link>
                       </Button>
                       <CopyProductLinkButton

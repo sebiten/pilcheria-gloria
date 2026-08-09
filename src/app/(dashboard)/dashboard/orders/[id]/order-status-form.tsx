@@ -80,7 +80,7 @@ export function OrderStatusForm({
         <select
           value={status}
           onChange={(event) => setStatus(event.target.value as OrderStatus)}
-          className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+          className="flex min-h-11 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm sm:w-auto"
           disabled={isPending}
         >
           {statusOptions.map((option) => (
@@ -89,7 +89,7 @@ export function OrderStatusForm({
             </option>
           ))}
         </select>
-        <Button onClick={handleSubmit} disabled={isPending || status === currentStatus}>
+        <Button className="min-h-11 w-full sm:w-auto" onClick={handleSubmit} disabled={isPending || status === currentStatus}>
           {isPending ? "Guardando..." : "Actualizar estado"}
         </Button>
       </div>

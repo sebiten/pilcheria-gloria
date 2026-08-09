@@ -491,18 +491,18 @@ export function ProductForm({
               </Field>
             ))}
           </div>
-          <Button type="button" variant="outline" onClick={applyGuidePrices}>
+          <Button className="min-h-11 w-full sm:w-auto" type="button" variant="outline" onClick={applyGuidePrices}>
             Aplicar guía a todos los talles
           </Button>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="flex-row items-center justify-between">
+        <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Talles, colores y stock</CardTitle>
           <Button
             type="button"
-            size="sm"
+            className="min-h-11 w-full sm:w-auto"
             onClick={() =>
               setVariants((current) => [
                 ...current,
@@ -578,7 +578,7 @@ export function ProductForm({
                   }
                 />
               </Field>
-              <div className="flex items-end gap-2">
+              <div className="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-1">
                 <Check
                   label="Disponible 24–48 h"
                   checked={variant.partnerAvailable}
@@ -587,7 +587,7 @@ export function ProductForm({
                   }
                 />
                 <Check label="Activa" checked={variant.active} onChange={(value) => updateVariant(index, "active", value)} />
-                <Button type="button" variant="ghost" size="icon" aria-label="Eliminar variante" onClick={() => setVariants((current) => current.filter((_, currentIndex) => currentIndex !== index))}>
+                <Button className="h-11 w-11 text-destructive hover:text-destructive" type="button" variant="ghost" size="icon" aria-label="Eliminar variante" onClick={() => setVariants((current) => current.filter((_, currentIndex) => currentIndex !== index))}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -597,9 +597,9 @@ export function ProductForm({
       </Card>
 
       <Card>
-        <CardHeader className="flex-row items-center justify-between">
+        <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Imágenes</CardTitle>
-          <div>
+          <div className="w-full sm:w-auto">
             <Input
               id="productImages"
               type="file"
@@ -612,7 +612,7 @@ export function ProductForm({
                 event.target.value = "";
               }}
             />
-            <Button type="button" size="sm" disabled={isUploadingImage || isSubmitting} onClick={() => document.getElementById("productImages")?.click()}>
+            <Button className="min-h-11 w-full sm:w-auto" type="button" disabled={isUploadingImage || isSubmitting} onClick={() => document.getElementById("productImages")?.click()}>
               <Upload className="mr-2 h-4 w-4" />
               {isUploadingImage ? "Subiendo..." : "Subir imágenes"}
             </Button>
@@ -629,7 +629,7 @@ export function ProductForm({
 
           {images.map((image, index) => (
             <div key={`${image.url}-${index}`} className="grid gap-4 rounded-xl border p-4 md:grid-cols-[8rem_1fr_auto]">
-              <div className="relative aspect-[4/5] overflow-hidden rounded-lg border bg-muted">
+              <div className="relative aspect-[4/5] w-full max-w-40 overflow-hidden rounded-lg border bg-muted">
                 <Image src={image.url} alt={image.alt || name || "Producto"} fill className="object-cover" sizes="8rem" />
               </div>
               <Field label="Texto alternativo">
@@ -646,8 +646,8 @@ export function ProductForm({
                   }
                 />
               </Field>
-              <div className="flex items-end">
-                <Button type="button" variant="ghost" size="icon" aria-label="Eliminar imagen" onClick={() => setImages((current) => current.filter((_, currentIndex) => currentIndex !== index))}>
+              <div className="flex items-end justify-end">
+                <Button className="h-11 w-11 text-destructive hover:text-destructive" type="button" variant="ghost" size="icon" aria-label="Eliminar imagen" onClick={() => setImages((current) => current.filter((_, currentIndex) => currentIndex !== index))}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -658,11 +658,11 @@ export function ProductForm({
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <div className="flex gap-3">
-        <Button type="submit" disabled={isSubmitting || isUploadingImage}>
+      <div className="sticky bottom-0 z-20 -mx-4 grid grid-cols-2 gap-3 border-t bg-background/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:flex sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <Button className="min-h-11" type="submit" disabled={isSubmitting || isUploadingImage}>
           {isSubmitting ? "Guardando..." : "Guardar producto"}
         </Button>
-        <Button variant="outline" asChild>
+        <Button className="min-h-11" variant="outline" asChild>
           <Link href="/dashboard/products">Cancelar</Link>
         </Button>
       </div>
@@ -697,7 +697,7 @@ function Check({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-10 items-center gap-2 text-sm">
+    <label className="flex min-h-11 items-center gap-2 text-sm">
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
       {label}
     </label>

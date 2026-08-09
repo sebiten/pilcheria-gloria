@@ -74,16 +74,16 @@ export default async function DashboardOrderDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">
+          <h1 className="text-2xl font-bold sm:text-3xl">
             Pedido {order.id.slice(0, 8).toUpperCase()}
           </h1>
           <p className="text-muted-foreground">
             Creado el {new Date(order.created_at).toLocaleDateString("es-AR")}
           </p>
         </div>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" className="min-h-11 w-full sm:w-auto">
           <Link href="/dashboard/orders">Volver</Link>
         </Button>
       </div>
@@ -145,7 +145,7 @@ export default async function DashboardOrderDetailPage({
                 <Button
                   asChild
                   variant="outline"
-                  className="border-green-300 bg-white"
+                  className="min-h-11 w-full border-green-300 bg-white sm:w-auto"
                 >
                   <Link href={whatsappHref} target="_blank" rel="noreferrer">
                     <MessageCircle className="mr-2 size-4" />
@@ -194,7 +194,7 @@ export default async function DashboardOrderDetailPage({
         </Card>
       </div>
 
-      <Card>
+      <Card className="admin-responsive-table overflow-hidden">
         <CardHeader>
           <CardTitle>Items</CardTitle>
         </CardHeader>
@@ -216,13 +216,13 @@ export default async function DashboardOrderDetailPage({
               <tbody>
                 {order.items?.map((item: any) => (
                   <tr key={item.id} className="border-b">
-                    <td className="p-4">{item.product?.name || "Producto eliminado"}</td>
-                    <td className="p-4">
+                    <td className="p-4 font-medium" data-primary="true">{item.product?.name || "Producto eliminado"}</td>
+                    <td className="p-4" data-label="Variante">
                       {formatVariantLabel(item.variant)}
                     </td>
-                    <td className="p-4">{item.quantity}</td>
-                    <td className="p-4">{formatPrice(Number(item.unit_price))}</td>
-                    <td className="p-4">
+                    <td className="p-4" data-label="Cantidad">{item.quantity}</td>
+                    <td className="p-4" data-label="Unitario">{formatPrice(Number(item.unit_price))}</td>
+                    <td className="p-4" data-label="Subtotal">
                       {formatPrice(Number(item.net_amount ?? Number(item.unit_price) * item.quantity))}
                       {Number(item.discount_allocated ?? 0) > 0 ? (
                         <span className="block text-xs text-muted-foreground">
@@ -230,21 +230,21 @@ export default async function DashboardOrderDetailPage({
                         </span>
                       ) : null}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4" data-label="Origen">
                       {item.source_code === "grandma_store"
                         ? "Negocio de abuela"
                         : "Propio"}
                     </td>
-                    <td className="p-4 text-xs">
+                    <td className="p-4 text-xs" data-label="Reparto">
                       <span className="block">Vos: {formatPrice(Number(item.seller_share ?? item.net_amount ?? 0))}</span>
                       {Number(item.partner_share ?? 0) > 0 ? (
                         <span className="block">Abuela: {formatPrice(Number(item.partner_share))}</span>
                       ) : null}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4" data-actions="true" data-label="Retiro">
                       {item.procurement_status === "pending_collection" ? (
                         <form action={markOrderItemCollected.bind(null, item.id)}>
-                          <Button size="sm">Marcar retirada</Button>
+                          <Button className="min-h-11 w-full sm:w-auto">Marcar retirada</Button>
                         </form>
                       ) : item.procurement_status === "collected" ? (
                         "Retirada"

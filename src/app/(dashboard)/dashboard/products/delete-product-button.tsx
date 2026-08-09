@@ -46,7 +46,7 @@ export function DeleteProductButton({
         size="icon"
         disabled={isPending}
         onClick={handleDelete}
-        className="text-destructive hover:text-destructive"
+        className="h-11 w-11 text-destructive hover:text-destructive"
         title="Borrar producto"
       >
         <Trash2 className="h-4 w-4" />

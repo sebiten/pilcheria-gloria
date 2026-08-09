@@ -140,14 +140,15 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Categorías</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">Categorías</h1>
           <p className="text-muted-foreground">
             {categories.length} categorías en el sitio
           </p>
         </div>
         <Button
+          className="min-h-11 w-full sm:w-auto"
           onClick={() => {
             if (isOpen && !isEditing) {
               resetForm();
@@ -166,11 +167,11 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
 
       {isOpen ? (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex-row items-center justify-between gap-3">
             <CardTitle>
               {isEditing ? "Editar categoría" : "Crear categoría"}
             </CardTitle>
-            <Button variant="ghost" size="icon" onClick={resetForm}>
+            <Button className="h-11 w-11" variant="ghost" size="icon" onClick={resetForm}>
               <X className="h-4 w-4" />
             </Button>
           </CardHeader>
@@ -301,15 +302,15 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
 
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isSubmitting}>
+              <div className="grid gap-2 sm:flex">
+                <Button className="min-h-11" type="submit" disabled={isSubmitting}>
                   {isSubmitting
                     ? "Guardando..."
                     : isEditing
                       ? "Guardar cambios"
                       : "Crear categoría"}
                 </Button>
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <Button className="min-h-11" type="button" variant="outline" onClick={resetForm}>
                   Cancelar
                 </Button>
               </div>
@@ -318,7 +319,7 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
         </Card>
       ) : null}
 
-      <Card>
+      <Card className="admin-responsive-table overflow-hidden">
         <CardContent className="p-0">
           <div className="relative w-full overflow-auto">
             <table className="w-full text-sm">
@@ -336,36 +337,40 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
               <tbody>
                 {categories.map((category) => (
                   <tr key={category.id} className="border-b">
-                    <td className="p-4 font-medium">{category.name}</td>
-                    <td className="p-4 text-muted-foreground">{category.slug}</td>
-                    <td className="p-4">{category.productCount}</td>
-                    <td className="p-4 text-muted-foreground">
+                    <td className="p-4 font-medium" data-primary="true">{category.name}</td>
+                    <td className="p-4 text-muted-foreground" data-label="Slug">{category.slug}</td>
+                    <td className="p-4" data-label="Productos">{category.productCount}</td>
+                    <td className="p-4 text-muted-foreground" data-label="Superior">
                       {category.parent_id
                         ? categories.find(
                             (parent) => parent.id === category.parent_id
                           )?.name || "No disponible"
                         : "Principal"}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4" data-label="Estado">
                       {category.active ? "Visible" : "Oculta"}
                     </td>
-                    <td className="p-4">{category.sort_order}</td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
+                    <td className="p-4" data-label="Orden">{category.sort_order}</td>
+                    <td className="p-4" data-actions="true" data-label="Acciones">
+                      <div className="flex items-center justify-end gap-2 md:justify-start">
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-11 w-11"
                           onClick={() => startEdit(category)}
                         >
                           <Pencil className="h-4 w-4" />
+                          <span className="sr-only">Editar {category.name}</span>
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-11 w-11 text-destructive hover:text-destructive"
                           onClick={() => handleDelete(category.id)}
                           disabled={category.productCount > 0}
                         >
                           <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Eliminar {category.name}</span>
                         </Button>
                       </div>
                     </td>

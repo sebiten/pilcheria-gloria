@@ -28,7 +28,7 @@ export default async function BrandsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Marcas</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl">Marcas</h1>
         <p className="text-muted-foreground">
           Las marcas se crean al cargarlas en un producto.
         </p>
@@ -53,7 +53,7 @@ export default async function BrandsPage() {
             </div>
             <form
               action={renameProductBrand.bind(null, brand)}
-              className="flex gap-2"
+              className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"
             >
               <Input
                 name="brand"
@@ -62,7 +62,7 @@ export default async function BrandsPage() {
                 className="min-h-10"
                 required
               />
-              <Button type="submit" variant="outline">
+              <Button className="min-h-11" type="submit" variant="outline">
                 Guardar
               </Button>
             </form>

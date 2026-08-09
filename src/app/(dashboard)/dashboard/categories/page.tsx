@@ -34,7 +34,7 @@ export default async function CategoriesPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Categorías</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">Categorías</h1>
           <p className="text-muted-foreground">
             No se pudo cargar esta seccion del dashboard.
           </p>
@@ -46,7 +46,7 @@ export default async function CategoriesPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">{message}</p>
-            <Button asChild>
+            <Button asChild className="min-h-11 w-full sm:w-auto">
               <a href="/dashboard/categories">Reintentar</a>
             </Button>
           </CardContent>

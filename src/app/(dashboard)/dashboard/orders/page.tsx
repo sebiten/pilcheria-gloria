@@ -49,13 +49,13 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Órdenes</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl">Órdenes</h1>
         <p className="text-muted-foreground">
           {totalOrders} órdenes en total
         </p>
       </div>
 
-      <Card>
+      <Card className="admin-responsive-table overflow-hidden">
         <CardContent className="p-0">
           <div className="relative w-full overflow-auto">
             <table className="w-full caption-bottom text-sm">
@@ -81,13 +81,13 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
               <tbody>
                 {orders?.map((order) => (
                   <tr key={order.id} className="border-b">
-                    <td className="p-4 font-medium">
+                    <td className="p-4 font-medium" data-primary="true">
                       {order.id.slice(0, 8).toUpperCase()}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4" data-label="Fecha">
                       {new Date(order.created_at).toLocaleDateString("es-AR")}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4" data-label="Estado">
                       <Badge className={statusColors[order.status] || ""}>
                         {getOrderStatusLabel(
                           order.status,
@@ -95,9 +95,9 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                         )}
                       </Badge>
                     </td>
-                    <td className="p-4">{formatPrice(Number(order.total))}</td>
-                    <td className="p-4">
-                      <Button variant="ghost" size="sm" asChild>
+                    <td className="p-4" data-label="Total">{formatPrice(Number(order.total))}</td>
+                    <td className="p-4" data-actions="true" data-label="Acciones">
+                      <Button variant="outline" className="min-h-11 w-full sm:w-auto" asChild>
                         <Link href={`/dashboard/orders/${order.id}`}>
                           Ver detalle
                         </Link>
@@ -122,30 +122,30 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
       </Card>
 
       {totalPages > 1 ? (
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Página {currentPage} de {totalPages}
           </p>
-          <div className="flex gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
             {currentPage > 1 ? (
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" className="min-h-11">
                 <Link href={`/dashboard/orders?page=${currentPage - 1}`}>
                   Anterior
                 </Link>
               </Button>
             ) : (
-              <Button variant="outline" disabled>
+              <Button variant="outline" className="min-h-11" disabled>
                 Anterior
               </Button>
             )}
             {currentPage < totalPages ? (
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" className="min-h-11">
                 <Link href={`/dashboard/orders?page=${currentPage + 1}`}>
                   Siguiente
                 </Link>
               </Button>
             ) : (
-              <Button variant="outline" disabled>
+              <Button variant="outline" className="min-h-11" disabled>
                 Siguiente
               </Button>
             )}

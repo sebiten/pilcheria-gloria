@@ -23,7 +23,7 @@ export default async function FinancePage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Inventario y liquidaciones</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl">Inventario y liquidaciones</h1>
         <p className="text-muted-foreground">
           Control interno del stock propio y las prendas del negocio.
         </p>
@@ -38,7 +38,7 @@ export default async function FinancePage() {
         <StatsCard title="Liquidaciones pagadas" value={formatPrice(data.metrics.settlementsPaid)} description="Histórico registrado" icon={WalletCards} />
       </div>
 
-      <Card>
+      <Card className="admin-responsive-table overflow-hidden">
         <CardHeader><CardTitle>Prendas pendientes de retirar</CardTitle></CardHeader>
         <CardContent>
           {data.pendingItems.length ? (
@@ -52,14 +52,14 @@ export default async function FinancePage() {
                 <tbody>
                   {data.pendingItems.map((item: any) => (
                     <tr key={item.id} className="border-b last:border-0">
-                      <td className="p-3 font-mono">{item.order.id.slice(0, 8).toUpperCase()}</td>
-                      <td className="p-3">{item.product?.name}</td>
-                      <td className="p-3">{formatVariantLabel(item.variant)}</td>
-                      <td className="p-3">{item.quantity}</td>
-                      <td className="p-3">{formatPrice(Number(item.partner_share ?? 0))}</td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 font-mono" data-primary="true">Pedido {item.order.id.slice(0, 8).toUpperCase()}</td>
+                      <td className="p-3" data-label="Prenda">{item.product?.name}</td>
+                      <td className="p-3" data-label="Variante">{formatVariantLabel(item.variant)}</td>
+                      <td className="p-3" data-label="Cantidad">{item.quantity}</td>
+                      <td className="p-3" data-label="Para tu abuela">{formatPrice(Number(item.partner_share ?? 0))}</td>
+                      <td className="p-3 text-right" data-actions="true" data-label="Acción">
                         <form action={markOrderItemCollected.bind(null, item.id)}>
-                          <Button size="sm">Marcar retirada</Button>
+                          <Button className="min-h-11 w-full sm:w-auto">Marcar retirada</Button>
                         </form>
                       </td>
                     </tr>
@@ -78,7 +78,7 @@ export default async function FinancePage() {
             {data.settlements.length ? (
               <div className="space-y-3">
                 {data.settlements.map((settlement: any) => (
-                  <div key={settlement.id} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0">
+                  <div key={settlement.id} className="flex flex-col gap-2 border-b pb-3 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                     <div>
                       <p className="font-semibold">{new Date(settlement.paid_at).toLocaleString("es-AR")}</p>
                       {settlement.notes ? <p className="text-sm text-muted-foreground">{settlement.notes}</p> : null}
@@ -98,7 +98,7 @@ export default async function FinancePage() {
             <form action={createGrandmaSettlement} className="space-y-3">
               <label htmlFor="notes" className="text-sm font-medium">Nota opcional</label>
               <textarea id="notes" name="notes" maxLength={500} className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="Ej. Transferencia del sábado" />
-              <Button className="w-full" disabled={data.metrics.partnerBalance <= 0}>Registrar liquidación</Button>
+              <Button className="min-h-11 w-full" disabled={data.metrics.partnerBalance <= 0}>Registrar liquidación</Button>
             </form>
           </CardContent>
         </Card>

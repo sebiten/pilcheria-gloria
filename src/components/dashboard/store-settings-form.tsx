@@ -215,9 +215,11 @@ export function StoreSettingsForm({ settings }: StoreSettingsFormProps) {
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {success ? <p className="text-sm text-green-700">{success}</p> : null}
 
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "Guardando..." : "Guardar cambios"}
-      </Button>
+      <div className="sticky bottom-0 z-20 -mx-4 border-t bg-background/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <Button className="min-h-11 w-full sm:w-auto" type="submit" disabled={isPending}>
+          {isPending ? "Guardando..." : "Guardar cambios"}
+        </Button>
+      </div>
     </form>
   );
 }

@@ -86,6 +86,84 @@
   }
 }
 
+@media (max-width: 767px) {
+  .dashboard-content input:not([type="checkbox"]):not([type="radio"]),
+  .dashboard-content select,
+  .dashboard-content button,
+  .dashboard-content a[role="button"] {
+    min-height: 2.75rem;
+  }
+
+  .admin-responsive-table table,
+  .admin-responsive-table tbody,
+  .admin-responsive-table tr,
+  .admin-responsive-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-responsive-table thead {
+    display: none;
+  }
+
+  .admin-responsive-table tr {
+    padding: 1rem;
+  }
+
+  .admin-responsive-table tr + tr {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .admin-responsive-table td {
+    display: flex;
+    min-height: 2rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.3rem 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-responsive-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--color-muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .admin-responsive-table td[data-primary="true"] {
+    display: block;
+    padding-bottom: 0.75rem;
+    text-align: left;
+  }
+
+  .admin-responsive-table td[data-primary="true"]::before {
+    content: none;
+  }
+
+  .admin-responsive-table td[data-actions="true"] {
+    display: block;
+    margin-top: 0.6rem;
+    border-top: 1px solid var(--color-border);
+    padding-top: 0.75rem;
+    text-align: left;
+  }
+
+  .admin-responsive-table td[data-actions="true"]::before {
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .admin-responsive-table td[data-actions="true"] > * {
+    width: 100%;
+  }
+}
+
 @keyframes gloria-rise {
   from {
     opacity: 0;

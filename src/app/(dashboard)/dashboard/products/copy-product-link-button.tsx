@@ -26,6 +26,7 @@ export function CopyProductLinkButton({
       type="button"
       variant="ghost"
       size="icon"
+      className="h-11 w-11"
       onClick={copyLink}
       title={copied ? "Enlace copiado" : `Copiar enlace de ${productName}`}
     >

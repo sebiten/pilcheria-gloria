@@ -19,7 +19,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Editar producto</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl">Editar producto</h1>
         <p className="text-muted-foreground">
           Actualiza datos, variantes e imagenes.
         </p>

@@ -77,14 +77,14 @@ export function CouponsManager({ initialCoupons }: CouponsManagerProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Cupones</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">Cupones</h1>
           <p className="text-muted-foreground">
             Gestiona descuentos aplicables en checkout.
           </p>
         </div>
-        <Button onClick={() => setIsCreating((current) => !current)}>
+        <Button className="min-h-11 w-full sm:w-auto" onClick={() => setIsCreating((current) => !current)}>
           <Plus className="mr-2 h-4 w-4" />
           Nuevo cupon
         </Button>
@@ -214,13 +214,14 @@ export function CouponsManager({ initialCoupons }: CouponsManagerProps) {
 
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isPending}>
+              <div className="grid gap-2 sm:flex">
+                <Button className="min-h-11" type="submit" disabled={isPending}>
                   {isPending ? "Guardando..." : "Crear cupon"}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
+                  className="min-h-11"
                   onClick={() => setIsCreating(false)}
                 >
                   Cancelar
@@ -231,7 +232,7 @@ export function CouponsManager({ initialCoupons }: CouponsManagerProps) {
         </Card>
       ) : null}
 
-      <Card>
+      <Card className="admin-responsive-table overflow-hidden">
         <CardContent className="p-0">
           <div className="relative w-full overflow-auto">
             <table className="w-full text-sm">
@@ -247,27 +248,29 @@ export function CouponsManager({ initialCoupons }: CouponsManagerProps) {
               <tbody>
                 {coupons.map((coupon) => (
                   <tr key={coupon.id} className="border-b">
-                    <td className="p-4 font-medium">{coupon.code}</td>
-                    <td className="p-4">
+                    <td className="p-4 font-medium" data-primary="true">{coupon.code}</td>
+                    <td className="p-4" data-label="Descuento">
                       {coupon.type === "percentage"
                         ? `${coupon.value}%`
                         : formatPrice(Number(coupon.value))}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4" data-label="Uso">
                       {coupon.used_count}
                       {coupon.max_uses ? ` / ${coupon.max_uses}` : ""}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4" data-label="Estado">
                       {coupon.active ? "Activo" : "Inactivo"}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4" data-actions="true" data-label="Acciones">
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-11 w-11 text-destructive hover:text-destructive"
                         onClick={() => handleDelete(coupon.id)}
                         disabled={isPending}
                       >
                         <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Eliminar cupón {coupon.code}</span>
                       </Button>
                     </td>
                   </tr>

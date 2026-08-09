@@ -15,7 +15,7 @@ export default async function ReviewsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Reseñas</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl">Reseñas</h1>
         <p className="text-muted-foreground">
           {reviews.length} reseña{reviews.length === 1 ? "" : "s"} recibida
           {reviews.length === 1 ? "" : "s"}
@@ -72,12 +72,12 @@ export default async function ReviewsPage() {
                       !review.approved
                     )}
                   >
-                    <Button type="submit" variant="outline" size="sm">
+                    <Button className="min-h-11" type="submit" variant="outline">
                       {review.approved ? "Ocultar" : "Publicar"}
                     </Button>
                   </form>
                   <form action={deleteProductReviewAdmin.bind(null, review.id)}>
-                    <Button type="submit" variant="destructive" size="sm">
+                    <Button className="min-h-11" type="submit" variant="destructive">
                       Eliminar
                     </Button>
                   </form>

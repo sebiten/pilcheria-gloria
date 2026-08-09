@@ -90,7 +90,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl">Dashboard</h1>
         <p className="text-muted-foreground">
           Gestión de Pilchería Gloria
         </p>
@@ -153,7 +153,7 @@ export default async function DashboardPage() {
                 {orders.map((order) => (
                   <div
                     key={order.id}
-                    className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
+                    className="flex flex-col gap-2 border-b pb-4 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div>
                       <p className="font-medium">
@@ -163,7 +163,7 @@ export default async function DashboardPage() {
                         {new Date(order.created_at).toLocaleDateString("es-AR")}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="sm:text-right">
                       <p className="font-medium">
                         {formatPrice(Number(order.total))}
                       </p>
@@ -198,7 +198,7 @@ export default async function DashboardPage() {
           <CardContent className="grid gap-4">
             <Link
               href="/dashboard/products/new"
-              className="rounded-lg border p-4 hover:bg-accent transition-colors"
+              className="min-h-11 rounded-lg border p-4 transition-colors hover:bg-accent"
             >
               <Package className="mb-2 h-5 w-5" />
               <p className="font-medium">Agregar producto</p>
@@ -208,7 +208,7 @@ export default async function DashboardPage() {
             </Link>
             <Link
               href="/dashboard/orders"
-              className="rounded-lg border p-4 hover:bg-accent transition-colors"
+              className="min-h-11 rounded-lg border p-4 transition-colors hover:bg-accent"
             >
               <ShoppingCart className="mb-2 h-5 w-5" />
               <p className="font-medium">Ver pedidos</p>
