@@ -25,6 +25,7 @@ const productVariantSchema = z
   .object({
     size: z.string().trim().min(1),
     sizeSystem: z.enum(["infant", "adult"]).nullable().optional(),
+    schoolLevel: z.enum(["primary", "secondary"]).nullable().optional(),
     color: z.string().trim().nullable().optional(),
     sku: z.string().trim().nullable().optional(),
     priceOverride: z.number().nonnegative().nullable().optional(),
@@ -128,7 +129,7 @@ function normalizeProductVariants(variants: ProductPayload["variants"]) {
     const size = variant.size.trim();
     const color = variant.color?.trim() || null;
     const sku = variant.sku?.trim() || null;
-    const key = `${variant.sizeSystem ?? "legacy"}:${size.toLocaleLowerCase("es-AR")}:${color?.toLocaleLowerCase("es-AR") ?? ""}`;
+    const key = `${variant.schoolLevel ?? "no-design"}:${variant.sizeSystem ?? "legacy"}:${size.toLocaleLowerCase("es-AR")}:${color?.toLocaleLowerCase("es-AR") ?? ""}`;
     const existing = variantsBySize.get(key);
 
     if (!existing) {
@@ -163,7 +164,7 @@ function getAvailableSizeCount(product: ProductWithDetails) {
       )
       .map(
         (variant) =>
-          `${variant.sizeSystem ?? "legacy"}:${variant.size.trim().toLocaleLowerCase("es-AR")}`
+          `${variant.schoolLevel ?? "no-design"}:${variant.sizeSystem ?? "legacy"}:${variant.size.trim().toLocaleLowerCase("es-AR")}`
       )
       .filter(Boolean)
   ).size;
@@ -260,14 +261,14 @@ async function replaceProductRelations(
   const variants = normalizeProductVariants(payload.variants);
   const variantByKey = new Map(
     (previousVariants || []).map((variant) => [
-      `${variant.size_system ?? "legacy"}:${variant.size?.trim().toLocaleLowerCase("es-AR") ?? ""}:${
+      `${variant.school_level ?? "no-design"}:${variant.size_system ?? "legacy"}:${variant.size?.trim().toLocaleLowerCase("es-AR") ?? ""}:${
         variant.color?.trim().toLocaleLowerCase("es-AR") ?? ""
       }`,
       variant,
     ])
   );
   const desiredVariantEntries = variants.map((variant) => {
-    const key = `${variant.sizeSystem ?? "legacy"}:${variant.size.toLocaleLowerCase("es-AR")}:${
+    const key = `${variant.schoolLevel ?? "no-design"}:${variant.sizeSystem ?? "legacy"}:${variant.size.toLocaleLowerCase("es-AR")}:${
       variant.color?.toLocaleLowerCase("es-AR") ?? ""
     }`;
     return {
@@ -277,6 +278,7 @@ async function replaceProductRelations(
       product_id: productId,
       size: variant.size,
       size_system: variant.sizeSystem ?? null,
+      school_level: variant.schoolLevel ?? null,
       color: variant.color ?? null,
       sku: variant.sku ?? null,
       price_override: variant.priceOverride ?? null,
@@ -582,7 +584,7 @@ const getProductsCached = unstable_cache(
 
     return options?.limit ? products.slice(0, options.limit) : products;
   },
-  ["products-public-v7"],
+  ["products-public-v8"],
   {
     tags: [PRODUCTS_CACHE_TAG],
     revalidate: 3600,
@@ -653,7 +655,7 @@ const getProductBySlugCached = unstable_cache(
         .eq("active", true)
     );
   },
-  ["product-by-slug-v6"],
+  ["product-by-slug-v7"],
   {
     tags: [PRODUCT_DETAILS_CACHE_TAG],
     revalidate: 3600,

@@ -65,6 +65,7 @@ export const productVariants = pgTable("product_variants", {
   length: numeric("length"),
   size: text("size"),
   sizeSystem: text("size_system"),
+  schoolLevel: text("school_level"),
   color: text("color"),
   sku: text("sku"),
   priceOverride: numeric("price_override", { precision: 10, scale: 2 }),

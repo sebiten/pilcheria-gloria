@@ -4,7 +4,12 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ImageIcon, Plus, Trash2, Upload } from "lucide-react";
-import type { Category, ProductWithDetails, SizeSystem } from "@/types";
+import type {
+  Category,
+  ProductWithDetails,
+  SchoolLevel,
+  SizeSystem,
+} from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +24,7 @@ interface VariantFormValue {
   formId: string;
   size: string;
   sizeSystem: SizeSystem | null;
+  schoolLevel: SchoolLevel | null;
   color: string;
   sku: string;
   priceOverride: number | null;
@@ -44,6 +50,7 @@ const defaultVariants: VariantFormValue[] = [
     formId: "default-variant",
     size: "S",
     sizeSystem: null,
+    schoolLevel: null,
     color: "",
     sku: "",
     priceOverride: null,
@@ -65,7 +72,7 @@ function normalizeVariantValues(variants: VariantFormValue[]) {
     const color = variant.color.trim();
     if (!size) continue;
 
-    const key = `${variant.sizeSystem ?? "legacy"}:${size.toLocaleLowerCase("es-AR")}:${color.toLocaleLowerCase("es-AR")}`;
+    const key = `${variant.schoolLevel ?? "no-design"}:${variant.sizeSystem ?? "legacy"}:${size.toLocaleLowerCase("es-AR")}:${color.toLocaleLowerCase("es-AR")}`;
     const existing = normalized.get(key);
 
     if (!existing) {
@@ -154,6 +161,7 @@ export function ProductForm({
           formId: variant.id,
           size: variant.size,
           sizeSystem: variant.sizeSystem,
+          schoolLevel: variant.schoolLevel,
           color: variant.color ?? "",
           sku: variant.sku ?? "",
           priceOverride: variant.priceOverride,
@@ -212,7 +220,7 @@ export function ProductForm({
     }> = [
       {
         sizeSystem: "infant",
-        sizes: ["4", "6", "8", "10"],
+        sizes: ["8", "10"],
         price: Number(guidePrices.infantSmall),
       },
       {
@@ -227,7 +235,7 @@ export function ProductForm({
       },
       {
         sizeSystem: "adult",
-        sizes: ["5", "6"],
+        sizes: ["5"],
         price: Number(guidePrices.adultLarge),
       },
     ];
@@ -246,21 +254,24 @@ export function ProductForm({
 
       for (const group of validGroups) {
         for (const size of group.sizes) {
-          const existingIndex = next.findIndex(
-            (variant) =>
-              variant.sizeSystem === group.sizeSystem &&
-              variant.size.trim() === size &&
-              variant.color.trim().toLocaleLowerCase("es-AR") ===
-                guideColor.trim().toLocaleLowerCase("es-AR")
+          const existingIndexes = next.flatMap((variant, index) =>
+            variant.sizeSystem === group.sizeSystem &&
+            variant.size.trim() === size &&
+            variant.color.trim().toLocaleLowerCase("es-AR") ===
+              guideColor.trim().toLocaleLowerCase("es-AR")
+              ? [index]
+              : []
           );
 
-          if (existingIndex >= 0) {
-            next[existingIndex] = {
-              ...next[existingIndex],
-              partnerPrice: group.price,
-              partnerAvailable: true,
-              active: true,
-            };
+          if (existingIndexes.length) {
+            for (const existingIndex of existingIndexes) {
+              next[existingIndex] = {
+                ...next[existingIndex],
+                partnerPrice: group.price,
+                partnerAvailable: true,
+                active: true,
+              };
+            }
             continue;
           }
 
@@ -268,6 +279,7 @@ export function ProductForm({
             formId: crypto.randomUUID(),
             size,
             sizeSystem: group.sizeSystem,
+            schoolLevel: null,
             color: guideColor.trim(),
             sku: "",
             priceOverride: null,
@@ -336,6 +348,7 @@ export function ProductForm({
         variants: normalizeVariantValues(variants).map((variant) => ({
           size: variant.size,
           sizeSystem: variant.sizeSystem,
+          schoolLevel: variant.schoolLevel,
           color: variant.color || null,
           sku: variant.sku || null,
           priceOverride: variant.priceOverride,
@@ -470,10 +483,10 @@ export function ProductForm({
               />
             </Field>
             {[
-              ["infantSmall", "Infantil 4–10"],
-              ["infantLarge", "Infantil 12–16"],
+              ["infantSmall", "Juvenil 8–10"],
+              ["infantLarge", "Juvenil 12–16"],
               ["adultSmall", "Adulto 1–4"],
-              ["adultLarge", "Adulto 5–6"],
+              ["adultLarge", "Adulto 5"],
             ].map(([key, label]) => (
               <Field key={key} label={label}>
                 <Input
@@ -510,6 +523,7 @@ export function ProductForm({
                   formId: crypto.randomUUID(),
                   size: "",
                   sizeSystem: null,
+                  schoolLevel: null,
                   color: "",
                   sku: "",
                   priceOverride: null,
@@ -547,8 +561,25 @@ export function ProductForm({
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <option value="">Sin escala</option>
-                  <option value="infant">Infantil</option>
+                  <option value="infant">Juvenil</option>
                   <option value="adult">Adulto</option>
+                </select>
+              </Field>
+              <Field label="Diseño escolar">
+                <select
+                  value={variant.schoolLevel ?? ""}
+                  onChange={(event) =>
+                    updateVariant(
+                      index,
+                      "schoolLevel",
+                      (event.target.value || null) as SchoolLevel | null
+                    )
+                  }
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">Sin diseño específico</option>
+                  <option value="primary">Primaria</option>
+                  <option value="secondary">Secundaria</option>
                 </select>
               </Field>
               <Field label="Color">

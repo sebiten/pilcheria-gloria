@@ -2,6 +2,7 @@ import type {
   PricingTier,
   ProductVariant,
   ProductWithDetails,
+  SchoolLevel,
   SizeSystem,
 } from "@/types";
 
@@ -57,6 +58,7 @@ export type RawVariantWithOffers = {
   product_id: string;
   size?: string | null;
   size_system?: SizeSystem | null;
+  school_level?: SchoolLevel | null;
   color?: string | null;
   sku?: string | null;
   price_override?: number | string | null;
@@ -147,6 +149,7 @@ export function mapProductVariant(variant: RawVariantWithOffers): ProductVariant
     product_id: variant.product_id,
     size: variant.size ?? "",
     sizeSystem: variant.size_system ?? null,
+    schoolLevel: variant.school_level ?? null,
     color: variant.color ?? null,
     sku: variant.sku ?? null,
     priceOverride:
@@ -243,8 +246,14 @@ export function getVariantQuantityTotal(
 }
 
 export function getSizeSystemLabel(sizeSystem: SizeSystem | null) {
-  if (sizeSystem === "infant") return "Primaria";
-  if (sizeSystem === "adult") return "Secundaria";
+  if (sizeSystem === "infant") return "Juvenil";
+  if (sizeSystem === "adult") return "Adulto";
+  return null;
+}
+
+export function getSchoolLevelLabel(schoolLevel: SchoolLevel | null) {
+  if (schoolLevel === "primary") return "Primaria";
+  if (schoolLevel === "secondary") return "Secundaria";
   return null;
 }
 

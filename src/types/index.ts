@@ -12,6 +12,7 @@ export type OrderStatus =
 export type CouponType = "percentage" | "fixed";
 
 export type SizeSystem = "infant" | "adult";
+export type SchoolLevel = "primary" | "secondary";
 export type FulfillmentSpeed = "immediate" | "24_48_hours";
 export type RefundStatus = "none" | "pending" | "partial" | "refunded";
 
@@ -70,6 +71,7 @@ export interface ProductVariant {
   product_id: string;
   size: string;
   sizeSystem: SizeSystem | null;
+  schoolLevel: SchoolLevel | null;
   color: string | null;
   sku: string | null;
   priceOverride: number | null;

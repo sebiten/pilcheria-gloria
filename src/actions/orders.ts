@@ -163,6 +163,7 @@ async function resolveCheckoutItems(
         product_id,
         size,
         size_system,
+        school_level,
         color,
         price_override,
         stock,
@@ -236,6 +237,11 @@ async function resolveCheckoutItems(
                 sizeSystem: variant.size_system ?? null,
               })}`
             : null,
+          variant.school_level === "primary"
+            ? "Diseño Primaria"
+            : variant.school_level === "secondary"
+              ? "Diseño Secundaria"
+              : null,
           variant.color,
         ]
           .filter(Boolean)

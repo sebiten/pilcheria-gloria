@@ -104,7 +104,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     {
       icon: Shirt,
       title: "Talles claros",
-      text: "Disponibilidad visible por variante.",
+      text: "Elegí el diseño y el talle antes de comprar.",
     },
     ...(settings.pickup_enabled
       ? [
@@ -247,7 +247,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     }`}
                   >
                     <CheckCircle2 className="size-3.5" />
-                    {activeVariants.length > 0 ? "Disponible" : "Sin stock"}
+                    {activeVariants.length > 0 ? "Elegí tu talle" : "Consultar"}
                   </span>
                 </div>
 

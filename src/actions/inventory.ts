@@ -42,7 +42,7 @@ export async function getInventoryDashboard() {
     supabase
       .from("order_items")
       .select(
-        "id, quantity, unit_price, net_amount, seller_share, partner_share, procurement_status, product:products(name), variant:product_variants(size, size_system, color), order:orders!inner(id, status, created_at)"
+        "id, quantity, unit_price, net_amount, seller_share, partner_share, procurement_status, product:products(name), variant:product_variants(size, size_system, school_level, color), order:orders!inner(id, status, created_at)"
       )
       .eq("source_id", grandmaSource.id)
       .eq("procurement_status", "pending_collection")
@@ -61,7 +61,7 @@ export async function getInventoryDashboard() {
     supabase
       .from("manual_refunds")
       .select(
-        "id, amount, status, notes, created_at, order:orders!inner(id, status, shipping_address), item:order_items!inner(id, quantity, product:products(name), variant:product_variants(size, size_system, color))"
+        "id, amount, status, notes, created_at, order:orders!inner(id, status, shipping_address), item:order_items!inner(id, quantity, product:products(name), variant:product_variants(size, size_system, school_level, color))"
       )
       .eq("status", "pending")
       .order("created_at", { ascending: true }),
