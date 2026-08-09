@@ -8,9 +8,9 @@ interface HeroUniformCollageProps {
 
 const heroProducts = [
   {
-    src: "/images/uniforms/catalog/311-chomba.webp",
-    alt: "Chomba escolar de la Escuela N° 311",
-    label: "Escuela N° 311",
+    src: "/images/uniforms/catalog/coronel-arias-chomba.png",
+    alt: "Chomba escolar de la Escuela Coronel Arias",
+    label: "Coronel Arias",
     garment: "Chomba",
   },
   {
@@ -67,7 +67,7 @@ export function HeroUniformCollage({ href }: HeroUniformCollageProps) {
           <span className="absolute inset-2 rounded-[1.8rem_0.5rem_3.8rem_0.8rem] border border-dashed border-white/45" />
           <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-[0.62rem] font-black uppercase tracking-[0.1em] text-gloria-950 shadow sm:left-4 sm:top-4 sm:text-xs">
             <span className="hidden sm:inline">
-              {heroProducts[0].garment} ·{` `}
+              {heroProducts[0].garment} · Escuela{` `}
             </span>
             {heroProducts[0].label}
           </span>
