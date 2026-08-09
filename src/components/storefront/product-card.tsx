@@ -9,8 +9,7 @@ interface ProductCardProps {
   priority?: boolean;
 }
 
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1766934587214-86e21b3ae093?auto=format&fit=crop&w=900&q=82";
+const FALLBACK_IMAGE = "/pilcheria-gloria-facebook.png";
 
 function getAvailableVariants(product: ProductWithDetails) {
   return product.variants.filter(
@@ -27,6 +26,7 @@ function getDisplayPrice(product: ProductWithDetails) {
 }
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
+  const primaryImage = product.images?.[0];
   const availableVariants = getAvailableVariants(product);
   const sizes = new Set(
     availableVariants.map(
@@ -51,8 +51,11 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
       <article className="flex h-full flex-col overflow-hidden rounded-[1.35rem] border border-border/80 bg-card transition duration-300 hover:-translate-y-1 hover:border-gloria-300 hover:shadow-[0_20px_55px_-30px_oklch(0.35_0.085_134/0.45)]">
         <div className="relative aspect-[4/5] overflow-hidden bg-[#17151a]">
           <Image
-            src={product.images?.[0]?.url || FALLBACK_IMAGE}
-            alt={product.images?.[0]?.alt || product.name}
+            src={primaryImage?.url || FALLBACK_IMAGE}
+            alt={
+              primaryImage?.alt ||
+              (primaryImage ? product.name : "Pilchería Gloria")
+            }
             fill
             className="object-contain transition duration-500 ease-out group-hover:scale-[1.02]"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"

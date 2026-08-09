@@ -37,8 +37,7 @@ export function CartContent() {
       <div className="flex-1 overflow-y-auto space-y-4">
         {items.map((item) => {
           const imageUrl =
-            item.product?.images?.[0]?.url ||
-            "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=300&h=300&fit=crop";
+            item.product?.images?.[0]?.url || "/pilcheria-gloria-facebook.png";
           const selectedVariant = item.variant_id
             ? item.product?.variants?.find((variant) => variant.id === item.variant_id)
             : null;

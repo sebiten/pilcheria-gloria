@@ -67,7 +67,7 @@ export default async function ProductsPage() {
                         <Image
                           src={
                             product.images?.[0]?.url ||
-                            "https://images.unsplash.com/photo-1766934587214-86e21b3ae093?auto=format&fit=crop&w=120&q=75"
+                            "/pilcheria-gloria-facebook.png"
                           }
                           alt={product.name}
                           fill

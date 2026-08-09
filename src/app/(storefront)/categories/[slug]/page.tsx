@@ -32,6 +32,11 @@ export async function generateMetadata({
     ? SCHOOL_UNIFORMS_DESCRIPTION
     : category.description ||
       `${category.name} para comprar online en Pilchería Gloria, ${SITE_LOCALITY}, Ledesma.`;
+  const categoryImage = isSchoolUniforms
+    ? absoluteUrl("/social/facebook-general/02-varias-escuelas.png")
+    : category.image_url
+      ? absoluteUrl(category.image_url)
+      : undefined;
 
   return {
     title,
@@ -41,6 +46,15 @@ export async function generateMetadata({
       title,
       description,
       url: `/categories/${category.slug}`,
+      images: categoryImage
+        ? [{ url: categoryImage, alt: `${category.name} en Pilchería Gloria` }]
+        : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: categoryImage ? [categoryImage] : undefined,
     },
   };
 }
@@ -56,6 +70,11 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   if (!category) notFound();
   const children = categories.filter((item) => item.parent_id === category.id);
   const isSchoolUniforms = category.slug === "uniformes-escolares";
+  const categoryImage = isSchoolUniforms
+    ? absoluteUrl("/social/facebook-general/02-varias-escuelas.png")
+    : category.image_url
+      ? absoluteUrl(category.image_url)
+      : undefined;
   const uniformsWhatsappUrl = settings.whatsapp_phone
     ? `https://wa.me/${settings.whatsapp_phone.replace(/\D/g, "")}?text=${encodeURIComponent(
         "Hola, quiero consultar por uniformes escolares. La escuela es: "
@@ -83,6 +102,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           category.description ||
           `${category.name} disponibles en Pilchería Gloria.`,
         url: absoluteUrl(`/categories/${category.slug}`),
+        image: categoryImage,
         inLanguage: "es-AR",
         mainEntity: itemList,
       },
@@ -167,9 +187,9 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               Uniformes para primaria y secundaria
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">
-              Consultá prendas para todas las escuelas de Ledesma: remeras,
-              camisas, pantalones y medias en talles infantiles, juveniles y de
-              adulto, sujetos al stock de cada modelo.
+              Consultá remeras y chombas de distintas escuelas de Ledesma en
+              talles infantiles, juveniles y de adulto, según la disponibilidad
+              de cada modelo.
             </p>
           </div>
         ) : null}

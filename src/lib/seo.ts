@@ -99,9 +99,7 @@ export function getStorefrontJsonLd(settings: StoreSettings) {
           description: SCHOOL_UNIFORMS_DESCRIPTION,
           itemListElement: [
             "Remeras escolares",
-            "Camisas escolares",
-            "Pantalones escolares",
-            "Medias escolares",
+            "Chombas escolares",
           ].map((name) => ({
             "@type": "OfferCatalog",
             name,

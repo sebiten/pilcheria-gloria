@@ -10,8 +10,7 @@ interface ProductGalleryProps {
   images: ProductImage[];
 }
 
-const fallbackImage =
-  "https://images.unsplash.com/photo-1766934587214-86e21b3ae093?auto=format&fit=crop&w=1200&q=84";
+const fallbackImage = "/pilcheria-gloria-facebook.png";
 
 export function ProductGallery({
   productName,
@@ -24,7 +23,7 @@ export function ProductGallery({
         {
           id: "fallback",
           url: fallbackImage,
-          alt: productName,
+          alt: "Pilchería Gloria",
           sort_order: 0,
           product_id: "",
         },
