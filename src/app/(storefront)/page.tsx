@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
@@ -13,6 +12,7 @@ import {
 import { getProducts } from "@/actions/products";
 import { getStoreSettings } from "@/actions/store-settings";
 import { PaymentConfidence } from "@/components/storefront/payment-confidence";
+import { HeroUniformCollage } from "@/components/storefront/hero-uniform-collage";
 import { ProductGrid } from "@/components/storefront/product-grid";
 import { SchoolUniformsCarousel } from "@/components/storefront/school-uniforms-carousel";
 import { Button } from "@/components/ui/button";
@@ -37,21 +37,6 @@ export const metadata: Metadata = {
 };
 
 const catalogHref = "/products?category=uniformes-escolares";
-const heroProducts = [
-  {
-    src: "/images/uniforms/catalog/311-chomba.webp",
-    alt: "Chomba escolar de la Escuela N° 311",
-  },
-  {
-    src: "/images/uniforms/catalog/etha-remera.webp",
-    alt: "Remera escolar ETHA",
-  },
-  {
-    src: "/images/uniforms/catalog/normal-remera.webp",
-    alt: "Remera de la Escuela Normal Superior",
-  },
-];
-
 export default async function HomePage() {
   const [products, settings] = await Promise.all([
     getProducts({ categorySlug: "uniformes-escolares", limit: 8 }),
@@ -133,45 +118,7 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <Link
-            href={catalogHref}
-            className="group relative grid min-h-[34rem] grid-cols-2 gap-3 sm:min-h-[42rem]"
-            aria-label="Abrir tienda de uniformes escolares"
-          >
-            <div className="relative row-span-2 overflow-hidden rounded-[2.5rem_0.8rem_2.5rem_0.8rem] border border-white/70 bg-[#17151a] shadow-[0_35px_80px_-45px_oklch(0.35_0.085_134/0.5)]">
-              <Image
-                src={heroProducts[0].src}
-                alt={heroProducts[0].alt}
-                fill
-                priority
-                className="object-cover transition duration-500 group-hover:scale-[1.02]"
-                sizes="(max-width: 1024px) 50vw, 28vw"
-              />
-            </div>
-            {heroProducts.slice(1).map((product, index) => (
-              <div
-                key={product.src}
-                className={`relative overflow-hidden border border-white/70 bg-[#17151a] shadow-[0_24px_55px_-40px_oklch(0.35_0.085_134/0.55)] ${
-                  index === 0
-                    ? "rounded-[0.8rem_2rem_0.8rem_2rem]"
-                    : "rounded-[2rem_0.8rem_2rem_0.8rem]"
-                }`}
-              >
-                <Image
-                  src={product.src}
-                  alt={product.alt}
-                  fill
-                  priority
-                  className="object-cover transition duration-500 group-hover:scale-[1.02]"
-                  sizes="(max-width: 1024px) 50vw, 28vw"
-                />
-              </div>
-            ))}
-            <span className="absolute bottom-5 left-5 rounded-full bg-white px-5 py-3 text-sm font-black text-gloria-950 shadow-xl">
-              Comprar uniformes
-              <ArrowRight className="ml-2 inline size-4" />
-            </span>
-          </Link>
+          <HeroUniformCollage href={catalogHref} />
         </div>
       </section>
 
