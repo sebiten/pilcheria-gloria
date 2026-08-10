@@ -51,12 +51,6 @@ const CROP_OVERRIDES: Record<
   { left: number; top: number; width: number; height: number }
 > = {};
 
-const HERO_IMAGES: Record<string, string> = {
-  "chomba dorrego.png": "dorrego-chomba-hero.webp",
-  "remera ETHA.png": "etha-remera-hero.webp",
-  "remera normal.png": "normal-remera-hero.webp",
-};
-
 function getArgument(name: string) {
   const index = process.argv.indexOf(name);
   return index === -1 ? undefined : process.argv[index + 1];
@@ -182,31 +176,6 @@ async function processImage(input: string, output: string) {
   return bounds;
 }
 
-async function processHeroImage(input: string, output: string) {
-  const image = sharp(input).rotate().ensureAlpha();
-  const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
-
-  for (let offset = 0; offset < data.length; offset += info.channels) {
-    const red = data[offset];
-    const green = data[offset + 1];
-    const blue = data[offset + 2];
-    const brightest = Math.max(red, green, blue);
-    data[offset + 3] = Math.max(0, Math.min(255, (brightest - 10) * 12));
-  }
-
-  await sharp(data, {
-    raw: {
-      width: info.width,
-      height: info.height,
-      channels: 4,
-    },
-  })
-    .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 8 })
-    .resize(1122, 1402, { fit: "contain" })
-    .webp({ quality: 90, effort: 5 })
-    .toFile(output);
-}
-
 function escapeXml(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;");
 }
@@ -276,14 +245,6 @@ async function main() {
     const output = path.join(outputDirectory, outputName);
     const bounds = await processImage(input, output);
     console.log(`${sourceName} -> ${outputName}`, bounds);
-  }
-
-  for (const [sourceName, outputName] of Object.entries(HERO_IMAGES)) {
-    await processHeroImage(
-      path.join(inputDirectory, sourceName),
-      path.join(outputDirectory, outputName)
-    );
-    console.log(`${sourceName} -> ${outputName}`);
   }
 
   if (contactSheet) {
