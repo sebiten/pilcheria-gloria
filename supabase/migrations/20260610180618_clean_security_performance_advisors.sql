@@ -12,10 +12,16 @@ create index if not exists product_images_product_id_idx on public.product_image
 create index if not exists product_variants_product_id_idx on public.product_variants (product_id);
 create index if not exists products_category_id_idx on public.products (category_id);
 
-revoke execute on function public.handle_new_user() from public;
-revoke execute on function public.handle_new_user() from anon;
-revoke execute on function public.handle_new_user() from authenticated;
-alter function public.handle_new_user() set search_path = public, auth;
+do $$
+begin
+  if to_regprocedure('public.handle_new_user()') is not null then
+    execute 'revoke execute on function public.handle_new_user() from public';
+    execute 'revoke execute on function public.handle_new_user() from anon';
+    execute 'revoke execute on function public.handle_new_user() from authenticated';
+    execute 'alter function public.handle_new_user() set search_path = public, auth';
+  end if;
+end
+$$;
 
 alter table public.profiles enable row level security;
 drop policy if exists "Users can read own profile" on public.profiles;
