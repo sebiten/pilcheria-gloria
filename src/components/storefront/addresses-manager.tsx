@@ -117,7 +117,7 @@ export function AddressesManager({ addresses }: AddressesManagerProps) {
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{address.name}</p>
                       {address.is_default ? (
-                        <span className="rounded-full bg-[#f6ae66]/20 px-2 py-0.5 text-xs font-medium text-[#9a5b19]">
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-gloria-800">
                           Predeterminada
                         </span>
                       ) : null}

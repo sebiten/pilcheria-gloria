@@ -1,20 +1,36 @@
 import type { NextConfig } from "next";
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseOrigin = (() => {
+  try {
+    return supabaseUrl ? new URL(supabaseUrl).origin : "";
+  } catch {
+    return "";
+  }
+})();
+const supabaseHostname = (() => {
+  try {
+    return supabaseUrl ? new URL(supabaseUrl).hostname : null;
+  } catch {
+    return null;
+  }
+})();
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${
     process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""
-  } https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://clerk.pilcheriagloria.com.ar https://challenges.cloudflare.com https://*.protect.clerk.com https://sdk.mercadopago.com https://www.googletagmanager.com`,
+  } https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://clerk.pilcheriagloria.com.ar https://challenges.cloudflare.com https://*.protect.clerk.com https://www.googletagmanager.com`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://*.clerk.com https://*.clerk.dev https://img.clerk.com https://*.google-analytics.com https://www.googletagmanager.com",
+  `img-src 'self' data: blob: https://images.unsplash.com${supabaseOrigin ? ` ${supabaseOrigin}` : ""} https://*.clerk.com https://*.clerk.dev https://img.clerk.com https://*.google-analytics.com https://www.googletagmanager.com`,
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://clerk.pilcheriagloria.com.ar https://clerk-telemetry.com https://*.clerk-telemetry.com https://img.clerk.com https://*.protect.clerk.com https://api.clerk.com https://api.mercadopago.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com",
-  "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://*.protect.clerk.com https://*.mercadopago.com https://www.google.com",
+  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://clerk.pilcheriagloria.com.ar https://clerk-telemetry.com https://*.clerk-telemetry.com https://img.clerk.com https://*.protect.clerk.com https://api.clerk.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com",
+  "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://*.protect.clerk.com https://www.google.com",
   "worker-src 'self' blob:",
   "media-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self' https://*.mercadopago.com",
+  "form-action 'self'",
   "frame-ancestors 'none'",
   ...(process.env.NODE_ENV === "production" ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
@@ -26,15 +42,15 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
-      {
-        protocol: "https",
-        hostname: "*.supabase.co",
-      },
+      ...(supabaseHostname
+        ? [{ protocol: "https" as const, hostname: supabaseHostname }]
+        : []),
     ],
   },
   async headers() {
@@ -63,6 +79,26 @@ const nextConfig: NextConfig = {
             value:
               "camera=(), microphone=(), geolocation=(), browsing-topics=()",
           },
+          {
+            key: "X-DNS-Prefetch-Control",
+            value: "on",
+          },
+          {
+            key: "X-Permitted-Cross-Domain-Policies",
+            value: "none",
+          },
+          {
+            key: "Origin-Agent-Cluster",
+            value: "?1",
+          },
+          ...(process.env.NODE_ENV === "production"
+            ? [
+                {
+                  key: "Strict-Transport-Security",
+                  value: "max-age=31536000; includeSubDomains",
+                },
+              ]
+            : []),
         ],
       },
     ];

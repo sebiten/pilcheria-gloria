@@ -5,7 +5,7 @@ import { revalidatePath, unstable_cache, updateTag } from "next/cache";
 import { z } from "zod";
 import { ensureUserProfile, requireAdmin } from "@/actions/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import type { ProductReview, ProductReviewStats } from "@/types";
+import type { PublicProductReview, ProductReviewStats } from "@/types";
 import { reportDataFallback } from "@/lib/logging";
 
 type ReviewFormState = {
@@ -23,12 +23,9 @@ const reviewSchema = z.object({
   comment: z.string().trim().min(10).max(1000),
 });
 
-function mapReview(row: any): ProductReview {
+function mapPublicReview(row: any): PublicProductReview {
   return {
     id: row.id,
-    product_id: row.product_id,
-    clerk_user_id: row.clerk_user_id,
-    order_id: row.order_id,
     rating: Number(row.rating),
     title: row.title,
     comment: row.comment,
@@ -77,16 +74,20 @@ const getProductReviewStatsCached = unstable_cache(
   }
 );
 
-export async function getProductReviews(productId: string): Promise<ProductReview[]> {
+export async function getProductReviews(
+  productId: string
+): Promise<PublicProductReview[]> {
   return getProductReviewsCached(productId);
 }
 
 const getProductReviewsCached = unstable_cache(
-  async (productId: string): Promise<ProductReview[]> => {
+  async (productId: string): Promise<PublicProductReview[]> => {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("product_reviews")
-      .select("*")
+      .select(
+        "id, rating, title, comment, reviewer_name, approved, created_at, updated_at"
+      )
       .eq("product_id", productId)
       .eq("approved", true)
       .order("created_at", { ascending: false })
@@ -97,7 +98,7 @@ const getProductReviewsCached = unstable_cache(
       return [];
     }
 
-    return (data || []).map(mapReview);
+    return (data || []).map(mapPublicReview);
   },
   ["product-reviews"],
   {
@@ -106,20 +107,23 @@ const getProductReviewsCached = unstable_cache(
   }
 );
 
-export async function getProductReviewEligibility(productId: string) {
+async function getProductReviewEligibilityData(productId: string) {
   const { userId } = await auth();
   if (!userId) {
     return {
       canReview: false,
       reason: "Inicia sesión para dejar una reseña.",
       existingReview: null,
+      orderId: null,
     };
   }
 
   const supabase = getSupabaseAdmin();
   const { data: existingReview } = await supabase
     .from("product_reviews")
-    .select("*")
+    .select(
+      "id, rating, title, comment, reviewer_name, approved, created_at, updated_at"
+    )
     .eq("product_id", productId)
     .eq("clerk_user_id", userId)
     .maybeSingle();
@@ -138,7 +142,8 @@ export async function getProductReviewEligibility(productId: string) {
     return {
       canReview: false,
       reason: "No pudimos validar tu compra.",
-      existingReview: existingReview ? mapReview(existingReview) : null,
+      existingReview: existingReview ? mapPublicReview(existingReview) : null,
+      orderId: null,
     };
   }
 
@@ -147,9 +152,15 @@ export async function getProductReviewEligibility(productId: string) {
     reason: orders?.[0]
       ? null
       : "Podés dejar una reseña cuando el pedido figure como entregado.",
-    existingReview: existingReview ? mapReview(existingReview) : null,
+    existingReview: existingReview ? mapPublicReview(existingReview) : null,
     orderId: orders?.[0]?.id ?? null,
   };
+}
+
+export async function getProductReviewEligibility(productId: string) {
+  const { orderId: _orderId, ...eligibility } =
+    await getProductReviewEligibilityData(productId);
+  return eligibility;
 }
 
 export async function submitProductReview(
@@ -174,7 +185,9 @@ export async function submitProductReview(
   }
 
   const profile = await ensureUserProfile();
-  const eligibility = await getProductReviewEligibility(parsed.data.productId);
+  const eligibility = await getProductReviewEligibilityData(
+    parsed.data.productId
+  );
 
   if (!eligibility.canReview || !eligibility.orderId) {
     return {
@@ -184,6 +197,11 @@ export async function submitProductReview(
   }
 
   const supabase = getSupabaseAdmin();
+  const profileName = profile.full_name?.trim();
+  const reviewerName =
+    profileName && !profileName.includes("@")
+      ? profileName.slice(0, 80)
+      : "Cliente verificado";
   const { error } = await supabase.from("product_reviews").upsert(
     {
       product_id: parsed.data.productId,
@@ -192,7 +210,7 @@ export async function submitProductReview(
       rating: parsed.data.rating,
       title: parsed.data.title || null,
       comment: parsed.data.comment,
-      reviewer_name: profile.full_name || profile.email,
+      reviewer_name: reviewerName,
       approved: false,
       updated_at: new Date().toISOString(),
     },

@@ -6,18 +6,24 @@ import {
   enforceCheckoutRateLimit,
 } from "@/lib/security/checkout-rate-limit";
 import { isValidArgentinaContactPhone } from "@/lib/contact";
+import { getOrderConfirmationCookieName } from "@/lib/orders/confirmation-access";
+import { getCheckoutRouteCapability } from "@/lib/security/checkout-capability";
 
 const checkoutSchema = z.object({
   items: z
     .array(
       z.object({
         product_id: z.string().uuid(),
-        variant_id: z.string().uuid().nullable(),
+        variant_id: z.string().uuid(),
         quantity: z.number().int().min(1).max(10),
       })
     )
     .min(1)
-    .max(20),
+    .max(20)
+    .refine(
+      (items) => items.reduce((total, item) => total + item.quantity, 0) <= 20,
+      { message: "El checkout admite hasta 20 prendas por pedido" }
+    ),
   expectedSubtotal: z.number().finite().nonnegative(),
   shippingMethod: z.enum(["pickup", "local_delivery"]),
   shippingAddress: z.object({
@@ -51,13 +57,41 @@ export async function POST(request: Request) {
     const body = checkoutSchema.parse(await request.json());
     const requestFingerprint = await enforceCheckoutRateLimit(request);
 
-    const result = await createOrder({
-      ...body,
-      checkoutRequestId,
-      requestFingerprint,
-    });
+    const result = await createOrder(
+      {
+        ...body,
+        checkoutRequestId,
+        requestFingerprint,
+      },
+      getCheckoutRouteCapability()
+    );
 
-    return NextResponse.json(result);
+    const initPoint = result.preference?.init_point;
+    if (!initPoint) {
+      throw new Error("Mercado Pago no devolvió un enlace de pago");
+    }
+
+    const response = NextResponse.json({
+      preference: { init_point: String(initPoint) },
+    });
+    const guestToken = result.order?.guest_access_token;
+
+    if (guestToken) {
+      response.cookies.set(
+        getOrderConfirmationCookieName(result.order.id),
+        guestToken,
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: `/order-confirmation/${result.order.id}`,
+          maxAge: 7 * 24 * 60 * 60,
+        }
+      );
+    }
+
+    response.headers.set("Cache-Control", "no-store");
+    return response;
   } catch (error) {
     console.error("Checkout error:", error);
 

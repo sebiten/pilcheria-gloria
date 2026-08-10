@@ -15,6 +15,7 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { getBreadcrumbJsonLd } from "@/lib/seo";
 import { formatPrice } from "@/lib/utils";
 import { absoluteUrl, SITE_LOCALITY, SITE_NAME } from "@/lib/site";
+import { sanitizeStorefrontProduct } from "@/lib/inventory";
 import { AddToCartButton } from "./add-to-cart-button";
 import { ProductGallery } from "./product-gallery";
 import { ProductReviews, ProductReviewSummary } from "./product-reviews";
@@ -256,7 +257,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 </p>
 
                 <AddToCartButton
-                  product={product}
+                  product={sanitizeStorefrontProduct(product)}
                   whatsappPhone={settings.whatsapp_phone}
                   productUrl={productUrl}
                 />

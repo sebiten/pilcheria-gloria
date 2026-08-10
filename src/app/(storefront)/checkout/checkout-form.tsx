@@ -149,6 +149,8 @@ export function CheckoutForm({
   const itemCount = getCartItemCount(items);
   const localDeliveryAvailable =
     settings.local_delivery_enabled && canUseLocalDelivery(items);
+  const hasAvailableShippingMethod =
+    settings.pickup_enabled || localDeliveryAvailable;
   const subtotal = getTotal();
   const shippingCost = getShippingCost(formData.shippingMethod, {
     localDeliveryCost: settings.local_delivery_cost,
@@ -263,6 +265,12 @@ export function CheckoutForm({
 
     try {
       const fullName = `${formData.name} ${formData.lastName}`.trim();
+
+      if (!hasAvailableShippingMethod) {
+        throw new Error(
+          "No hay un método de entrega disponible para este carrito. Sumá otra prenda o contactanos."
+        );
+      }
 
       if (!isValidArgentinaContactPhone(formData.phone)) {
         throw new Error(
@@ -421,6 +429,7 @@ export function CheckoutForm({
             </CardHeader>
             <CardContent>
               <RadioGroup
+                aria-label="Método de entrega"
                 value={formData.shippingMethod}
                 onValueChange={(value) => {
                   checkoutRequestId.current = null;
@@ -454,6 +463,19 @@ export function CheckoutForm({
                   />
                 ) : null}
               </RadioGroup>
+              {!hasAvailableShippingMethod ? (
+                <div
+                  className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950"
+                  role="alert"
+                >
+                  No hay un método disponible para este carrito. Volvé al{" "}
+                  <Link href="/cart" className="underline underline-offset-4">
+                    carrito
+                  </Link>{" "}
+                  y sumá otra prenda para habilitar entrega local, o consultanos
+                  antes de pagar.
+                </div>
+              ) : null}
               {settings.local_delivery_enabled ? (
                 <p
                   data-testid="local-delivery-condition"
@@ -699,7 +721,7 @@ export function CheckoutForm({
                 <span>{formatPrice(total)}</span>
               </div>
             </div>
-            <Button className="min-h-14 w-full text-base font-bold" size="lg" type="submit" form={formId} data-testid="checkout-submit" disabled={isProcessing}>
+            <Button className="min-h-14 w-full text-base font-bold" size="lg" type="submit" form={formId} data-testid="checkout-submit" disabled={isProcessing || !hasAvailableShippingMethod}>
               {isProcessing ? "Abriendo Mercado Pago..." : "Continuar a Mercado Pago"}
             </Button>
             <PaymentConfidence amount={total} compact />
@@ -737,7 +759,7 @@ function DeliveryOption({
   return (
     <div>
       <RadioGroupItem value={id} id={id} className="peer sr-only" />
-      <Label htmlFor={id} className="flex min-h-32 cursor-pointer flex-col rounded-xl border p-4 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5">
+      <Label htmlFor={id} className="flex min-h-32 cursor-pointer flex-col rounded-xl border p-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5">
         <Icon className="h-5 w-5 text-primary" />
         <span className="mt-4 text-base font-bold">{title}</span>
         <span className="mt-1 text-sm text-muted-foreground">{description}</span>

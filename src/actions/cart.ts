@@ -6,13 +6,18 @@ import { revalidatePath } from "next/cache";
 import { ensureUserProfile } from "@/actions/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { CartItem, ProductWithDetails } from "@/types";
-import { mapProductRow, PRODUCT_OFFERS_SELECT } from "@/lib/inventory";
+import {
+  mapProductRow,
+  PRODUCT_OFFERS_SELECT,
+  sanitizeStorefrontProduct,
+} from "@/lib/inventory";
 
 const cartItemInputSchema = z.object({
   product_id: z.string().uuid(),
   variant_id: z.string().uuid().nullable(),
-  quantity: z.number().int().positive(),
+  quantity: z.number().int().min(1).max(10),
 });
+const cartItemsInputSchema = z.array(cartItemInputSchema).max(20);
 
 type CartItemInput = z.infer<typeof cartItemInputSchema>;
 
@@ -29,7 +34,7 @@ function createCartKey(productId: string, variantId: string | null) {
 }
 
 function mapProduct(product: any): ProductWithDetails {
-  return mapProductRow(product);
+  return sanitizeStorefrontProduct(mapProductRow(product));
 }
 
 function mapCartItem(row: CartRow): CartItem {
@@ -45,17 +50,16 @@ function mapCartItem(row: CartRow): CartItem {
 function normalizeCartItems(items: CartItemInput[]): CartItemInput[] {
   const merged = new Map<string, CartItemInput>();
 
-  for (const item of items) {
-    const parsed = cartItemInputSchema.parse({
-      product_id: item.product_id,
-      variant_id: item.variant_id ?? null,
-      quantity: item.quantity,
-    });
+  for (const parsed of cartItemsInputSchema.parse(items)) {
     const key = createCartKey(parsed.product_id, parsed.variant_id);
     const existing = merged.get(key);
 
     if (existing) {
-      existing.quantity += parsed.quantity;
+      const quantity = existing.quantity + parsed.quantity;
+      if (quantity > 10) {
+        throw new Error("La cantidad máxima por talle es 10");
+      }
+      existing.quantity = quantity;
       continue;
     }
 
@@ -284,7 +288,9 @@ export async function mergeCartItems(items: CartItemInput[]): Promise<CartItem[]
   return selectUserCart(userId);
 }
 
-export async function replaceCartItems(items: CartItemInput[]): Promise<CartItem[]> {
+export async function replaceCartItems(
+  items: CartItemInput[]
+): Promise<{ ok: true }> {
   const { userId } = await auth();
   if (!userId) throw new Error("User not authenticated");
 
@@ -292,7 +298,6 @@ export async function replaceCartItems(items: CartItemInput[]): Promise<CartItem
   const normalizedItems = normalizeCartItems(items);
 
   await replaceUserCart(userId, normalizedItems);
-  revalidateCartPaths();
 
-  return selectUserCart(userId);
+  return { ok: true };
 }

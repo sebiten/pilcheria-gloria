@@ -105,6 +105,18 @@ export interface ProductReview {
   updated_at: string;
 }
 
+export type PublicProductReview = Pick<
+  ProductReview,
+  | "id"
+  | "rating"
+  | "title"
+  | "comment"
+  | "reviewer_name"
+  | "approved"
+  | "created_at"
+  | "updated_at"
+>;
+
 export interface ProductReviewStats {
   average: number;
   count: number;

@@ -18,6 +18,21 @@ export function CartContent() {
   const { items, removeItem, updateQuantity, getTotal, setIsOpen } = useCartStore();
   const itemCount = getCartItemCount(items);
   const localDeliveryAvailable = canUseLocalDelivery(items);
+  const hasInvalidItems = items.some((item) => {
+    const selectedVariant = item.variant_id
+      ? item.product?.variants?.find(
+          (variant) => variant.id === item.variant_id
+        )
+      : null;
+
+    return Boolean(
+      !item.product ||
+        !item.variant_id ||
+        !selectedVariant ||
+        selectedVariant.active === false ||
+        !selectedVariant.available
+    );
+  });
 
   if (items.length === 0) {
     return (
@@ -47,7 +62,11 @@ export function CartContent() {
           const hasReachedStockLimit =
             maxQuantity !== null && item.quantity >= maxQuantity;
           const isUnavailableVariant = Boolean(
-            item.variant_id && (!selectedVariant || !selectedVariant.available)
+            !item.product ||
+              !item.variant_id ||
+              !selectedVariant ||
+              selectedVariant.active === false ||
+              !selectedVariant.available
           );
           const pricing = getCartItemPricingSegments(item);
 
@@ -66,7 +85,17 @@ export function CartContent() {
               <div className="flex min-w-0 flex-1 flex-col justify-between">
                 <div>
                   <h4 className="line-clamp-2 text-base font-bold leading-5">
-                    {item.product?.name}
+                    {item.product?.slug ? (
+                      <Link
+                        href={`/products/${item.product.slug}`}
+                        className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        {item.product.name}
+                      </Link>
+                    ) : (
+                      "Producto no disponible"
+                    )}
                   </h4>
                   {selectedVariant ? (
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -77,11 +106,26 @@ export function CartContent() {
                     </p>
                   ) : null}
                   {isUnavailableVariant ? (
-                    <p className="text-sm text-destructive">
-                      Variante no disponible
-                    </p>
+                    <div className="mt-1 text-sm">
+                      <p className="font-semibold text-destructive">
+                        Este talle ya no está disponible
+                      </p>
+                      {item.product?.slug ? (
+                        <Link
+                          href={`/products/${item.product.slug}`}
+                          className="inline-flex min-h-11 items-center font-bold text-primary underline underline-offset-4"
+                          onClick={() => setIsOpen(false)}
+                        >
+                          Elegir otro talle
+                        </Link>
+                      ) : (
+                        <p className="mt-1 text-muted-foreground">
+                          Eliminá este producto para continuar.
+                        </p>
+                      )}
+                    </div>
                   ) : null}
-                  {selectedVariant ? (
+                  {selectedVariant && !isUnavailableVariant ? (
                     <p className="text-sm text-muted-foreground">
                       {selectedVariant.stock > 0
                         ? "Entrega inmediata para el stock disponible"
@@ -162,15 +206,35 @@ export function CartContent() {
             ? "Entrega local en Ledesma habilitada. También podés elegir retiro coordinado."
             : `Con ${itemCount} prenda: retiro coordinado. Sumá otra para habilitar entrega local en Ledesma.`}
         </p>
-        <Button className="min-h-12 w-full text-base font-bold" size="lg" asChild>
-          <Link
-            href="/checkout"
-            data-testid="cart-checkout-link"
-            onClick={() => setIsOpen(false)}
-          >
-            Finalizar compra
-          </Link>
-        </Button>
+        {hasInvalidItems ? (
+          <>
+            <p
+              className="rounded-xl bg-destructive/10 p-3 text-sm font-semibold leading-5 text-destructive"
+              role="alert"
+            >
+              Revisá los productos marcados y elegí un talle disponible antes
+              de continuar.
+            </p>
+            <Button
+              className="min-h-12 w-full text-base font-bold"
+              size="lg"
+              data-testid="cart-checkout-link"
+              disabled
+            >
+              Revisá los talles para continuar
+            </Button>
+          </>
+        ) : (
+          <Button className="min-h-12 w-full text-base font-bold" size="lg" asChild>
+            <Link
+              href="/checkout"
+              data-testid="cart-checkout-link"
+              onClick={() => setIsOpen(false)}
+            >
+              Finalizar compra
+            </Link>
+          </Button>
+        )}
       </div>
     </div>
   );

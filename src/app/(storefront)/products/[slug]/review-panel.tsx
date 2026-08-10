@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUser } from "@clerk/nextjs";
 import { getProductReviewEligibility } from "@/actions/reviews";
-import type { ProductReview } from "@/types";
+import type { PublicProductReview } from "@/types";
 import { ReviewForm } from "./review-form";
 
 type ReviewEligibility = {
   canReview: boolean;
   reason: string | null;
-  existingReview: ProductReview | null;
+  existingReview: PublicProductReview | null;
 };
 
 interface ReviewPanelProps {
@@ -18,8 +19,20 @@ interface ReviewPanelProps {
 
 export function ReviewPanel({ productId, productSlug }: ReviewPanelProps) {
   const [eligibility, setEligibility] = useState<ReviewEligibility | null>(null);
+  const { isLoaded, isSignedIn } = useUser();
 
   useEffect(() => {
+    if (!isLoaded) return;
+
+    if (!isSignedIn) {
+      setEligibility({
+        canReview: false,
+        reason: "Ingresá a tu cuenta para dejar una reseña verificada.",
+        existingReview: null,
+      });
+      return;
+    }
+
     let active = true;
 
     getProductReviewEligibility(productId)
@@ -45,7 +58,7 @@ export function ReviewPanel({ productId, productSlug }: ReviewPanelProps) {
     return () => {
       active = false;
     };
-  }, [productId]);
+  }, [isLoaded, isSignedIn, productId]);
 
   if (!eligibility) {
     return (

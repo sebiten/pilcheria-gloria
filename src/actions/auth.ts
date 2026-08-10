@@ -2,12 +2,28 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { clerkClient } from "@clerk/nextjs/server";
+import { cache } from "react";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import type { Profile } from "@/types";
 import type { Role } from "@/types";
 import { reportDataFallback } from "@/lib/logging";
+
+const idSchema = z.string().uuid();
+const addressSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  street: z.string().trim().min(1).max(200),
+  city: z.string().trim().min(1).max(120),
+  state: z.string().trim().min(1).max(120),
+  zip: z.string().trim().max(20).optional(),
+  isDefault: z.boolean().optional(),
+});
+const profileContactSchema = z.object({
+  fullName: z.string().trim().max(120).optional(),
+  phone: z.string().trim().max(32).optional(),
+});
 
 type ProfileRow = {
   id: string;
@@ -48,7 +64,7 @@ async function getClerkUserBasics(userId: string) {
   return { email, displayName };
 }
 
-async function getProfileFromDb(userId: string) {
+const getProfileFromDb = cache(async function getProfileFromDb(userId: string) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("profiles")
@@ -61,7 +77,7 @@ async function getProfileFromDb(userId: string) {
     return null;
   }
   return data ? buildProfileFromRow(data as ProfileRow) : null;
-}
+});
 
 export async function ensureUserProfile() {
   const { userId } = await auth();
@@ -72,21 +88,24 @@ export async function ensureUserProfile() {
   const supabase = getSupabaseAdmin();
   const existingProfile = await getProfileFromDb(userId);
 
+  if (existingProfile) {
+    return existingProfile;
+  }
+
   let clerkBasics: Awaited<ReturnType<typeof getClerkUserBasics>>;
   try {
     clerkBasics = await getClerkUserBasics(userId);
   } catch (error) {
     reportDataFallback("clerk-user", error);
-    if (existingProfile) return existingProfile;
     throw new Error("User not found in Clerk");
   }
 
   const payload = {
-    id: existingProfile?.id ?? randomUUID(),
+    id: randomUUID(),
     clerk_user_id: userId,
     email: clerkBasics.email,
-    full_name: existingProfile?.full_name ?? clerkBasics.displayName,
-    role: existingProfile?.role ?? "client",
+    full_name: clerkBasics.displayName,
+    role: "client",
   };
 
   const { data, error } = await supabase
@@ -139,11 +158,12 @@ export async function requireAdmin(): Promise<void> {
 
 export async function updateRole(profileId: string, role: "client" | "admin") {
   await requireAdmin();
+  const safeProfileId = idSchema.parse(profileId);
   const supabase = getSupabaseAdmin();
   const { error } = await supabase
     .from("profiles")
     .update({ role })
-    .eq("id", profileId);
+    .eq("id", safeProfileId);
 
   if (error) throw error;
   revalidatePath("/dashboard");
@@ -180,13 +200,14 @@ export async function addAddress(address: {
 
   await ensureUserProfile();
   const supabase = getSupabaseAdmin();
+  const parsedAddress = addressSchema.parse(address);
   const normalizedAddress = {
-    name: address.name.trim(),
-    street: address.street.trim(),
-    city: address.city.trim(),
-    state: address.state.trim(),
-    zip: address.zip?.trim() || null,
-    is_default: Boolean(address.isDefault),
+    name: parsedAddress.name,
+    street: parsedAddress.street,
+    city: parsedAddress.city,
+    state: parsedAddress.state,
+    zip: parsedAddress.zip || null,
+    is_default: Boolean(parsedAddress.isDefault),
   };
 
   const { data: existingAddress, error: existingAddressError } = await supabase
@@ -218,6 +239,16 @@ export async function addAddress(address: {
 
     if (error) throw error;
   } else {
+    const { count, error: countError } = await supabase
+      .from("addresses")
+      .select("id", { count: "exact", head: true })
+      .eq("clerk_user_id", userId);
+
+    if (countError) throw countError;
+    if ((count ?? 0) >= 10) {
+      throw new Error("Alcanzaste el límite de 10 direcciones guardadas");
+    }
+
     const { error } = await supabase.from("addresses").insert({
       clerk_user_id: userId,
       ...normalizedAddress,
@@ -236,11 +267,12 @@ export async function deleteAddress(id: string) {
   if (!userId) throw new Error("User not authenticated");
 
   await ensureUserProfile();
+  const safeId = idSchema.parse(id);
   const supabase = getSupabaseAdmin();
   const { error } = await supabase
     .from("addresses")
     .delete()
-    .eq("id", id)
+    .eq("id", safeId)
     .eq("clerk_user_id", userId);
 
   if (error) throw error;
@@ -254,6 +286,7 @@ export async function setDefaultAddress(id: string) {
   if (!userId) throw new Error("User not authenticated");
 
   await ensureUserProfile();
+  const safeId = idSchema.parse(id);
   const supabase = getSupabaseAdmin();
 
   const { error: resetError } = await supabase
@@ -266,7 +299,7 @@ export async function setDefaultAddress(id: string) {
   const { error } = await supabase
     .from("addresses")
     .update({ is_default: true })
-    .eq("id", id)
+    .eq("id", safeId)
     .eq("clerk_user_id", userId);
 
   if (error) throw error;
@@ -291,9 +324,10 @@ export async function updateProfileContact(input: {
 
   await ensureUserProfile();
   const supabase = getSupabaseAdmin();
+  const parsedInput = profileContactSchema.parse(input);
   const payload = {
-    full_name: input.fullName?.trim() || null,
-    phone: input.phone?.trim() || null,
+    full_name: parsedInput.fullName || null,
+    phone: parsedInput.phone || null,
   };
 
   const { error } = await supabase

@@ -171,7 +171,7 @@ export default async function HomePage() {
             </Button>
           </div>
           {products.length ? (
-            <ProductGrid products={products} priorityFirst={4} />
+            <ProductGrid products={products} priorityFirst={0} />
           ) : (
             <div className="rounded-3xl border border-dashed border-gloria-300 bg-gloria-50 px-6 py-14 text-center">
               <p className="font-display text-2xl text-gloria-950">

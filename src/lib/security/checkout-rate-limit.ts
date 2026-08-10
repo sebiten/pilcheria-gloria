@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_CHECKOUTS_PER_WINDOW = 8;
 const MAX_REQUESTS_PER_MINUTE = 12;
+const MAX_LOCAL_FINGERPRINTS = 5_000;
 
 type LocalAttempt = {
   count: number;
@@ -40,6 +41,19 @@ function getClientIp(request: Request) {
 
 function consumeLocalLimit(fingerprint: string) {
   const now = Date.now();
+
+  if (localAttempts.size >= MAX_LOCAL_FINGERPRINTS) {
+    for (const [key, attempt] of localAttempts) {
+      if (attempt.resetAt <= now) localAttempts.delete(key);
+    }
+
+    while (localAttempts.size >= MAX_LOCAL_FINGERPRINTS) {
+      const oldestKey = localAttempts.keys().next().value;
+      if (!oldestKey) break;
+      localAttempts.delete(oldestKey);
+    }
+  }
+
   const current = localAttempts.get(fingerprint);
 
   if (!current || current.resetAt <= now) {
@@ -79,6 +93,7 @@ export async function enforceCheckoutRateLimit(request: Request) {
 
   if (error) {
     console.error("No se pudo verificar el límite distribuido del checkout:", error);
+    throw new CheckoutRateLimitError(60);
   } else if ((count ?? 0) >= MAX_CHECKOUTS_PER_WINDOW) {
     throw new CheckoutRateLimitError(Math.ceil(WINDOW_MS / 1000));
   }

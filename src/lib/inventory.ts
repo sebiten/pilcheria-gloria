@@ -208,6 +208,20 @@ export function mapProductRow(product: any): ProductWithDetails {
   };
 }
 
+export function sanitizeStorefrontProduct(
+  product: ProductWithDetails
+): ProductWithDetails {
+  return {
+    ...product,
+    variants: product.variants.map((variant) => ({
+      ...variant,
+      sku: null,
+      partnerPrice: null,
+      partnerAvailable: false,
+    })),
+  };
+}
+
 export function getVariantPricingSegments(
   variant: Pick<ProductVariant, "pricingTiers">,
   quantity: number

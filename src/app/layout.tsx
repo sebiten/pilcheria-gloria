@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo_Black, Manrope } from "next/font/google";
-import Script from "next/script";
 import { ClerkProvider } from "@clerk/nextjs";
 import { esES } from "@clerk/localizations";
-import { ThemeProvider } from "@/components/theme-provider";
 import {
   SITE_DESCRIPTION,
   SITE_DEPARTMENT,
@@ -98,6 +96,12 @@ export default function RootLayout({
       className={`${manrope.variable} ${archivoBlack.variable}`}
     >
       <body className="flex min-h-full flex-col antialiased">
+        <a
+          href="#contenido-principal"
+          className="fixed left-4 top-4 z-[100] -translate-y-24 rounded-lg bg-gloria-950 px-4 py-3 font-bold text-white shadow-xl transition-transform focus:translate-y-0"
+        >
+          Ir al contenido principal
+        </a>
         <ClerkProvider
           localization={esES as any}
           publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!}
@@ -106,19 +110,9 @@ export default function RootLayout({
           signInFallbackRedirectUrl="/"
           signUpFallbackRedirectUrl="/"
         >
-          <ThemeProvider>{children}</ThemeProvider>
+          {children}
         </ClerkProvider>
       </body>
-      <Script
-        src="https://www.googletagmanager.com/gtag/js?id=G-QVFH4THVE9"
-        strategy="afterInteractive"
-      />
-      <Script id="google-analytics" strategy="afterInteractive">
-        {`window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-QVFH4THVE9');`}
-      </Script>
     </html>
   );
 }

@@ -5,10 +5,18 @@ import { headers } from "next/headers";
 import { randomUUID } from "node:crypto";
 
 const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET || "";
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 
 export async function POST(request: Request) {
   try {
-    const body = await request.text();
+    if (!WEBHOOK_SECRET) {
+      console.error("Falta CLERK_WEBHOOK_SECRET");
+      return NextResponse.json(
+        { error: "Webhook unavailable" },
+        { status: 503 }
+      );
+    }
+
     const headersList = await headers();
     const svix_id = headersList.get("svix-id");
     const svix_timestamp = headersList.get("svix-timestamp");
@@ -16,6 +24,16 @@ export async function POST(request: Request) {
 
     if (!svix_id || !svix_timestamp || !svix_signature) {
       return NextResponse.json({ error: "Missing svix headers" }, { status: 400 });
+    }
+
+    const contentLength = Number(headersList.get("content-length") || 0);
+    if (contentLength > MAX_WEBHOOK_BODY_BYTES) {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+
+    const body = await request.text();
+    if (new TextEncoder().encode(body).byteLength > MAX_WEBHOOK_BODY_BYTES) {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
     }
 
     const wh = new Webhook(WEBHOOK_SECRET);

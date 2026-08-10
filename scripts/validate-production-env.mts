@@ -23,6 +23,18 @@ if (isProductionDeployment) {
     .map((key) => `Falta ${key}`);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
 
+  if (process.env.VERCEL_ENV === "production" && allowDevelopmentClerk) {
+    errors.push(
+      "ALLOW_CLERK_DEVELOPMENT_IN_PRODUCTION no está permitido en producción"
+    );
+  }
+  if (process.env.E2E_MERCADOPAGO_FAKE === "1") {
+    errors.push("E2E_MERCADOPAGO_FAKE no puede estar activo en producción");
+  }
+  if (process.env.E2E_ALLOW_REMOTE_DB === "1") {
+    errors.push("E2E_ALLOW_REMOTE_DB no puede estar activo en producción");
+  }
+
   if (
     !allowDevelopmentClerk &&
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")

@@ -157,7 +157,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       </header>
       <section className="container mx-auto px-4 py-8">
         {products.length ? (
-          <ProductGrid products={products} priorityFirst={4} />
+          <ProductGrid products={products} priorityFirst={1} />
         ) : (
           <div className="rounded-3xl border border-dashed border-gloria-300 bg-gloria-50 p-12 text-center">
             <h2 className="font-display text-2xl text-gloria-950">

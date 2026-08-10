@@ -9,6 +9,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 
 function parseSignatureHeader(signatureHeader: string | null) {
   if (!signatureHeader) {
@@ -68,26 +69,59 @@ function isValidWebhookSignature({
 
 export async function POST(request: Request) {
   try {
+    if (!process.env.MERCADOPAGO_WEBHOOK_SECRET) {
+      console.error("Falta MERCADOPAGO_WEBHOOK_SECRET");
+      return NextResponse.json(
+        { error: "Webhook no configurado" },
+        { status: 503 }
+      );
+    }
+
+    const signatureHeader = request.headers.get("x-signature");
+    const requestId = request.headers.get("x-request-id");
+    if (!signatureHeader || !requestId || requestId.length > 160) {
+      return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
+    }
+
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > MAX_WEBHOOK_BODY_BYTES) {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+
     const url = new URL(request.url);
-    const body = await request.json().catch(() => null);
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_WEBHOOK_BODY_BYTES) {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+    let body: any = null;
+    if (rawBody) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+      }
+    }
     const type = url.searchParams.get("type") || body?.type;
     const paymentId = String(
       url.searchParams.get("data.id") || body?.data?.id || body?.id || ""
     );
 
     if (type === "payment" && paymentId) {
-      if (!process.env.MERCADOPAGO_WEBHOOK_SECRET) {
-        console.error("Falta MERCADOPAGO_WEBHOOK_SECRET");
+      const validPaymentId =
+        process.env.E2E_MERCADOPAGO_FAKE === "1"
+          ? /^[0-9a-f-]{16,64}$/i.test(paymentId)
+          : /^\d{1,32}$/.test(paymentId);
+      if (!validPaymentId) {
         return NextResponse.json(
-          { error: "Webhook no configurado" },
-          { status: 503 }
+          { error: "Identificador de pago inválido" },
+          { status: 400 }
         );
       }
 
       const isValidSignature = isValidWebhookSignature({
         dataId: paymentId,
-        requestId: request.headers.get("x-request-id"),
-        signatureHeader: request.headers.get("x-signature"),
+        requestId,
+        signatureHeader,
       });
 
       if (!isValidSignature) {

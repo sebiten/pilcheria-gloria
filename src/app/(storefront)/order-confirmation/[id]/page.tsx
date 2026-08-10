@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, CircleAlert } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { getOrderForConfirmation } from "@/actions/orders";
 import {
@@ -9,6 +11,7 @@ import {
   getOrderStatusLabel,
 } from "@/lib/commerce";
 import { ClearCartOnMount } from "./clear-cart-on-mount";
+import { getOrderConfirmationCookieName } from "@/lib/orders/confirmation-access";
 
 export const metadata: Metadata = {
   title: "Confirmación del pedido",
@@ -26,29 +29,52 @@ export default async function OrderConfirmationPage({
 }: OrderConfirmationPageProps) {
   const { id } = await params;
   const { token } = await searchParams;
+
+  if (token) {
+    redirect(
+      `/api/order-confirmation/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`
+    );
+  }
+
+  const accessToken = (await cookies()).get(
+    getOrderConfirmationCookieName(id)
+  )?.value;
   let order;
 
   try {
-    order = await getOrderForConfirmation(id, token);
+    order = await getOrderForConfirmation(id, accessToken);
   } catch {
     order = null;
   }
+  const orderCode = id.slice(0, 8).toUpperCase();
+  const verificationPath = `/order-confirmation/${encodeURIComponent(id)}`;
+  const shouldClearCart = Boolean(
+    order && !["pending", "cancelled"].includes(order.status)
+  );
 
   return (
     <div className="container mx-auto px-4 py-16 text-center max-w-xl">
-      <ClearCartOnMount />
-      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-        <CheckCircle className="h-8 w-8 text-green-600" />
+      {shouldClearCart ? <ClearCartOnMount /> : null}
+      <div
+        className={`mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full ${
+          order ? "bg-green-100" : "bg-amber-100"
+        }`}
+      >
+        {order ? (
+          <CheckCircle className="h-8 w-8 text-green-600" />
+        ) : (
+          <CircleAlert className="h-8 w-8 text-amber-700" />
+        )}
       </div>
 
       <h1 className="mb-4 text-2xl font-bold">
-        {order ? "¡Gracias por tu compra!" : "Pedido recibido"}
+        {order ? "¡Gracias por tu compra!" : "No pudimos verificar el pedido"}
       </h1>
 
       {order ? (
-        <div className="mb-8 text-left rounded-lg border p-6 text-left">
+        <div className="mb-8 rounded-lg border p-6 text-left">
           <p className="mb-2">
-            <strong>Número de pedido:</strong> {order.id.slice(0, 8).toUpperCase()}
+            <strong>Número de pedido:</strong> {orderCode}
           </p>
           <p className="mb-2">
             <strong>Total:</strong> {formatPrice(Number(order.total))}
@@ -95,20 +121,41 @@ export default async function OrderConfirmationPage({
           ) : null}
         </div>
       ) : (
-        <p className="mb-8 text-muted-foreground">
-          Tu pedido está siendo procesado. Te notificaremos cuando esté listo.
-        </p>
+        <div
+          className="mb-8 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-left text-amber-950"
+          role="status"
+        >
+          <p className="font-bold">Tu carrito sigue guardado.</p>
+          <p className="mt-2 text-sm leading-6">
+            Si acabás de volver de Mercado Pago, esperá unos segundos y
+            reintentá. Si el pago fue debitado y esta pantalla continúa,
+            contactanos e indicá el código <strong>{orderCode}</strong>.
+          </p>
+        </div>
       )}
 
       <div className="flex flex-col gap-4">
-        <Button asChild>
-          <Link href="/products">Seguir comprando</Link>
-        </Button>
-        {!order?.guest_access_token ? (
-          <Button variant="outline" asChild>
-            <Link href="/account/orders">Ver mis pedidos</Link>
-          </Button>
-        ) : null}
+        {order ? (
+          <>
+            <Button asChild>
+              <Link href="/products">Seguir comprando</Link>
+            </Button>
+            {!order.guest_access_token ? (
+              <Button variant="outline" asChild>
+                <Link href="/account/orders">Ver mis pedidos</Link>
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <Button asChild>
+              <a href={verificationPath}>Reintentar verificación</a>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/cart">Volver al carrito</Link>
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

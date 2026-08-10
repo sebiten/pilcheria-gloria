@@ -35,6 +35,11 @@ import {
   type CheckoutOffer,
   type RawVariantWithOffers,
 } from "@/lib/inventory";
+import {
+  assertCheckoutRouteCapability,
+  type CheckoutRouteCapability,
+} from "@/lib/security/checkout-capability";
+import { secureTokenEquals } from "@/lib/orders/confirmation-access";
 
 const ORDER_STATUS_VALUES: OrderStatus[] = [
   "pending",
@@ -54,7 +59,7 @@ function assertValidOrderStatus(status: string): asserts status is OrderStatus {
 
 type CheckoutItem = {
   product_id: string;
-  variant_id: string | null;
+  variant_id: string;
   quantity: number;
 };
 
@@ -112,12 +117,18 @@ function normalizeCheckoutItems(items: CheckoutItem[]) {
   const merged = new Map<string, CheckoutItem>();
 
   for (const item of items) {
-    if (!item.product_id || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+    if (
+      !item.product_id ||
+      !item.variant_id ||
+      !Number.isInteger(item.quantity) ||
+      item.quantity <= 0 ||
+      item.quantity > 10
+    ) {
       throw new Error("Carrito invalido");
     }
 
-    const variantId = item.variant_id ?? null;
-    const key = `${item.product_id}:${variantId ?? "default"}`;
+    const variantId = item.variant_id;
+    const key = `${item.product_id}:${variantId}`;
     const existing = merged.get(key);
 
     if (existing) {
@@ -225,7 +236,7 @@ async function resolveCheckoutItems(
       ? (product.variants || []).find((current: any) => current.id === item.variant_id)
       : null;
 
-    if (item.variant_id && (!variant || variant.active === false)) {
+    if (!variant || variant.active === false) {
       throw new Error(`La variante de ${product.name} ya no esta disponible`);
     }
 
@@ -253,15 +264,6 @@ async function resolveCheckoutItems(
       title: variantLabel ? `${product.name} - ${variantLabel}` : product.name,
       pictureUrl: sortedImages[0]?.url,
     };
-
-    if (!variant) {
-      resolvedItems.push({
-        ...commonItem,
-        unitPrice: Number(product.base_price),
-        offer: null,
-      });
-      continue;
-    }
 
     let remaining = item.quantity;
     const offers = getCheckoutOffers(variant as RawVariantWithOffers);
@@ -487,23 +489,27 @@ function buildMercadoPagoItems(
   return preferenceItems;
 }
 
-export async function createOrder({
-  items,
-  shippingMethod,
-  shippingAddress,
-  couponCode,
-  expectedSubtotal,
-  checkoutRequestId,
-  requestFingerprint,
-}: {
-  items: CheckoutItem[];
-  shippingMethod: string;
-  shippingAddress: ShippingAddress;
-  couponCode?: string;
-  expectedSubtotal: number;
-  checkoutRequestId: string;
-  requestFingerprint: string;
-}) {
+export async function createOrder(
+  {
+    items,
+    shippingMethod,
+    shippingAddress,
+    couponCode,
+    expectedSubtotal,
+    checkoutRequestId,
+    requestFingerprint,
+  }: {
+    items: CheckoutItem[];
+    shippingMethod: string;
+    shippingAddress: ShippingAddress;
+    couponCode?: string;
+    expectedSubtotal: number;
+    checkoutRequestId: string;
+    requestFingerprint: string;
+  },
+  capability: CheckoutRouteCapability
+) {
+  assertCheckoutRouteCapability(capability);
   const { userId } = await auth();
   const profile = userId ? await ensureUserProfile() : null;
 
@@ -718,9 +724,7 @@ export async function createOrder({
       external_reference: order.id,
       notification_url: `${appUrl}/api/webhooks/mercadopago?source_news=webhooks`,
       back_urls: {
-        success: `${appUrl}/order-confirmation/${order.id}${
-          guestAccessToken ? `?token=${guestAccessToken}` : ""
-        }`,
+        success: `${appUrl}/order-confirmation/${order.id}`,
         failure: `${appUrl}/checkout`,
         pending: `${appUrl}/checkout`,
       },
@@ -889,7 +893,11 @@ export async function getOrderForConfirmation(id: string, accessToken?: string) 
     }
   }
 
-  if (accessToken && data.guest_access_token === accessToken) {
+  if (
+    accessToken &&
+    data.guest_access_token &&
+    secureTokenEquals(accessToken, data.guest_access_token)
+  ) {
     return reconcilePendingOrderPayment(data);
   }
 

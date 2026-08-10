@@ -7,7 +7,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const withdrawalSchema = z.object({
   orderReference: z.string().trim().min(4).max(100),
-  email: z.string().trim().email(),
+  email: z.string().trim().email().max(254),
   phone: z.string().trim().min(6).max(40),
   reason: z.string().trim().max(1000).optional(),
   website: z.string().max(0).optional(),
@@ -24,26 +24,65 @@ export async function createWithdrawalRequest(
   const payload = withdrawalSchema.parse(input);
   const supabase = getSupabaseAdmin();
   const requestCode = createRequestCode();
-  const orderId = z.string().uuid().safeParse(payload.orderReference);
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  const { data: recentRequest } = await supabase
-    .from("withdrawal_requests")
-    .select("id")
-    .eq("email", payload.email)
-    .gte("created_at", fiveMinutesAgo)
-    .limit(1)
-    .maybeSingle();
+  const normalizedEmail = payload.email.toLowerCase();
+  const normalizedPhone = payload.phone.replace(/\D/g, "");
+  if (normalizedPhone.length < 6 || normalizedPhone.length > 20) {
+    throw new Error("Ingresá un teléfono válido.");
+  }
+  const requestedOrderId = z.string().uuid().safeParse(payload.orderReference);
+  let verifiedOrderId: string | null = null;
 
-  if (recentRequest) {
+  if (requestedOrderId.success) {
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id, shipping_address")
+      .eq("id", requestedOrderId.data)
+      .maybeSingle();
+    const address = order?.shipping_address as {
+      email?: string | null;
+      phone?: string | null;
+    } | null;
+    const orderEmail = address?.email?.trim().toLowerCase();
+    const orderPhone = address?.phone?.replace(/\D/g, "");
+
+    if (
+      order &&
+      ((orderEmail && orderEmail === normalizedEmail) ||
+        (orderPhone && orderPhone === normalizedPhone))
+    ) {
+      verifiedOrderId = order.id;
+    }
+  }
+
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const [{ data: recentEmailRequest }, { data: recentPhoneRequest }] =
+    await Promise.all([
+      supabase
+        .from("withdrawal_requests")
+        .select("id")
+        .eq("email", normalizedEmail)
+        .gte("created_at", fiveMinutesAgo)
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("withdrawal_requests")
+        .select("id")
+        .eq("phone", normalizedPhone)
+        .gte("created_at", fiveMinutesAgo)
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+  if (recentEmailRequest || recentPhoneRequest) {
     throw new Error("Ya recibimos una solicitud reciente con este email.");
   }
 
   const { error } = await supabase.from("withdrawal_requests").insert({
     request_code: requestCode,
-    order_id: orderId.success ? orderId.data : null,
+    order_id: verifiedOrderId,
     order_reference: payload.orderReference,
-    email: payload.email,
-    phone: payload.phone,
+    email: normalizedEmail,
+    phone: normalizedPhone,
     reason: payload.reason || null,
   });
 
@@ -53,7 +92,7 @@ export async function createWithdrawalRequest(
 
   await sendWithdrawalReceipt({
     requestCode,
-    email: payload.email,
+    email: normalizedEmail,
     orderReference: payload.orderReference,
   }).catch((notificationError) => {
     console.error("No se pudo enviar el comprobante de arrepentimiento:", notificationError);

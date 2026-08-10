@@ -12,7 +12,7 @@ export default async function ProductsPage() {
   await requireAdmin();
   const supabase = getSupabaseAdmin();
 
-  const { data: products } = await supabase
+  const { data: products, error } = await supabase
     .from("products")
     .select(`
       *,
@@ -20,6 +20,11 @@ export default async function ProductsPage() {
       images:product_images(url)
     `)
     .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("No se pudo cargar el catálogo del panel:", error);
+    throw new Error("No se pudo cargar el catálogo");
+  }
 
   const visibleProducts = (products || []).filter(
     (product) =>

@@ -4,12 +4,12 @@ import { useActionState } from "react";
 import { submitProductReview } from "@/actions/reviews";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import type { ProductReview } from "@/types";
+import type { PublicProductReview } from "@/types";
 
 interface ReviewFormProps {
   productId: string;
   productSlug: string;
-  existingReview: ProductReview | null;
+  existingReview: PublicProductReview | null;
 }
 
 const initialState = {

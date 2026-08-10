@@ -1,26 +1,18 @@
 .viewport {
-  overflow: hidden;
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    black 5%,
-    black 95%,
-    transparent
-  );
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent,
-    black 5%,
-    black 95%,
-    transparent
-  );
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-padding-inline: 1rem;
+  scroll-snap-type: inline mandatory;
+  scrollbar-color: var(--color-gloria-300) transparent;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 .track {
   display: flex;
   width: max-content;
   gap: 1rem;
-  animation: school-marquee 48s linear infinite;
+  padding: 0 1rem 0.5rem;
 }
 
 .group {
@@ -28,9 +20,52 @@
   gap: 1rem;
 }
 
-.viewport:hover .track,
-.viewport:focus-within .track {
-  animation-play-state: paused;
+.group > * {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.duplicate {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .viewport {
+    overflow: hidden;
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 5%,
+      black 95%,
+      transparent
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 5%,
+      black 95%,
+      transparent
+    );
+  }
+
+  .track {
+    padding: 0;
+    animation: school-marquee 48s linear infinite;
+  }
+
+  .group > * {
+    scroll-snap-align: none;
+    scroll-snap-stop: normal;
+  }
+
+  .duplicate {
+    display: flex;
+  }
+
+  .viewport:hover .track,
+  .viewport:focus-within .track {
+    animation-play-state: paused;
+  }
 }
 
 @keyframes school-marquee {
@@ -42,12 +77,20 @@
 @media (prefers-reduced-motion: reduce) {
   .viewport {
     overflow-x: auto;
+    scroll-padding-inline: 1rem;
+    scroll-snap-type: inline mandatory;
     mask-image: none;
     -webkit-mask-image: none;
   }
 
   .track {
+    padding: 0 1rem 0.5rem;
     animation: none;
+  }
+
+  .group > * {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 
   .duplicate {

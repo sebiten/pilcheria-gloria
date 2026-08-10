@@ -1,3 +1,7 @@
+import "server-only";
+
+const MERCADOPAGO_TIMEOUT_MS = 12_000;
+
 function getMercadoPagoAccessToken() {
   const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
   if (!accessToken) {
@@ -63,6 +67,7 @@ export async function createPreference(preference: MPPreference) {
         preference.external_reference || crypto.randomUUID(),
     },
     body: JSON.stringify(preference),
+    signal: AbortSignal.timeout(MERCADOPAGO_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -79,6 +84,7 @@ export async function getPreference(preferenceId: string) {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
+    signal: AbortSignal.timeout(MERCADOPAGO_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -101,6 +107,7 @@ export async function searchPaymentsByExternalReference(externalReference: strin
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
+    signal: AbortSignal.timeout(MERCADOPAGO_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -120,6 +127,7 @@ export async function getPayment(paymentId: string) {
         Authorization: `Bearer ${accessToken}`,
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(MERCADOPAGO_TIMEOUT_MS),
     }
   );
 
@@ -145,6 +153,7 @@ export function getMercadoPagoAccountId() {
         Authorization: `Bearer ${accessToken}`,
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(MERCADOPAGO_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -182,6 +191,7 @@ export async function refundPayment(paymentId: string, orderId: string) {
       },
       body: JSON.stringify({}),
       cache: "no-store",
+      signal: AbortSignal.timeout(MERCADOPAGO_TIMEOUT_MS),
     }
   );
 
@@ -209,6 +219,7 @@ export async function cancelPayment(paymentId: string) {
       },
       body: JSON.stringify({ status: "cancelled" }),
       cache: "no-store",
+      signal: AbortSignal.timeout(MERCADOPAGO_TIMEOUT_MS),
     }
   );
 

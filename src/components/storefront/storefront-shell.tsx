@@ -11,7 +11,10 @@ interface StorefrontShellProps {
 export function StorefrontShell({ children, settings }: StorefrontShellProps) {
   return (
     <>
-      <StorefrontClientShell>{children}</StorefrontClientShell>
+      <StorefrontClientShell />
+      <div id="contenido-principal" className="flex-1" tabIndex={-1}>
+        {children}
+      </div>
       <WhatsAppFloatingButton
         phone={settings.whatsapp_phone}
         storeName={settings.store_name}

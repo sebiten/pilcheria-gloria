@@ -74,7 +74,7 @@ export async function generateMetadata({
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   const params = await searchParams;
-  const searchTerm = params.q?.trim() || undefined;
+  const searchTerm = params.q?.trim().slice(0, 80) || undefined;
   const requestedPromotion = isFacebookPromotion(params.promo);
   const [products, settings, promotion] = await Promise.all([
     getProducts({
@@ -187,7 +187,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 {products.length} uniforme{products.length === 1 ? "" : "s"} disponible
                 {products.length === 1 ? "" : "s"} online
               </p>
-              <ProductGrid products={products} priorityFirst={4} />
+              <ProductGrid products={products} priorityFirst={1} />
             </>
           ) : (
             <div className="rounded-3xl border border-dashed border-gloria-300 bg-gloria-50 px-6 py-16 text-center">

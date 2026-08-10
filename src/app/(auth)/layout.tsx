@@ -9,5 +9,9 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return (
+    <main id="contenido-principal" tabIndex={-1}>
+      {children}
+    </main>
+  );
 }

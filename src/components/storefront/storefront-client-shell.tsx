@@ -8,11 +8,7 @@ import { CartContent } from "@/components/storefront/cart-content";
 import { CartSync } from "@/components/storefront/cart-sync";
 import { hydrateCartStore, subscribeCartStorePersistence, useCartStore } from "@/hooks/use-cart";
 
-interface StorefrontClientShellProps {
-  children: React.ReactNode;
-}
-
-export function StorefrontClientShell({ children }: StorefrontClientShellProps) {
+export function StorefrontClientShell() {
   const pathname = usePathname();
   const isOpen = useCartStore((state) => state.isOpen);
   const setIsOpen = useCartStore((state) => state.setIsOpen);
@@ -30,7 +26,6 @@ export function StorefrontClientShell({ children }: StorefrontClientShellProps) 
     <>
       <CartSync />
       <Header />
-      <div className="flex-1">{children}</div>
       <CartDrawer isOpen={isOpen} onClose={() => setIsOpen(false)}>
         <CartContent />
       </CartDrawer>

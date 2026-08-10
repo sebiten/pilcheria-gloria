@@ -39,7 +39,7 @@ export function ProductGallery({
           alt={selectedImage.alt || productName}
           fill
           className="object-contain"
-          priority
+          preload
           sizes="(max-width: 1024px) 100vw, 52vw"
         />
         {featured ? (

@@ -113,7 +113,24 @@ export function AddToCartButton({
   const priceSegments = selectedVariant
     ? getVariantPricingSegments(selectedVariant, quantity).segments
     : [];
-  const canAddToCart = !variants.length || Boolean(selectedVariant);
+  const hasPurchasableVariants = availableVariants.length > 0;
+  const canAddToCart = Boolean(selectedVariant);
+  const hasImmediateFulfillment = priceSegments.some(
+    (segment) => segment.fulfillment === "immediate"
+  );
+  const hasPreparedFulfillment = priceSegments.some(
+    (segment) => segment.fulfillment === "24_48_hours"
+  );
+  const fulfillmentLabel = selectedVariant
+    ? hasImmediateFulfillment && hasPreparedFulfillment
+      ? "Combina entrega inmediata y preparación en 24–48 horas."
+      : hasImmediateFulfillment ||
+          (!priceSegments.length && selectedVariant.stock > 0)
+        ? "Entrega inmediata."
+        : "Preparación en 24–48 horas."
+    : null;
+  const designGroupLabelId = `product-${product.id}-design-label`;
+  const sizeGroupLabelId = `product-${product.id}-size-label`;
   const selectedLabel = selectedVariant
     ? [
         getSchoolLevelLabel(selectedVariant.schoolLevel)
@@ -144,10 +161,14 @@ export function AddToCartButton({
         <div className="space-y-5">
           {schoolLevels.length > 1 ? (
             <div>
-              <Label className="mb-3 block text-base font-bold">
+              <Label
+                id={designGroupLabelId}
+                className="mb-3 block text-base font-bold"
+              >
                 1. Elegí el diseño
               </Label>
               <RadioGroup
+                aria-labelledby={designGroupLabelId}
                 value={selectedSchoolLevel ?? ""}
                 onValueChange={(value) => {
                   setSelectedSchoolLevel(value as SchoolLevel);
@@ -165,7 +186,7 @@ export function AddToCartButton({
                     />
                     <Label
                       htmlFor={`school-level-${schoolLevel}`}
-                      className="flex min-h-14 cursor-pointer items-center justify-center rounded-xl border bg-card px-3 py-3 text-center text-base font-bold peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-primary/20"
+                      className="flex min-h-14 cursor-pointer items-center justify-center rounded-xl border bg-card px-3 py-3 text-center text-base font-bold peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-primary/20"
                     >
                       {getSchoolLevelLabel(schoolLevel)}
                     </Label>
@@ -176,7 +197,10 @@ export function AddToCartButton({
           ) : null}
 
           <div>
-            <Label className="mb-3 block text-base font-bold">
+            <Label
+              id={sizeGroupLabelId}
+              className="mb-3 block text-base font-bold"
+            >
               {schoolLevels.length > 1 ? "2. Elegí el talle" : "Elegí el talle"}
             </Label>
             {!designSelected ? (
@@ -185,6 +209,7 @@ export function AddToCartButton({
               </p>
             ) : (
               <RadioGroup
+                aria-labelledby={sizeGroupLabelId}
                 value={selectedVariant?.id ?? ""}
                 onValueChange={(value) => {
                   const variant =
@@ -215,12 +240,12 @@ export function AddToCartButton({
                             <div key={variant.id}>
                               <RadioGroupItem
                                 value={variant.id}
-                                id={variant.id}
+                                id={`variant-${variant.id}`}
                                 className="peer sr-only"
                               />
                               <Label
-                                htmlFor={variant.id}
-                                className="flex min-h-24 cursor-pointer flex-col justify-center rounded-xl border bg-card px-3 py-3 text-center text-base peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-primary/20"
+                                htmlFor={`variant-${variant.id}`}
+                                className="flex min-h-24 cursor-pointer flex-col justify-center rounded-xl border bg-card px-3 py-3 text-center text-base peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-primary/20"
                               >
                                 <span className="font-bold">Talle {variant.size}</span>
                                 <span className="mt-2 font-bold text-foreground">
@@ -262,6 +287,9 @@ export function AddToCartButton({
                   {formatPrice(
                     Number(selectedVariant.priceOverride ?? product.basePrice)
                   )}
+                </span>
+                <span className="mt-1 block text-sm font-semibold text-muted-foreground">
+                  {fulfillmentLabel}
                 </span>
               </>
             ) : (
@@ -317,20 +345,29 @@ export function AddToCartButton({
         </div>
       ) : null}
 
-      <Button
-        className="min-h-14 w-full text-base font-bold"
-        size="lg"
-        data-testid="add-to-cart-button"
-        onClick={() =>
-          canAddToCart &&
-          addItem(product, selectedVariant?.id ?? null, quantity)
-        }
-        disabled={!canAddToCart}
-      >
-        {canAddToCart
-          ? `Agregar al carrito - ${formatPrice(currentPrice)}`
-          : "Primero elegí un talle"}
-      </Button>
+      {hasPurchasableVariants ? (
+        <Button
+          className="min-h-14 w-full text-base font-bold"
+          size="lg"
+          data-testid="add-to-cart-button"
+          onClick={() =>
+            selectedVariant && addItem(product, selectedVariant.id, quantity)
+          }
+          disabled={!canAddToCart}
+        >
+          {canAddToCart
+            ? `Agregar al carrito - ${formatPrice(currentPrice)}`
+            : "Primero elegí un talle"}
+        </Button>
+      ) : (
+        <div
+          className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950"
+          role="status"
+        >
+          No hay talles disponibles para comprar online. Consultanos y
+          verificamos disponibilidad en el negocio.
+        </div>
+      )}
 
       {priceSegments.length > 1 ? (
         <div className="rounded-xl border bg-muted/40 p-3 text-sm">
@@ -346,12 +383,20 @@ export function AddToCartButton({
         </div>
       ) : null}
 
-      <PaymentConfidence amount={currentPrice} compact />
+      {hasPurchasableVariants ? (
+        <PaymentConfidence amount={currentPrice} compact />
+      ) : null}
 
       {whatsappUrl ? (
-        <Button variant="outline" className="min-h-12 w-full text-base" asChild>
+        <Button
+          variant={hasPurchasableVariants ? "outline" : "default"}
+          className="min-h-12 w-full text-base"
+          asChild
+        >
           <a href={whatsappUrl} target="_blank" rel="noreferrer">
-            ¿No encontrás tu talle? Consultanos
+            {hasPurchasableVariants
+              ? "¿No encontrás tu talle? Consultanos"
+              : "Consultar disponibilidad por WhatsApp"}
           </a>
         </Button>
       ) : null}

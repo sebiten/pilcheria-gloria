@@ -1,3 +1,5 @@
+import "server-only";
+
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getMercadoPagoAccountId } from "@/lib/mercadopago/client";
 

@@ -122,6 +122,22 @@ function getProductMutationError(error: unknown) {
 const PRODUCT_IMAGES_BUCKET = "product-images";
 const MAX_PRODUCT_IMAGE_SIZE = 4 * 1024 * 1024;
 
+async function hasWebpSignature(file: File) {
+  if (file.size < 12) return false;
+
+  const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  return (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  );
+}
+
 function normalizeProductVariants(variants: ProductPayload["variants"]) {
   const variantsBySize = new Map<string, ProductPayload["variants"][number]>();
 
@@ -491,35 +507,38 @@ async function removeUnreferencedProductImages(
   }
 }
 
-export async function getProducts(options?: {
+type ProductQueryOptions = {
   categorySlug?: string;
   brand?: string;
   searchTerm?: string;
   featured?: boolean;
   limit?: number;
-}): Promise<ProductWithDetails[]> {
+};
+
+export async function getProducts(
+  options?: ProductQueryOptions
+): Promise<ProductWithDetails[]> {
   try {
-    return await getProductsCached({
+    const normalizedOptions = {
       categorySlug: options?.categorySlug,
       brand: options?.brand?.trim() || undefined,
-      searchTerm: options?.searchTerm?.trim() || undefined,
+      searchTerm: options?.searchTerm?.trim().slice(0, 80) || undefined,
       featured: options?.featured,
       limit: options?.limit,
-    });
+    };
+
+    return normalizedOptions.searchTerm
+      ? await fetchProducts(normalizedOptions)
+      : await getProductsCached(normalizedOptions);
   } catch (error) {
     reportDataFallback("products", error);
     return [];
   }
 }
 
-const getProductsCached = unstable_cache(
-  async (options?: {
-    categorySlug?: string;
-    brand?: string;
-    searchTerm?: string;
-    featured?: boolean;
-    limit?: number;
-  }): Promise<ProductWithDetails[]> => {
+async function fetchProducts(
+  options?: ProductQueryOptions
+): Promise<ProductWithDetails[]> {
     const supabase = getSupabaseAdmin();
 
     let query = supabase
@@ -582,8 +601,11 @@ const getProductsCached = unstable_cache(
       (data || []).map(mapProductRow)
     );
 
-    return options?.limit ? products.slice(0, options.limit) : products;
-  },
+  return options?.limit ? products.slice(0, options.limit) : products;
+}
+
+const getProductsCached = unstable_cache(
+  fetchProducts,
   ["products-public-v8"],
   {
     tags: [PRODUCTS_CACHE_TAG],
@@ -753,7 +775,7 @@ export async function uploadProductImage(formData: FormData) {
     throw new Error("La imagen no puede superar 4MB");
   }
 
-  if (file.type !== "image/webp") {
+  if (file.type !== "image/webp" || !(await hasWebpSignature(file))) {
     throw new Error("La imagen debe estar convertida a WebP");
   }
 

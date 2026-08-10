@@ -93,7 +93,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
       </header>
       <section className="container mx-auto px-4 py-8">
         {products.length ? (
-          <ProductGrid products={products} priorityFirst={4} />
+          <ProductGrid products={products} priorityFirst={1} />
         ) : (
           <div className="rounded-3xl border border-dashed border-gloria-300 p-12 text-center">
             <p className="text-muted-foreground">

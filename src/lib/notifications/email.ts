@@ -1,3 +1,5 @@
+import "server-only";
+
 import { SITE_NAME } from "@/lib/site";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/utils";
@@ -127,6 +129,7 @@ async function sendEmail(input: EmailInput) {
       subject: input.subject,
       html: input.html,
     }),
+    signal: AbortSignal.timeout(12_000),
   });
 
   const result = await response.json().catch(() => ({}));

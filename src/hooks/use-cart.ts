@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { CartItem, ProductWithDetails } from "@/types";
 import { getCartSubtotal } from "@/lib/commerce";
+import { sanitizeStorefrontProduct } from "@/lib/inventory";
 
 interface CartStore {
   items: CartItem[];
@@ -40,6 +41,9 @@ function normalizeCartItems(items: CartItem[]) {
     itemsByKey.set(key, {
       ...item,
       variant_id: variantId,
+      product: item.product
+        ? sanitizeStorefrontProduct(item.product)
+        : undefined,
     });
   }
 
