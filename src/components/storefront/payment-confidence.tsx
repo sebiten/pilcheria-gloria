@@ -59,7 +59,7 @@ export function PaymentConfidence({
       ? formatPrice(amount / MERCADO_PAGO_PROMO_INSTALLMENTS)
       : null;
   const title = installmentAmount
-    ? `${MERCADO_PAGO_PROMO_INSTALLMENTS} cuotas sin interés de ${installmentAmount}`
+    ? `${MERCADO_PAGO_PROMO_INSTALLMENTS} cuotas sin interés`
     : `Hasta ${MERCADO_PAGO_PROMO_INSTALLMENTS} cuotas sin interés`;
 
   const isHeroBand = variant === "hero-band";
