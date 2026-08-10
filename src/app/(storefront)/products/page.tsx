@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { MessageCircle, Search, X } from "lucide-react";
+import { MessageCircle, Search, SlidersHorizontal, X } from "lucide-react";
 import { getProducts } from "@/actions/products";
 import { getStoreSettings } from "@/actions/store-settings";
 import { ProductGrid } from "@/components/storefront/product-grid";
@@ -9,13 +9,40 @@ import { Button } from "@/components/ui/button";
 import { FACEBOOK_PROMOTION, isFacebookPromotion } from "@/lib/promotions";
 import { getFacebookPromotionAvailability } from "@/lib/promotions-server";
 import { SCHOOL_UNIFORMS_DESCRIPTION } from "@/lib/site";
+import { SCHOOL_UNIFORM_FILTERS } from "@/lib/school-uniforms";
 import { formatPrice } from "@/lib/utils";
 
 interface ProductsPageProps {
   searchParams: Promise<{
     q?: string;
+    school?: string;
     promo?: string;
   }>;
+}
+
+function normalizeSearchValue(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es")
+    .trim();
+}
+
+function getProductsHref({
+  q,
+  school,
+  promo,
+}: {
+  q?: string;
+  school?: string;
+  promo?: string;
+}) {
+  const query = new URLSearchParams();
+  if (q) query.set("q", q);
+  if (school) query.set("school", school);
+  if (promo) query.set("promo", promo);
+  const suffix = query.toString();
+  return suffix ? `/products?${suffix}` : "/products";
 }
 
 export async function generateMetadata({
@@ -23,6 +50,9 @@ export async function generateMetadata({
 }: ProductsPageProps): Promise<Metadata> {
   const params = await searchParams;
   const query = params.q?.trim();
+  const selectedSchool = SCHOOL_UNIFORM_FILTERS.find(
+    (school) => school.id === params.school
+  );
   const requestedPromotion = isFacebookPromotion(params.promo);
   const promotion = requestedPromotion
     ? await getFacebookPromotionAvailability()
@@ -35,7 +65,9 @@ export async function generateMetadata({
     "Remeras y chombas desde $20.000, con stock real por talle. Hay más escuelas y opciones disponibles por consulta.";
 
   return {
-    title: query
+    title: selectedSchool
+      ? `Uniformes de ${selectedSchool.name}`
+      : query
       ? `Uniformes para ${query}`
       : hasPromotion
         ? promotionTitle
@@ -44,8 +76,9 @@ export async function generateMetadata({
       ? `${promotionDescription} Remeras y chombas de distintas escuelas, con stock real por talle.`
       : SCHOOL_UNIFORMS_DESCRIPTION,
     alternates: { canonical: "/products" },
-    robots: query ? { index: false, follow: true } : undefined,
-    openGraph: query
+    robots:
+      query || selectedSchool ? { index: false, follow: true } : undefined,
+    openGraph: query || selectedSchool
       ? undefined
       : {
           title: hasPromotion
@@ -58,7 +91,7 @@ export async function generateMetadata({
             ? `/products?promo=${FACEBOOK_PROMOTION.code}`
             : "/products",
         },
-    twitter: query
+    twitter: query || selectedSchool
       ? undefined
       : {
           card: "summary_large_image",
@@ -75,21 +108,38 @@ export async function generateMetadata({
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   const params = await searchParams;
   const searchTerm = params.q?.trim().slice(0, 80) || undefined;
+  const selectedSchool = SCHOOL_UNIFORM_FILTERS.find(
+    (school) => school.id === params.school
+  );
   const requestedPromotion = isFacebookPromotion(params.promo);
-  const [products, settings, promotion] = await Promise.all([
+  const [allProducts, settings, promotion] = await Promise.all([
     getProducts({
       categorySlug: "uniformes-escolares",
-      searchTerm,
     }),
     getStoreSettings(),
     requestedPromotion
       ? getFacebookPromotionAvailability()
       : Promise.resolve(null),
   ]);
+  const filters = [selectedSchool?.query, searchTerm]
+    .filter((value): value is string => Boolean(value))
+    .map(normalizeSearchValue);
+  const products = allProducts.filter((product) => {
+    const searchable = normalizeSearchValue(
+      `${product.name} ${product.description || ""}`
+    );
+    return filters.every((filter) => searchable.includes(filter));
+  });
   const hasPromotion = Boolean(promotion?.available);
+  const schoolName = selectedSchool?.name || searchTerm || "__";
+  const clearHref = getProductsHref({ promo: params.promo });
+  const removeSchoolHref = getProductsHref({
+    q: searchTerm,
+    promo: params.promo,
+  });
   const whatsappUrl = settings.whatsapp_phone
     ? `https://wa.me/${settings.whatsapp_phone.replace(/\D/g, "")}?text=${encodeURIComponent(
-        `Hola, busco un uniforme escolar. Escuela: ${searchTerm || "__"}. Prenda: __. Talle: __.`
+        `Hola, busco un uniforme escolar. Escuela: ${schoolName}. Prenda: __. Talle: __.`
       )}`
     : null;
 
@@ -103,16 +153,20 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="font-display text-4xl text-gloria-950 sm:text-6xl">
-                {searchTerm ? `Resultados para “${searchTerm}”` : "Uniformes escolares"}
+                {selectedSchool
+                  ? selectedSchool.name
+                  : searchTerm
+                    ? `Resultados para “${searchTerm}”`
+                    : "Uniformes escolares"}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
                 Busque por escuela o prenda. Si no aparece, consúltenos: en el
                 negocio tenemos más escuelas y talles que los publicados online.
               </p>
             </div>
-            {searchTerm ? (
+            {searchTerm || selectedSchool ? (
               <Button variant="outline" className="w-fit rounded-full" asChild>
-                <Link href="/products">
+                <Link href={clearHref}>
                   <X className="mr-2 size-4" />
                   Ver todos
                 </Link>
@@ -145,21 +199,60 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </>
         ) : null}
 
-        <form action="/products" className="flex gap-2">
-          <label className="relative block flex-1">
-            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <span className="sr-only">Buscar por escuela o prenda</span>
-            <input
-              name="q"
-              defaultValue={searchTerm}
-              placeholder="Ej.: FASTA, Normal, chomba o remera"
-              className="min-h-12 w-full rounded-full border border-input bg-white pl-11 pr-4 text-base outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-            />
+        <form
+          action="/products"
+          className="grid gap-3 rounded-3xl border border-gloria-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(13rem,0.75fr)_minmax(18rem,1.25fr)_auto] sm:items-end"
+        >
+          {params.promo ? <input type="hidden" name="promo" value={params.promo} /> : null}
+          <label className="block">
+            <span className="mb-1.5 flex items-center gap-2 px-2 text-xs font-bold uppercase tracking-[0.12em] text-gloria-700">
+              <SlidersHorizontal className="size-3.5" />
+              Institución
+            </span>
+            <select
+              name="school"
+              defaultValue={selectedSchool?.id || ""}
+              className="min-h-12 w-full rounded-2xl border border-input bg-gloria-50 px-4 text-base font-semibold text-gloria-950 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+            >
+              <option value="">Todas las escuelas</option>
+              {SCHOOL_UNIFORM_FILTERS.map((school) => (
+                <option key={school.id} value={school.id}>
+                  {school.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="relative block">
+            <span className="mb-1.5 block px-2 text-xs font-bold uppercase tracking-[0.12em] text-gloria-700">
+              Prenda o palabra clave
+            </span>
+            <span className="relative block">
+              <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                name="q"
+                defaultValue={searchTerm}
+                placeholder="Ej.: chomba o remera"
+                className="min-h-12 w-full rounded-2xl border border-input bg-white pl-11 pr-4 text-base outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+              />
+            </span>
           </label>
           <Button type="submit" className="min-h-12 rounded-full px-5 text-base font-bold">
-            Buscar
+            Filtrar
           </Button>
         </form>
+
+        {selectedSchool ? (
+          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Filtro activo:</span>
+            <Link
+              href={removeSchoolHref}
+              className="inline-flex min-h-9 items-center gap-2 rounded-full bg-gloria-950 px-4 font-bold text-white transition hover:bg-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gloria-600 focus-visible:ring-offset-2"
+            >
+              {selectedSchool.name}
+              <X className="size-3.5" />
+            </Link>
+          </div>
+        ) : null}
 
         <div className="my-7 flex flex-col gap-4 rounded-3xl border border-gloria-200 bg-gloria-50 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div>

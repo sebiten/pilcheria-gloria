@@ -29,6 +29,20 @@
   display: none;
 }
 
+.filteredViewport {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+.filteredTrack {
+  width: 100%;
+  animation: none;
+}
+
+.filteredTrack .group {
+  margin-inline: auto;
+}
+
 @media (min-width: 768px) {
   .viewport {
     overflow: hidden;
@@ -60,6 +74,18 @@
 
   .duplicate {
     display: flex;
+  }
+
+  .filteredViewport {
+    overflow: visible;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
+  .filteredTrack {
+    width: 100%;
+    padding-inline: 1rem;
+    animation: none;
   }
 
   .viewport:hover .track,

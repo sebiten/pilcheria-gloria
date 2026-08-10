@@ -1,6 +1,9 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, MessageCircle } from "lucide-react";
+import { ArrowRight, MessageCircle, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import styles from "./school-uniforms-carousel.module.css";
 
@@ -123,6 +126,60 @@ const schools: SchoolIdentity[] = [
       alt: "Remera completa de la Escuela Martín Raúl Galán",
     },
   },
+  {
+    name: "Colegio Secundario N° 47",
+    level: "Nivel secundario",
+    mark: "47",
+    image: {
+      src: "/images/uniforms/catalog/secundario-47-remera.webp",
+      alt: "Remera del Colegio Secundario N° 47",
+    },
+  },
+  {
+    name: "Colegio Secundario Agrotécnico",
+    level: "Nivel secundario",
+    mark: "AGRO",
+    image: {
+      src: "/images/uniforms/catalog/agrotecnica-remera.webp",
+      alt: "Remera del Colegio Secundario Agrotécnico",
+    },
+  },
+  {
+    name: "Colegio Secundario de Robótica",
+    level: "Nivel secundario",
+    mark: "ROBÓTICA",
+    image: {
+      src: "/images/uniforms/catalog/robotica-remera.webp",
+      alt: "Remera del Colegio Secundario de Robótica",
+    },
+  },
+  {
+    name: "Escuela N° 261 Provincia de Tucumán",
+    level: "Nivel primario",
+    mark: "261",
+    image: {
+      src: "/images/uniforms/catalog/escuela-261-remera.webp",
+      alt: "Remera de la Escuela N° 261 Provincia de Tucumán",
+    },
+  },
+  {
+    name: "Escuela Coronel Mariano Santibáñez",
+    level: "Nivel primario",
+    mark: "SANTIBÁÑEZ",
+    image: {
+      src: "/images/uniforms/catalog/coronel-mariano-santibanez-chomba.webp",
+      alt: "Chomba de la Escuela Coronel Mariano Santibáñez",
+    },
+  },
+  {
+    name: "Escuela N° 73 Miguel Estanislao Soler",
+    level: "Nivel primario",
+    mark: "73",
+    image: {
+      src: "/images/uniforms/catalog/escuela-73-soler-chomba.webp",
+      alt: "Chomba de la Escuela N° 73 Miguel Estanislao Soler",
+    },
+  },
 ];
 
 const schoolSearchTerms: Record<string, string> = {
@@ -138,6 +195,12 @@ const schoolSearchTerms: Record<string, string> = {
   "BACH 7": "Calilegua",
   COOP: "Cooperativa",
   "213": "Galán",
+  "47": "Secundario N° 47",
+  AGRO: "Agrotécnico",
+  ROBÓTICA: "Robótica",
+  "261": "261",
+  SANTIBÁÑEZ: "Santibáñez",
+  "73": "Miguel Estanislao Soler",
 };
 
 function getWhatsappUrl(phone: string | null | undefined) {
@@ -200,7 +263,11 @@ export function SchoolUniformsCarousel({
 }: {
   whatsappPhone?: string | null;
 }) {
+  const [selectedMark, setSelectedMark] = useState("");
   const whatsappUrl = getWhatsappUrl(whatsappPhone);
+  const visibleSchools = selectedMark
+    ? schools.filter((school) => school.mark === selectedMark)
+    : schools;
 
   return (
     <section
@@ -230,28 +297,58 @@ export function SchoolUniformsCarousel({
         </div>
       </div>
 
-      <div className={styles.viewport}>
-        <div className={styles.track}>
-          <div className={styles.group}>
+      <div className="container mx-auto mb-5 px-4">
+        <label className="flex max-w-xl flex-col gap-2 rounded-3xl border border-gloria-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center">
+          <span className="flex shrink-0 items-center gap-2 px-2 text-xs font-bold uppercase tracking-[0.12em] text-gloria-700">
+            <SlidersHorizontal className="size-3.5" />
+            Filtrar escuela
+          </span>
+          <select
+            value={selectedMark}
+            onChange={(event) => setSelectedMark(event.target.value)}
+            className="min-h-11 min-w-0 flex-1 rounded-2xl border border-input bg-gloria-50 px-4 text-sm font-bold text-gloria-950 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+          >
+            <option value="">Todas las instituciones</option>
             {schools.map((school) => (
+              <option key={school.mark} value={school.mark}>
+                {school.name}
+              </option>
+            ))}
+          </select>
+          <span className="shrink-0 px-2 text-xs font-semibold text-muted-foreground">
+            {visibleSchools.length} {visibleSchools.length === 1 ? "resultado" : "resultados"}
+          </span>
+        </label>
+      </div>
+
+      <div
+        className={`${styles.viewport} ${selectedMark ? styles.filteredViewport : ""}`}
+      >
+        <div
+          className={`${styles.track} ${selectedMark ? styles.filteredTrack : ""}`}
+        >
+          <div className={styles.group}>
+            {visibleSchools.map((school) => (
               <SchoolCard
                 key={`${school.name}-${school.level}`}
                 school={school}
               />
             ))}
           </div>
-          <div
-            className={`${styles.group} ${styles.duplicate}`}
-            aria-hidden="true"
-          >
-            {schools.map((school) => (
-              <SchoolCard
-                key={`duplicate-${school.name}-${school.level}`}
-                school={school}
-                duplicate
-              />
-            ))}
-          </div>
+          {!selectedMark ? (
+            <div
+              className={`${styles.group} ${styles.duplicate}`}
+              aria-hidden="true"
+            >
+              {visibleSchools.map((school) => (
+                <SchoolCard
+                  key={`duplicate-${school.name}-${school.level}`}
+                  school={school}
+                  duplicate
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 
