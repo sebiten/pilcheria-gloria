@@ -728,6 +728,7 @@ export async function createOrder(
         failure: `${appUrl}/checkout`,
         pending: `${appUrl}/checkout`,
       },
+      auto_return: "approved",
       expires: true,
       expiration_date_from: new Date().toISOString(),
       expiration_date_to: reservationExpiresAt,

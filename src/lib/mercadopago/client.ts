@@ -39,6 +39,7 @@ export interface MPPreference {
     failure: string;
     pending: string;
   };
+  auto_return?: "approved";
   expires?: boolean;
   expiration_date_from?: string;
   expiration_date_to?: string;
