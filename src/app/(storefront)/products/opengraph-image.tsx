@@ -172,6 +172,7 @@ export default async function OpenGraphImage() {
           {[
             "Stock visible por talle",
             "Compra segura con Mercado Pago",
+            "Envío local gratis desde 2 prendas",
             "Retiro coordinado en Ledesma",
           ].map((item) => (
             <div

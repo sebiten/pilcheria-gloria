@@ -50,6 +50,9 @@ export default async function HomePage() {
   const pickupAddress = getPickupAddress(settings);
   const pickupConfigured =
     settings.pickup_enabled && hasPickupAddress(settings);
+  const freeLocalDelivery =
+    settings.local_delivery_enabled &&
+    Number(settings.local_delivery_cost) === 0;
   const mapsUrl = getGoogleMapsDirectionsUrl(pickupAddress);
   const mapEmbedUrl = getGoogleMapsEmbedUrl(pickupAddress);
   const fulfillmentCards = [
@@ -57,7 +60,13 @@ export default async function HomePage() {
       ? [["Retiro", settings.address_line, MapPin] as const]
       : []),
     ...(settings.local_delivery_enabled
-      ? [["Entrega", "Desde 2 prendas", PackageCheck] as const]
+      ? [
+          [
+            freeLocalDelivery ? "Envío gratis" : "Entrega",
+            "Desde 2 prendas",
+            PackageCheck,
+          ] as const,
+        ]
       : []),
     ["Pago", "Mercado Pago", CreditCard] as const,
     ["Consulta", "Por WhatsApp", MessageCircle] as const,
@@ -125,11 +134,28 @@ export default async function HomePage() {
               ) : null}
             </div>
 
+            {settings.local_delivery_enabled ? (
+              <p className="mt-3 inline-flex items-center gap-2 text-xs font-extrabold text-gloria-900 sm:text-sm lg:hidden">
+                <PackageCheck className="size-4 shrink-0 text-gloria-600" />
+                {freeLocalDelivery
+                  ? "Envío local gratis desde 2 prendas"
+                  : "Entrega local desde 2 prendas"}
+              </p>
+            ) : null}
+
             <div className="mt-5 hidden flex-col gap-2 text-xs font-bold text-gloria-900 lg:flex lg:flex-row lg:flex-wrap lg:gap-x-5 lg:gap-y-2 lg:text-sm">
               <span className="inline-flex items-center gap-2">
                 <Ruler className="size-4 shrink-0 text-gloria-600" />
                 Talles infantil, juvenil y adulto
               </span>
+              {settings.local_delivery_enabled ? (
+                <span className="inline-flex items-center gap-2">
+                  <PackageCheck className="size-4 shrink-0 text-gloria-600" />
+                  {freeLocalDelivery
+                    ? "Envío local gratis desde 2 prendas"
+                    : "Entrega local desde 2 prendas"}
+                </span>
+              ) : null}
               <span className="inline-flex items-center gap-2">
                 <MapPin className="size-4 shrink-0 text-gloria-600" />
                 {pickupConfigured

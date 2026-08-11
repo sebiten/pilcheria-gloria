@@ -203,8 +203,8 @@ export function CartContent() {
         </div>
         <p className="rounded-xl bg-primary/5 p-3 text-sm font-semibold leading-5 text-foreground">
           {localDeliveryAvailable
-            ? "Entrega local en Ledesma habilitada. También podés elegir retiro coordinado."
-            : `Con ${itemCount} prenda: retiro coordinado. Sumá otra para habilitar entrega local en Ledesma.`}
+            ? "Tenés envío local gratis en Ledesma. También podés elegir retiro coordinado."
+            : `Con ${itemCount} prenda podés retirar de forma coordinada. Sumá otra y tenés envío local gratis.`}
         </p>
         {hasInvalidItems ? (
           <>

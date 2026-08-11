@@ -158,6 +158,7 @@ export function CheckoutForm({
   const localDeliveryCost = getShippingCost("local_delivery", {
     localDeliveryCost: settings.local_delivery_cost,
   });
+  const freeLocalDelivery = localDeliveryCost === 0;
   const discount = appliedCoupon?.discount ?? 0;
   const total = Math.max(0, subtotal - discount + shippingCost);
   const needsAddress = formData.shippingMethod === "local_delivery";
@@ -453,8 +454,8 @@ export function CheckoutForm({
                   <DeliveryOption
                     id="local_delivery"
                     icon={Truck}
-                    title="Entrega local"
-                    description="Ledesma y localidades cercanas"
+                    title={freeLocalDelivery ? "Envío local gratis" : "Entrega local"}
+                    description="Ledesma y localidades cercanas, desde 2 prendas"
                     price={
                       localDeliveryCost > 0
                         ? formatPrice(localDeliveryCost)
@@ -482,8 +483,12 @@ export function CheckoutForm({
                   className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm font-semibold leading-6"
                 >
                   {localDeliveryAvailable
-                    ? `Tu compra de ${itemCount} prendas habilita entrega local en Ledesma. También podés retirar sin costo.`
-                    : `La entrega local en Ledesma se habilita desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas. Con una sola prenda, el pedido se retira de forma coordinada.`}
+                    ? freeLocalDelivery
+                      ? `Tu compra de ${itemCount} prendas tiene envío local gratis en Ledesma. También podés retirar sin costo.`
+                      : `Tu compra de ${itemCount} prendas habilita entrega local en Ledesma. También podés retirar sin costo.`
+                    : freeLocalDelivery
+                      ? `El envío local gratis en Ledesma se habilita desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas. Con una sola prenda, el pedido se retira de forma coordinada.`
+                      : `La entrega local en Ledesma se habilita desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas. Con una sola prenda, el pedido se retira de forma coordinada.`}
                 </p>
               ) : null}
             </CardContent>

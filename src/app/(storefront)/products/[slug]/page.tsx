@@ -101,6 +101,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const isOffer = compareAtPrice > price;
   const productUrl = absoluteUrl(`/products/${product.slug}`);
   const images = product.images.map((image) => image.url);
+  const freeLocalDelivery =
+    settings.local_delivery_enabled &&
+    Number(settings.local_delivery_cost) === 0;
   const fulfillmentBenefits = [
     {
       icon: Shirt,
@@ -120,8 +123,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
       ? [
           {
             icon: PackageCheck,
-            title: "Entrega local",
-            text: "Disponible desde 2 prendas en Ledesma y localidades cercanas.",
+            title: freeLocalDelivery
+              ? "Envío gratis desde 2 prendas"
+              : "Entrega local desde 2 prendas",
+            text: "Disponible en Ledesma y localidades cercanas.",
           },
         ]
       : []),
