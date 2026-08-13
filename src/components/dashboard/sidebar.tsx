@@ -19,6 +19,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/brand/logo";
+import { AdminNotificationCenter } from "@/components/dashboard/notification-center";
+import type { AdminNotificationState } from "@/actions/admin-notifications";
 
 const sidebarItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -87,7 +89,11 @@ function StoreLink() {
   );
 }
 
-export function DashboardSidebar() {
+export function DashboardSidebar({
+  initialNotificationState,
+}: {
+  initialNotificationState: AdminNotificationState;
+}) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -107,6 +113,9 @@ export function DashboardSidebar() {
 
   return (
     <>
+      <div className="fixed right-[4.75rem] top-2.5 z-[60] lg:left-[12.75rem] lg:right-auto lg:top-[1.125rem]">
+        <AdminNotificationCenter initialState={initialNotificationState} />
+      </div>
       <header className="fixed inset-x-0 top-0 z-40 border-b bg-card lg:hidden">
         <div className="flex h-16 items-center justify-between px-4 pt-[env(safe-area-inset-top)]">
           <Logo href="/dashboard" />

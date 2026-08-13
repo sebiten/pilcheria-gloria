@@ -295,6 +295,18 @@ export const orderNotifications = pgTable("order_notifications", {
   sentAt: timestamp("sent_at", { withTimezone: true }),
 });
 
+export const adminNotifications = pgTable("admin_notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: uuid("order_id")
+    .references(() => orders.id, { onDelete: "cascade" })
+    .notNull(),
+  eventKey: text("event_key").notNull(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const cartItems = pgTable("cart_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   profileId: text("profile_id").references(() => profiles.id, { onDelete: "cascade" }),
