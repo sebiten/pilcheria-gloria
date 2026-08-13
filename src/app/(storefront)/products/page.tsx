@@ -20,6 +20,10 @@ interface ProductsPageProps {
   }>;
 }
 
+const PRODUCTS_SOCIAL_IMAGE = "/social/og/uniformes-escolares-2026.png";
+const PRODUCTS_SOCIAL_IMAGE_ALT =
+  "Uniformes escolares en Pilchería Gloria: elegí escuela, prenda y talle";
+
 function normalizeSearchValue(value: string) {
   return value
     .normalize("NFD")
@@ -90,6 +94,14 @@ export async function generateMetadata({
           url: hasPromotion
             ? `/products?promo=${FACEBOOK_PROMOTION.code}`
             : "/products",
+          images: [
+            {
+              url: PRODUCTS_SOCIAL_IMAGE,
+              width: 1200,
+              height: 630,
+              alt: PRODUCTS_SOCIAL_IMAGE_ALT,
+            },
+          ],
         },
     twitter: query || selectedSchool
       ? undefined
@@ -101,6 +113,7 @@ export async function generateMetadata({
           description: hasPromotion
             ? `${promotionSocialDescription} ${promotionDescription}`
             : SCHOOL_UNIFORMS_DESCRIPTION,
+          images: [PRODUCTS_SOCIAL_IMAGE],
         },
   };
 }
