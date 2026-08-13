@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   },
 };
 
-const catalogHref = "/products?category=uniformes-escolares";
+const catalogHref = "/uniformes";
 export default async function HomePage() {
   const [products, settings] = await Promise.all([
     getProducts({ categorySlug: "uniformes-escolares", limit: 8 }),

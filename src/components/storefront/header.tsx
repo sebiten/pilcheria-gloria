@@ -20,7 +20,7 @@ import { useCartStore } from "@/hooks/use-cart";
 import { isAdmin } from "@/actions/auth";
 
 const NAV_ITEMS = [
-  { href: "/products?category=uniformes-escolares", label: "Uniformes" },
+  { href: "/uniformes", label: "Uniformes" },
   { href: "/#escuelas", label: "Escuelas" },
   { href: "/#retiro", label: "Ubicación" },
 ];

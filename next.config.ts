@@ -53,6 +53,14 @@ const nextConfig: NextConfig = {
         : []),
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/uniformes",
+        destination: "/products",
+      },
+    ];
+  },
   async headers() {
     return [
       {

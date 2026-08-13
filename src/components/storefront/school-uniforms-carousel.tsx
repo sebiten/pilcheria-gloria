@@ -289,7 +289,7 @@ export function SchoolUniformsCarousel({
             </p>
           </div>
           <Button variant="outline" className="w-fit rounded-full bg-white" asChild>
-            <Link href="/products?category=uniformes-escolares">
+            <Link href="/uniformes">
               Ver tienda de uniformes
               <ArrowRight className="ml-2 size-4" />
             </Link>
