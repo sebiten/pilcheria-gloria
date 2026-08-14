@@ -1,11 +1,19 @@
 "use server";
 
 import { z } from "zod";
+import { auth } from "@clerk/nextjs/server";
 import { requireAdmin } from "@/actions/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/utils";
 
 const notificationIdSchema = z.string().uuid();
+const pushSubscriptionSchema = z.object({
+  endpoint: z.string().url().startsWith("https://").max(4096),
+  keys: z.object({
+    p256dh: z.string().min(20).max(512),
+    auth: z.string().min(8).max(256),
+  }),
+});
 
 export type AdminSaleNotification = {
   id: string;
@@ -104,6 +112,48 @@ export async function markAllAdminSaleNotificationsRead() {
     .update({ read_at: new Date().toISOString() })
     .eq("event_key", "sale_paid")
     .is("read_at", null);
+
+  if (error) throw new Error(error.message);
+  return { ok: true };
+}
+
+export async function getAdminPushPublicKey() {
+  await requireAdmin();
+  return process.env.VAPID_PUBLIC_KEY ?? null;
+}
+
+export async function saveAdminPushSubscription(input: unknown) {
+  await requireAdmin();
+  const { userId } = await auth();
+  if (!userId) throw new Error("Usuario no autenticado");
+  const subscription = pushSubscriptionSchema.parse(input);
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.from("admin_push_subscriptions").upsert(
+    {
+      clerk_user_id: userId,
+      endpoint: subscription.endpoint,
+      p256dh: subscription.keys.p256dh,
+      auth: subscription.keys.auth,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "endpoint" }
+  );
+
+  if (error) throw new Error(error.message);
+  return { ok: true };
+}
+
+export async function removeAdminPushSubscription(endpoint: string) {
+  await requireAdmin();
+  const { userId } = await auth();
+  if (!userId) throw new Error("Usuario no autenticado");
+  const safeEndpoint = z.string().url().startsWith("https://").max(4096).parse(endpoint);
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("admin_push_subscriptions")
+    .delete()
+    .eq("clerk_user_id", userId)
+    .eq("endpoint", safeEndpoint);
 
   if (error) throw new Error(error.message);
   return { ok: true };

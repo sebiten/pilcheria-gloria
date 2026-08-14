@@ -302,9 +302,23 @@ export const adminNotifications = pgTable("admin_notifications", {
     .notNull(),
   eventKey: text("event_key").notNull(),
   readAt: timestamp("read_at", { withTimezone: true }),
+  pushClaimedAt: timestamp("push_claimed_at", { withTimezone: true }),
+  pushSentAt: timestamp("push_sent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+export const adminPushSubscriptions = pgTable("admin_push_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clerkUserId: text("clerk_user_id")
+    .references(() => profiles.clerkUserId, { onDelete: "cascade" })
+    .notNull(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const cartItems = pgTable("cart_items", {

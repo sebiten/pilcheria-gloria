@@ -34,6 +34,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "svix": "^1.93.0",
+    "web-push": "3.6.7",
     "zod": "^4.4.3",
     "zustand": "^5.0.13"
   },
@@ -44,6 +45,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-kit": "^0.31.10",

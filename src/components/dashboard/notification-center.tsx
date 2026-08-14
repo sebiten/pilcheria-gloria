@@ -2,14 +2,155 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck, ShoppingBag } from "lucide-react";
+import { Bell, BellRing, CheckCheck, Smartphone, ShoppingBag } from "lucide-react";
 import {
+  getAdminPushPublicKey,
   getAdminSaleNotifications,
   markAdminSaleNotificationRead,
   markAllAdminSaleNotificationsRead,
+  removeAdminPushSubscription,
+  saveAdminPushSubscription,
   type AdminNotificationState,
 } from "@/actions/admin-notifications";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+
+function urlBase64ToUint8Array(value: string) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map((character) => character.charCodeAt(0)));
+}
+
+function PushNotificationSetup() {
+  const [status, setStatus] = useState<
+    "checking" | "unsupported" | "needs-install" | "available" | "enabled" | "denied" | "error"
+  >("checking");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const check = async () => {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        setStatus("unsupported");
+        return;
+      }
+
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
+      if (isIOS && !isStandalone) {
+        setStatus("needs-install");
+        return;
+      }
+
+      try {
+        const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) setStatus("enabled");
+        else if (Notification.permission === "denied") setStatus("denied");
+        else setStatus("available");
+      } catch {
+        setStatus("error");
+      }
+    };
+    void check();
+  }, []);
+
+  const enable = async () => {
+    setBusy(true);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setStatus("denied");
+        return;
+      }
+      const publicKey = await getAdminPushPublicKey();
+      if (!publicKey) throw new Error("Las claves push todavía no están configuradas");
+      const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      const subscription =
+        (await registration.pushManager.getSubscription()) ??
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        }));
+      const serialized = subscription.toJSON();
+      if (!serialized.endpoint || !serialized.keys?.p256dh || !serialized.keys.auth) {
+        throw new Error("La suscripción push está incompleta");
+      }
+      await saveAdminPushSubscription({
+        endpoint: serialized.endpoint,
+        keys: { p256dh: serialized.keys.p256dh, auth: serialized.keys.auth },
+      });
+      setStatus("enabled");
+    } catch (error) {
+      console.error(error);
+      setStatus("error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disable = async () => {
+    setBusy(true);
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        await removeAdminPushSubscription(subscription.endpoint);
+        await subscription.unsubscribe();
+      }
+      setStatus("available");
+    } catch {
+      setStatus("error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (status === "checking") return null;
+
+  return (
+    <div className="border-t bg-muted/35 p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
+          {status === "enabled" ? <BellRing className="size-4" /> : <Smartphone className="size-4" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold">
+            {status === "enabled" ? "Avisos activados en este celular" : "Avisos en el celular"}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            {status === "needs-install"
+              ? "En iPhone: Compartir → Agregar a inicio. Después abrí Gloria desde su ícono y activalos acá."
+              : status === "denied"
+                ? "Los avisos están bloqueados. Habilitalos desde la configuración de notificaciones del celular."
+                : status === "unsupported"
+                  ? "Este navegador no admite notificaciones push. Probá desde Chrome o agregá la web al inicio en iPhone."
+                  : status === "error"
+                    ? "No pudimos configurar los avisos. Revisá la conexión e intentá nuevamente."
+                    : status === "enabled"
+                      ? "Te avisaremos cuando Mercado Pago apruebe una venta."
+                      : "Recibí una notificación aunque el panel esté cerrado."}
+          </p>
+          {status === "available" || status === "error" ? (
+            <Button type="button" size="sm" className="mt-3 min-h-10" disabled={busy} onClick={enable}>
+              {busy ? "Activando…" : "Activar avisos"}
+            </Button>
+          ) : null}
+          {status === "enabled" ? (
+            <button
+              type="button"
+              className="mt-2 min-h-10 text-xs font-bold text-muted-foreground hover:text-foreground hover:underline"
+              disabled={busy}
+              onClick={disable}
+            >
+              Desactivar en este dispositivo
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function AdminNotificationCenter({ initialState }: { initialState: AdminNotificationState }) {
   const [state, setState] = useState(initialState);
@@ -154,6 +295,7 @@ export function AdminNotificationCenter({ initialState }: { initialState: AdminN
               </div>
             )}
           </div>
+          <PushNotificationSetup />
         </section>
       ) : null}
 

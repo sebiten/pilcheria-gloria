@@ -7,6 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       "Uniformes escolares en Libertador General San Martín, Ledesma, Jujuy.",
     start_url: "/",
+    id: "/",
     display: "standalone",
     background_color: "#f8fbed",
     theme_color: "#a8d829",

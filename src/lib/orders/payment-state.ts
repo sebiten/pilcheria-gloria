@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getMercadoPagoAccountId } from "@/lib/mercadopago/client";
+import { sendAdminSalePush } from "@/lib/notifications/admin-push";
 
 export const ORDER_RESERVATION_MINUTES = 30;
 export const PENDING_PAYMENT_EXTENSION_HOURS = 24;
@@ -120,6 +121,12 @@ export async function applyMercadoPagoPayment(
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  if (String(data) === "paid") {
+    await sendAdminSalePush(orderId).catch((notificationError) => {
+      console.error("No se pudo enviar el aviso push de la venta:", notificationError);
+    });
   }
 
   return String(data);
