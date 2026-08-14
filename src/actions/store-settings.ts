@@ -36,19 +36,19 @@ const defaultStoreSettings: StoreSettings = {
   contact_email: "completar@ejemplo.com",
   contact_phone: "Completar",
   whatsapp_phone: null,
-  address_line: "Av. Los Ceibos 429",
+  address_line: "Feria, pasillo verde, local 49",
   city: "Libertador General San Martín",
   state: "Jujuy",
   business_hours: "Horarios a completar",
   instagram_url: null,
   facebook_url: null,
   footer_text:
-    "Uniformes escolares en Libertador General San Martín. Más escuelas y talles disponibles en el local.",
+    "Uniformes escolares en Libertador General San Martín. Encontranos en la feria, pasillo verde, local 49.",
   pickup_enabled: true,
   local_delivery_enabled: false,
   local_delivery_cost: 0,
   pickup_instructions:
-    "Esperá nuestra confirmación por WhatsApp. Cuando esté listo, retiralo mostrando el código del pedido. Referencia: casa de dos pisos amarilla, familia Burgos.",
+    "Esperá nuestra confirmación por WhatsApp. Cuando esté listo, retiralo mostrando el código del pedido. Buscá Pilchería Gloria: es el local verde manzana.",
   legal_name: null,
   tax_id: null,
   legal_address: null,
@@ -111,7 +111,7 @@ const getStoreSettingsCached = unstable_cache(
 
     return data ? mapStoreSettings(data) : defaultStoreSettings;
   },
-  ["store-settings-v6"],
+  ["store-settings-v7"],
   {
     tags: [STORE_SETTINGS_CACHE_TAG],
     revalidate: 3600,

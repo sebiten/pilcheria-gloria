@@ -255,9 +255,8 @@ export default async function HomePage() {
                   Retire su compra en {settings.address_line}.
                 </h2>
                 <p className="mt-5 max-w-md text-sm leading-6 text-white/70 sm:text-base">
-                  El stock publicado online se retira en este domicilio de
-                  Libertador General San Martín, con pedido confirmado y horario
-                  coordinado previamente.
+                  El stock publicado online se retira en este local de la feria,
+                  con pedido confirmado y horario coordinado previamente.
                 </p>
 
                 <div className="mt-7 rounded-2xl border border-white/12 bg-white/8 p-4">

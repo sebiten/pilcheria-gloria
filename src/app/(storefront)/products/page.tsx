@@ -20,9 +20,9 @@ interface ProductsPageProps {
   }>;
 }
 
-const PRODUCTS_SOCIAL_IMAGE = "/social/og/uniformes-escolares-2026.png";
+const PRODUCTS_SOCIAL_IMAGE = "/social/og/uniformes-escolares-click-2026.png";
 const PRODUCTS_SOCIAL_IMAGE_ALT =
-  "Uniformes escolares en Pilchería Gloria: elegí escuela, prenda y talle";
+  "Uniformes escolares en Pilchería Gloria: tocá la imagen para entrar a la tienda";
 
 function normalizeSearchValue(value: string) {
   return value
