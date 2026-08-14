@@ -160,26 +160,25 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   return (
     <main className="min-h-screen bg-background">
       <section className="border-b border-border bg-gloria-50">
-        <div className="container mx-auto px-4 py-8 sm:py-10">
+        <div className="container mx-auto px-4 py-5 sm:py-10">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-gloria-700">
             Tienda de uniformes
           </p>
-          <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mt-2 flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="font-display text-4xl text-gloria-950 sm:text-6xl">
+              <h1 className="font-display text-3xl text-gloria-950 sm:text-6xl">
                 {selectedSchool
                   ? selectedSchool.name
                   : searchTerm
                     ? `Resultados para “${searchTerm}”`
                     : "Uniformes escolares"}
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Busque por escuela o prenda. Si no aparece, consúltenos: en el
-                negocio tenemos más escuelas y talles que los publicados online.
+              <p className={`mt-2 max-w-2xl text-sm leading-5 text-muted-foreground sm:mt-3 sm:block sm:text-base sm:leading-6 ${selectedSchool || searchTerm ? "hidden" : ""}`}>
+                Elegí tu escuela, la prenda y después el talle.
               </p>
             </div>
             {searchTerm || selectedSchool ? (
-              <Button variant="outline" className="w-fit rounded-full" asChild>
+              <Button variant="outline" className="hidden w-fit rounded-full sm:inline-flex" asChild>
                 <Link href={clearHref}>
                   <X className="mr-2 size-4" />
                   Ver todos
@@ -190,7 +189,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </div>
       </section>
 
-      <div className="container mx-auto px-4 py-6 sm:py-8">
+      <div className="container mx-auto px-4 py-4 sm:py-8">
         {hasPromotion ? (
           <>
             <PromotionTracker />
@@ -222,70 +221,48 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
         <section
           aria-label="Compra segura"
-          className="my-5 grid overflow-hidden rounded-3xl bg-gloria-950 text-white sm:grid-cols-3"
+          className="my-3 flex items-center justify-between gap-2 border-y border-gloria-200 py-3 text-gloria-900 sm:my-5 sm:grid sm:overflow-hidden sm:rounded-3xl sm:border-0 sm:bg-gloria-950 sm:py-0 sm:text-white sm:grid-cols-3"
         >
-          <div className="flex items-start gap-3 p-4 sm:p-5">
-            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-gloria-300" />
+          <div className="flex items-center gap-1.5 sm:items-start sm:gap-3 sm:p-5">
+            <ShieldCheck className="size-4 shrink-0 text-gloria-700 sm:mt-0.5 sm:size-5 sm:text-gloria-300" />
             <div>
-              <p className="font-bold">Pago protegido</p>
-              <p className="mt-1 text-xs leading-5 text-white/65">Pagás de forma segura en Mercado Pago.</p>
+              <p className="text-[0.68rem] font-extrabold sm:text-base sm:font-bold">Pago seguro</p>
+              <p className="mt-1 hidden text-xs leading-5 text-white/65 sm:block">Pagás de forma segura en Mercado Pago.</p>
             </div>
           </div>
-          <div className="flex items-start gap-3 border-t border-white/10 p-4 sm:border-l sm:border-t-0 sm:p-5">
-            <UserRoundCheck className="mt-0.5 size-5 shrink-0 text-gloria-300" />
+          <div className="flex items-center gap-1.5 sm:items-start sm:gap-3 sm:border-l sm:border-white/10 sm:p-5">
+            <UserRoundCheck className="size-4 shrink-0 text-gloria-700 sm:mt-0.5 sm:size-5 sm:text-gloria-300" />
             <div>
-              <p className="font-bold">Sin crear una cuenta</p>
-              <p className="mt-1 text-xs leading-5 text-white/65">Podés comprar como invitado desde el celular.</p>
+              <p className="text-[0.68rem] font-extrabold sm:text-base sm:font-bold">Sin registro</p>
+              <p className="mt-1 hidden text-xs leading-5 text-white/65 sm:block">Podés comprar como invitado desde el celular.</p>
             </div>
           </div>
-          <div className="flex items-start gap-3 border-t border-white/10 p-4 sm:border-l sm:border-t-0 sm:p-5">
-            <MessageCircle className="mt-0.5 size-5 shrink-0 text-gloria-300" />
+          <div className="flex items-center gap-1.5 sm:items-start sm:gap-3 sm:border-l sm:border-white/10 sm:p-5">
+            <MessageCircle className="size-4 shrink-0 text-gloria-700 sm:mt-0.5 sm:size-5 sm:text-gloria-300" />
             <div>
-              <p className="font-bold">Te acompañamos</p>
-              <p className="mt-1 text-xs leading-5 text-white/65">Si falta una prenda, coordinamos cambio o devolución.</p>
+              <p className="text-[0.68rem] font-extrabold sm:text-base sm:font-bold">Cambios simples</p>
+              <p className="mt-1 hidden text-xs leading-5 text-white/65 sm:block">Si falta una prenda, coordinamos cambio o devolución.</p>
             </div>
           </div>
         </section>
 
-        {selectedSchool ? (
-          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Filtro activo:</span>
-            <Link
-              href={removeSchoolHref}
-              className="inline-flex min-h-9 items-center gap-2 rounded-full bg-gloria-950 px-4 font-bold text-white transition hover:bg-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gloria-600 focus-visible:ring-offset-2"
-            >
-              {selectedSchool.name}
-              <X className="size-3.5" />
-            </Link>
-          </div>
-        ) : null}
-
-        <div className="my-7 flex flex-col gap-4 rounded-3xl border border-gloria-200 bg-gloria-50 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-          <div>
-            <p className="font-bold text-gloria-950">
-              ¿Busca otra escuela o un talle que no figura?
-            </p>
-            <p className="mt-1 text-base leading-7 text-muted-foreground">
-              Escriba escuela, prenda y talle. Revisamos el stock del negocio.
-            </p>
-          </div>
-          {whatsappUrl ? (
-            <Button className="min-h-12 shrink-0 rounded-full text-base" asChild>
-              <a href={whatsappUrl} target="_blank" rel="noreferrer">
-                <MessageCircle className="mr-2 size-4" />
-                Consultar stock
-              </a>
-            </Button>
-          ) : null}
-        </div>
-
         <section aria-label="Listado de uniformes">
           {products.length ? (
             <>
-              <p className="mb-5 text-sm font-semibold text-muted-foreground">
-                {products.length} uniforme{products.length === 1 ? "" : "s"} disponible
-                {products.length === 1 ? "" : "s"} online
-              </p>
+              <div className="mb-3 mt-4 flex min-h-9 items-center justify-between gap-3 sm:mb-5">
+                <p className="text-sm font-semibold text-muted-foreground">
+                  {products.length} uniforme{products.length === 1 ? "" : "s"}
+                </p>
+                {selectedSchool ? (
+                  <Link
+                    href={removeSchoolHref}
+                    className="inline-flex min-h-9 items-center gap-2 rounded-full bg-gloria-950 px-3 text-sm font-bold text-white transition hover:bg-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gloria-600 focus-visible:ring-offset-2"
+                  >
+                    {selectedSchool.name}
+                    <X className="size-3.5" />
+                  </Link>
+                ) : null}
+              </div>
               <ProductGrid products={products} priorityFirst={1} />
             </>
           ) : (

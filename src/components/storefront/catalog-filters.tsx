@@ -40,7 +40,7 @@ export function CatalogFilters({
   return (
     <form
       onSubmit={handleSubmit}
-      className="grid gap-3 rounded-3xl border border-gloria-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(13rem,0.8fr)_minmax(18rem,1.2fr)_auto] sm:items-end"
+      className="grid gap-3 rounded-2xl border border-gloria-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(13rem,0.8fr)_minmax(20rem,1.2fr)] sm:items-end sm:rounded-3xl"
       aria-busy={isPending}
     >
       <label className="block">
@@ -64,27 +64,29 @@ export function CatalogFilters({
         </select>
       </label>
 
-      <label className="relative block">
-        <span className="mb-1.5 block px-2 text-sm font-extrabold text-gloria-900">
+      <div>
+        <label htmlFor="catalog-search" className="mb-1.5 block px-2 text-sm font-extrabold text-gloria-900">
           2. Buscá una prenda
-        </span>
-        <span className="relative block">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            name="q"
-            defaultValue={searchTerm}
-            placeholder="Ej.: chomba o remera"
-            className="min-h-14 w-full rounded-2xl border border-input bg-white pl-12 pr-4 text-base outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-          />
-        </span>
-      </label>
+        </label>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <span className="relative block">
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              id="catalog-search"
+              name="q"
+              defaultValue={searchTerm}
+              placeholder="Chomba o remera"
+              className="min-h-14 w-full rounded-2xl border border-input bg-white pl-12 pr-3 text-base outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+            />
+          </span>
+          <Button type="submit" className="min-h-14 rounded-2xl px-4 text-sm font-bold sm:rounded-full sm:px-6 sm:text-base" disabled={isPending}>
+            {isPending ? "Buscando…" : "Buscar"}
+          </Button>
+        </div>
+      </div>
 
-      <Button type="submit" className="min-h-14 rounded-full px-6 text-base font-bold" disabled={isPending}>
-        {isPending ? "Buscando…" : "Buscar"}
-      </Button>
-
-      <p className="px-2 text-xs font-semibold text-muted-foreground sm:col-span-3" aria-live="polite">
-        {isPending ? "Mostrando los uniformes…" : "Al elegir una escuela, sus prendas aparecen automáticamente."}
+      <p className="sr-only" aria-live="polite">
+        {isPending ? "Mostrando los uniformes…" : "La escuela se filtra automáticamente."}
       </p>
     </form>
   );
