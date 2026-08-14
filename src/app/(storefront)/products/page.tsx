@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { MessageCircle, Search, SlidersHorizontal, X } from "lucide-react";
+import { MessageCircle, ShieldCheck, UserRoundCheck, X } from "lucide-react";
 import { getProducts } from "@/actions/products";
 import { getStoreSettings } from "@/actions/store-settings";
 import { ProductGrid } from "@/components/storefront/product-grid";
 import { PromotionTracker } from "@/components/storefront/promotion-tracker";
+import { CatalogFilters } from "@/components/storefront/catalog-filters";
 import { Button } from "@/components/ui/button";
 import { FACEBOOK_PROMOTION, isFacebookPromotion } from "@/lib/promotions";
 import { getFacebookPromotionAvailability } from "@/lib/promotions-server";
@@ -212,47 +213,39 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </>
         ) : null}
 
-        <form
-          action="/products"
-          className="grid gap-3 rounded-3xl border border-gloria-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(13rem,0.75fr)_minmax(18rem,1.25fr)_auto] sm:items-end"
+        <CatalogFilters
+          schools={SCHOOL_UNIFORM_FILTERS}
+          selectedSchoolId={selectedSchool?.id}
+          searchTerm={searchTerm}
+          promotion={params.promo}
+        />
+
+        <section
+          aria-label="Compra segura"
+          className="my-5 grid overflow-hidden rounded-3xl bg-gloria-950 text-white sm:grid-cols-3"
         >
-          {params.promo ? <input type="hidden" name="promo" value={params.promo} /> : null}
-          <label className="block">
-            <span className="mb-1.5 flex items-center gap-2 px-2 text-xs font-bold uppercase tracking-[0.12em] text-gloria-700">
-              <SlidersHorizontal className="size-3.5" />
-              Institución
-            </span>
-            <select
-              name="school"
-              defaultValue={selectedSchool?.id || ""}
-              className="min-h-12 w-full rounded-2xl border border-input bg-gloria-50 px-4 text-base font-semibold text-gloria-950 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-            >
-              <option value="">Todas las escuelas</option>
-              {SCHOOL_UNIFORM_FILTERS.map((school) => (
-                <option key={school.id} value={school.id}>
-                  {school.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="relative block">
-            <span className="mb-1.5 block px-2 text-xs font-bold uppercase tracking-[0.12em] text-gloria-700">
-              Prenda o palabra clave
-            </span>
-            <span className="relative block">
-              <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                name="q"
-                defaultValue={searchTerm}
-                placeholder="Ej.: chomba o remera"
-                className="min-h-12 w-full rounded-2xl border border-input bg-white pl-11 pr-4 text-base outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-              />
-            </span>
-          </label>
-          <Button type="submit" className="min-h-12 rounded-full px-5 text-base font-bold">
-            Filtrar
-          </Button>
-        </form>
+          <div className="flex items-start gap-3 p-4 sm:p-5">
+            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-gloria-300" />
+            <div>
+              <p className="font-bold">Pago protegido</p>
+              <p className="mt-1 text-xs leading-5 text-white/65">Pagás de forma segura en Mercado Pago.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 border-t border-white/10 p-4 sm:border-l sm:border-t-0 sm:p-5">
+            <UserRoundCheck className="mt-0.5 size-5 shrink-0 text-gloria-300" />
+            <div>
+              <p className="font-bold">Sin crear una cuenta</p>
+              <p className="mt-1 text-xs leading-5 text-white/65">Podés comprar como invitado desde el celular.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 border-t border-white/10 p-4 sm:border-l sm:border-t-0 sm:p-5">
+            <MessageCircle className="mt-0.5 size-5 shrink-0 text-gloria-300" />
+            <div>
+              <p className="font-bold">Te acompañamos</p>
+              <p className="mt-1 text-xs leading-5 text-white/65">Si falta una prenda, coordinamos cambio o devolución.</p>
+            </div>
+          </div>
+        </section>
 
         {selectedSchool ? (
           <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">

@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { getUniformDisplayName } from "@/lib/school-uniforms";
 import type { ProductWithDetails } from "@/types";
 
 interface ProductCardProps {
@@ -26,6 +27,7 @@ function getDisplayPrice(product: ProductWithDetails) {
 }
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
+  const displayName = getUniformDisplayName(product.name);
   const primaryImage = product.images?.[0];
   const availableVariants = getAvailableVariants(product);
   const sizes = new Set(
@@ -46,9 +48,9 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="group block h-full rounded-[1.35rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4"
+      className="group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:rounded-[1.35rem] sm:focus-visible:ring-offset-4"
     >
-      <article className="flex h-full flex-col overflow-hidden rounded-[1.35rem] border border-border/80 bg-card transition duration-300 hover:-translate-y-1 hover:border-gloria-300 hover:shadow-[0_20px_55px_-30px_oklch(0.35_0.085_134/0.45)]">
+      <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-border/80 bg-card transition duration-300 hover:-translate-y-1 hover:border-gloria-300 hover:shadow-[0_20px_55px_-30px_oklch(0.35_0.085_134/0.45)] sm:rounded-[1.35rem]">
         <div className="relative aspect-[4/5] overflow-hidden bg-[#17151a]">
           <Image
             src={primaryImage?.url || FALLBACK_IMAGE}
@@ -58,55 +60,56 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             }
             fill
             className="object-contain transition duration-500 ease-out group-hover:scale-[1.02]"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
           />
-          <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+          <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
             {product.featured ? (
-              <span className="rounded-full bg-gloria-500 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-wide text-gloria-950">
+              <span className="rounded-full bg-gloria-500 px-2 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-gloria-950 sm:px-3 sm:text-[0.68rem]">
                 Destacado
               </span>
             ) : null}
             {isOffer ? (
-              <span className="rounded-full bg-white px-3 py-1 text-[0.68rem] font-bold uppercase tracking-wide text-gloria-800">
+              <span className="rounded-full bg-white px-2 py-1 text-[0.6rem] font-bold uppercase tracking-wide text-gloria-800 sm:px-3 sm:text-[0.68rem]">
                 Oferta
               </span>
             ) : null}
           </div>
-          <span className="absolute bottom-3 left-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-foreground">
+          <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-2 py-1 text-[0.68rem] font-bold text-foreground shadow-sm sm:bottom-3 sm:left-3 sm:px-3 sm:text-xs">
             {availableVariants.length > 0
               ? `${sizes || 1} talle${sizes === 1 ? "" : "s"}`
               : "Agotado"}
           </span>
         </div>
 
-        <div className="flex flex-1 flex-col p-4 sm:p-5">
-          <p className="min-h-4 text-xs font-bold uppercase tracking-[0.14em] text-gloria-700">
+        <div className="flex flex-1 flex-col p-3 sm:p-5">
+          <p className="hidden min-h-4 text-xs font-bold uppercase tracking-[0.14em] text-gloria-700 sm:block">
             {product.brand || product.category?.name || "Pilchería Gloria"}
           </p>
-          <h2 className="mt-2 line-clamp-2 text-xl font-bold leading-snug text-foreground">
-            {product.name}
+          <h2 className="line-clamp-2 text-base font-extrabold leading-snug text-foreground sm:mt-2 sm:text-xl">
+            {displayName}
           </h2>
-          <p className="mt-2 line-clamp-2 text-sm leading-5 text-muted-foreground">
+          <p className="mt-2 hidden line-clamp-2 text-sm leading-5 text-muted-foreground sm:block">
             {product.description || "Conocé talles, colores y disponibilidad."}
           </p>
 
-          <div className="mt-auto flex items-end justify-between gap-3 pt-5">
+          <div className="mt-auto flex flex-col items-stretch gap-2 pt-3 min-[380px]:flex-row min-[380px]:items-end min-[380px]:justify-between sm:gap-3 sm:pt-5">
             <div>
               {isOffer ? (
                 <p className="text-xs text-muted-foreground line-through">
                   {formatPrice(compareAtPrice)}
                 </p>
               ) : null}
-              <p className="text-lg font-black tracking-tight text-foreground sm:text-xl">
+              <p className="text-base font-black tracking-tight text-foreground sm:text-xl">
                 {hasVariablePrice ? "Desde " : ""}
                 {formatPrice(price)}
               </p>
             </div>
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition group-hover:bg-gloria-800">
-              <ArrowUpRight className="size-5" />
-              <span className="sr-only">Ver {product.name}</span>
+            <span className="flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-full bg-primary px-2.5 text-xs font-extrabold text-primary-foreground transition group-hover:bg-gloria-800 sm:min-h-11 sm:px-3">
+              <span>Ver</span>
+              <ArrowUpRight className="size-4 sm:size-5" />
+              <span className="sr-only">talles de {displayName}</span>
             </span>
           </div>
         </div>

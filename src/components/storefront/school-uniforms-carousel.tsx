@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, MessageCircle, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import styles from "./school-uniforms-carousel.module.css";
 
 type SchoolIdentity = {
+  id: string;
   name: string;
   level: string;
   mark: string;
@@ -19,7 +21,8 @@ type SchoolIdentity = {
 
 const schools: SchoolIdentity[] = [
   {
-    name: "Escuela N° 311 Bernardino Rivadavia",
+    id: "311",
+    name: "Escuela N.º 311",
     level: "Nivel primario",
     mark: "311",
     image: {
@@ -28,7 +31,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela Normal Superior General San Martín",
+    id: "normal",
+    name: "Normal",
     level: "Primaria y secundaria",
     mark: "ENS",
     image: {
@@ -37,7 +41,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Colegio Técnico Marista Ing. Herminio Arrieta",
+    id: "etha",
+    name: "ETHA",
     level: "Nivel secundario",
     mark: "ETHA",
     image: {
@@ -46,7 +51,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Colegio FASTA Ing. José María Paz",
+    id: "fasta",
+    name: "FASTA",
     level: "Nivel primario y secundario",
     mark: "FASTA",
     image: {
@@ -55,7 +61,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela N° 3 Enrique Wollmann",
+    id: "wollmann",
+    name: "Enrique Wollmann",
     level: "Nivel primario",
     mark: "N° 3",
     image: {
@@ -64,7 +71,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela Provincial de Artes N° 3 Lola Mora",
+    id: "lola-mora",
+    name: "Artes · Lola Mora",
     level: "Nivel secundario",
     mark: "ARTES",
     image: {
@@ -73,7 +81,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela Provincial de Comercio N° 4",
+    id: "comercial-4",
+    name: "Comercio N.º 4",
     level: "25 de Febrero · Secundaria",
     mark: "COM 4",
     image: {
@@ -82,7 +91,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela de Comercio N° 6",
+    id: "comercial-6",
+    name: "Comercio N.º 6",
     level: "Nivel secundario",
     mark: "COM 6",
     image: {
@@ -91,7 +101,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela N° 112 Coronel Manuel Dorrego",
+    id: "dorrego",
+    name: "Dorrego",
     level: "Nivel primario",
     mark: "112",
     image: {
@@ -100,7 +111,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Bachillerato Provincial N° 7 de Calilegua",
+    id: "bachillerato-7",
+    name: "Bachillerato N.º 7 · Calilegua",
     level: "Nivel secundario",
     mark: "BACH 7",
     image: {
@@ -109,7 +121,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela Cooperativa Libertad",
+    id: "cooperativa",
+    name: "Cooperativa",
     level: "Nivel primario",
     mark: "COOP",
     image: {
@@ -118,7 +131,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela N° 213 Martín Raúl Galán",
+    id: "galan",
+    name: "Galán",
     level: "Nivel primario",
     mark: "213",
     image: {
@@ -127,7 +141,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Colegio Secundario N° 47",
+    id: "secundario-47",
+    name: "Secundario N.º 47",
     level: "Nivel secundario",
     mark: "47",
     image: {
@@ -136,7 +151,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Colegio Secundario Agrotécnico",
+    id: "agrotecnico",
+    name: "Agrotécnica",
     level: "Nivel secundario",
     mark: "AGRO",
     image: {
@@ -145,7 +161,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Colegio Secundario de Robótica",
+    id: "robotica",
+    name: "Robótica",
     level: "Nivel secundario",
     mark: "ROBÓTICA",
     image: {
@@ -154,7 +171,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela N° 261 Provincia de Tucumán",
+    id: "escuela-261",
+    name: "Escuela 261",
     level: "Nivel primario",
     mark: "261",
     image: {
@@ -163,7 +181,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela Coronel Mariano Santibáñez",
+    id: "santibanez",
+    name: "Mariano Santibáñez",
     level: "Nivel primario",
     mark: "SANTIBÁÑEZ",
     image: {
@@ -172,7 +191,8 @@ const schools: SchoolIdentity[] = [
     },
   },
   {
-    name: "Escuela N° 73 Miguel Estanislao Soler",
+    id: "escuela-73",
+    name: "Miguel E. Soler",
     level: "Nivel primario",
     mark: "73",
     image: {
@@ -181,27 +201,6 @@ const schools: SchoolIdentity[] = [
     },
   },
 ];
-
-const schoolSearchTerms: Record<string, string> = {
-  "311": "311",
-  ENS: "Normal",
-  ETHA: "ETHA",
-  FASTA: "FASTA",
-  "N° 3": "Wollmann",
-  ARTES: "Lola Mora",
-  "COM 4": "Comercio N° 4",
-  "COM 6": "Comercio N° 6",
-  "112": "Dorrego",
-  "BACH 7": "Calilegua",
-  COOP: "Cooperativa",
-  "213": "Galán",
-  "47": "Secundario N° 47",
-  AGRO: "Agrotécnico",
-  ROBÓTICA: "Robótica",
-  "261": "261",
-  SANTIBÁÑEZ: "Santibáñez",
-  "73": "Miguel Estanislao Soler",
-};
 
 function getWhatsappUrl(phone: string | null | undefined) {
   const normalizedPhone = phone?.replace(/\D/g, "");
@@ -219,8 +218,7 @@ function SchoolCard({
   school: SchoolIdentity;
   duplicate?: boolean;
 }) {
-  const query = schoolSearchTerms[school.mark] ?? school.name;
-  const productUrl = `/products?category=uniformes-escolares&q=${encodeURIComponent(query)}`;
+  const productUrl = `/products?school=${school.id}`;
   const content = (
     <>
       <span className="relative h-24 w-20 shrink-0 overflow-hidden rounded-2xl border border-gloria-200 bg-[#17151a]">
@@ -233,7 +231,7 @@ function SchoolCard({
         />
       </span>
       <span className="min-w-0">
-        <span className="line-clamp-2 text-sm font-extrabold leading-5 text-gloria-950">
+        <span className="line-clamp-2 text-base font-extrabold leading-5 text-gloria-950">
           {school.name}
         </span>
         <span className="mt-1 block text-xs font-medium text-muted-foreground">
@@ -263,11 +261,14 @@ export function SchoolUniformsCarousel({
 }: {
   whatsappPhone?: string | null;
 }) {
-  const [selectedMark, setSelectedMark] = useState("");
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const whatsappUrl = getWhatsappUrl(whatsappPhone);
-  const visibleSchools = selectedMark
-    ? schools.filter((school) => school.mark === selectedMark)
-    : schools;
+
+  const chooseSchool = (schoolId: string) => {
+    if (!schoolId) return;
+    startTransition(() => router.push(`/products?school=${schoolId}`));
+  };
 
   return (
     <section
@@ -281,11 +282,11 @@ export function SchoolUniformsCarousel({
               Uniformes por institución
             </p>
             <h2 className="mt-3 font-display text-3xl text-gloria-950 sm:text-5xl">
-              Buscá tu escuela en Ledesma.
+              Elegí tu escuela.
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-              Indicá institución, nivel, prenda y talle. Confirmamos el modelo y
-              el stock antes de preparar tu pedido.
+              Tocá el nombre y vas directo a sus remeras y chombas. Después
+              elegís el talle y continuás la compra.
             </p>
           </div>
           <Button variant="outline" className="w-fit rounded-full bg-white" asChild>
@@ -299,56 +300,48 @@ export function SchoolUniformsCarousel({
 
       <div className="container mx-auto mb-5 px-4">
         <label className="flex max-w-xl flex-col gap-2 rounded-3xl border border-gloria-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center">
-          <span className="flex shrink-0 items-center gap-2 px-2 text-xs font-bold uppercase tracking-[0.12em] text-gloria-700">
+          <span className="flex shrink-0 items-center gap-2 px-2 text-sm font-extrabold text-gloria-900">
             <SlidersHorizontal className="size-3.5" />
-            Filtrar escuela
+            Elegí tu escuela
           </span>
           <select
-            value={selectedMark}
-            onChange={(event) => setSelectedMark(event.target.value)}
-            className="min-h-11 min-w-0 flex-1 rounded-2xl border border-input bg-gloria-50 px-4 text-sm font-bold text-gloria-950 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+            value=""
+            onChange={(event) => chooseSchool(event.target.value)}
+            disabled={isPending}
+            className="min-h-14 min-w-0 flex-1 rounded-2xl border border-input bg-gloria-50 px-4 text-base font-bold text-gloria-950 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
           >
-            <option value="">Todas las instituciones</option>
+            <option value="">Seleccioná una escuela</option>
             {schools.map((school) => (
-              <option key={school.mark} value={school.mark}>
+              <option key={school.id} value={school.id}>
                 {school.name}
               </option>
             ))}
           </select>
-          <span className="shrink-0 px-2 text-xs font-semibold text-muted-foreground">
-            {visibleSchools.length} {visibleSchools.length === 1 ? "resultado" : "resultados"}
+          <span className="shrink-0 px-2 text-xs font-semibold text-muted-foreground" aria-live="polite">
+            {isPending ? "Abriendo…" : "Se filtra al elegir"}
           </span>
         </label>
       </div>
 
-      <div
-        className={`${styles.viewport} ${selectedMark ? styles.filteredViewport : ""}`}
-      >
-        <div
-          className={`${styles.track} ${selectedMark ? styles.filteredTrack : ""}`}
-        >
+      <div className={styles.viewport}>
+        <div className={styles.track}>
           <div className={styles.group}>
-            {visibleSchools.map((school) => (
+            {schools.map((school) => (
               <SchoolCard
                 key={`${school.name}-${school.level}`}
                 school={school}
               />
             ))}
           </div>
-          {!selectedMark ? (
-            <div
-              className={`${styles.group} ${styles.duplicate}`}
-              aria-hidden="true"
-            >
-              {visibleSchools.map((school) => (
-                <SchoolCard
-                  key={`duplicate-${school.name}-${school.level}`}
-                  school={school}
-                  duplicate
-                />
-              ))}
-            </div>
-          ) : null}
+          <div className={`${styles.group} ${styles.duplicate}`} aria-hidden="true">
+            {schools.map((school) => (
+              <SchoolCard
+                key={`duplicate-${school.name}-${school.level}`}
+                school={school}
+                duplicate
+              />
+            ))}
+          </div>
         </div>
       </div>
 

@@ -16,6 +16,7 @@ import { getBreadcrumbJsonLd } from "@/lib/seo";
 import { formatPrice } from "@/lib/utils";
 import { absoluteUrl, SITE_LOCALITY, SITE_NAME } from "@/lib/site";
 import { sanitizeStorefrontProduct } from "@/lib/inventory";
+import { getUniformDisplayName } from "@/lib/school-uniforms";
 import { AddToCartButton } from "./add-to-cart-button";
 import { ProductGallery } from "./product-gallery";
 import { ProductReviews, ProductReviewSummary } from "./product-reviews";
@@ -86,6 +87,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     getStoreSettings(),
   ]);
   if (!product) notFound();
+  const displayName = getUniformDisplayName(product.name);
 
   const activeVariants = product.variants.filter(
     (variant) => variant.active !== false && variant.available
@@ -209,7 +211,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <span>/</span>
               </>
             ) : null}
-            <span className="font-semibold text-foreground">{product.name}</span>
+            <span className="font-semibold text-foreground">{displayName}</span>
           </nav>
 
           <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
@@ -227,7 +229,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   {product.brand || product.category?.name || "Pilchería Gloria"}
                 </p>
                 <h1 className="mt-3 font-display text-balance text-4xl leading-[0.98] text-gloria-950 sm:text-5xl">
-                  {product.name}
+                  {displayName}
                 </h1>
                 <div className="mt-4">
                   <ProductReviewSummary productId={product.id} />
