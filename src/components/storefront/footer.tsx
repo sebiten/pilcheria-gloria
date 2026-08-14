@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
-import { SITE_NAME } from "@/lib/site";
+import {
+  SITE_NAME,
+  STORE_LOCATION_ADDRESS,
+  STORE_LOCATION_REFERENCE,
+} from "@/lib/site";
 import type { StoreSettings } from "@/types";
 import { PaymentBrandLogos } from "@/components/storefront/payment-confidence";
 import {
@@ -57,8 +61,13 @@ export function Footer({ settings }: FooterProps) {
             ]}
           />
           <div>
-            <h2 className="font-bold">Punto de retiro</h2>
+            <h2 className="font-bold">Dónde encontrarnos</h2>
             <div className="mt-4 space-y-2 text-sm leading-6 text-background/70">
+              <p className="font-semibold text-background">Local en la feria</p>
+              <p>{STORE_LOCATION_ADDRESS}</p>
+              <p>{STORE_LOCATION_REFERENCE}</p>
+              <div className="my-3 border-t border-background/15" />
+              <p className="font-semibold text-background">Retiro de pedidos online</p>
               {hasAddress ? (
                 <a
                   href={mapsUrl}

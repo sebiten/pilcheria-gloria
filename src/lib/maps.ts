@@ -1,7 +1,7 @@
 import type { StoreSettings } from "@/types";
 
 export const PICKUP_LOCATION_REFERENCE =
-  "Pilchería Gloria, local verde manzana.";
+  "Casa de dos pisos amarilla, familia Burgos.";
 
 type PickupSettings = Pick<
   StoreSettings,

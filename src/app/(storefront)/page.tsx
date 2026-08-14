@@ -8,6 +8,7 @@ import {
   MessageCircle,
   PackageCheck,
   Ruler,
+  Store,
 } from "lucide-react";
 import { getProducts } from "@/actions/products";
 import { getStoreSettings } from "@/actions/store-settings";
@@ -16,7 +17,11 @@ import { HeroUniformCollage } from "@/components/storefront/hero-uniform-collage
 import { ProductGrid } from "@/components/storefront/product-grid";
 import { SchoolUniformsCarousel } from "@/components/storefront/school-uniforms-carousel";
 import { Button } from "@/components/ui/button";
-import { SITE_DESCRIPTION } from "@/lib/site";
+import {
+  SITE_DESCRIPTION,
+  STORE_LOCATION_ADDRESS,
+  STORE_LOCATION_REFERENCE,
+} from "@/lib/site";
 import {
   getGoogleMapsDirectionsUrl,
   getGoogleMapsEmbedUrl,
@@ -68,6 +73,7 @@ export default async function HomePage() {
           ] as const,
         ]
       : []),
+    ["Local", "Feria · local 49", Store] as const,
     ["Pago", "Mercado Pago", CreditCard] as const,
     ["Consulta", "Por WhatsApp", MessageCircle] as const,
   ];
@@ -157,6 +163,10 @@ export default async function HomePage() {
                 </span>
               ) : null}
               <span className="inline-flex items-center gap-2">
+                <Store className="size-4 shrink-0 text-gloria-600" />
+                Local en la feria: pasillo verde, local 49
+              </span>
+              <span className="inline-flex items-center gap-2">
                 <MapPin className="size-4 shrink-0 text-gloria-600" />
                 {pickupConfigured
                   ? `Retiro coordinado en ${settings.address_line}`
@@ -228,7 +238,7 @@ export default async function HomePage() {
               Del catálogo al local.
             </h2>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {fulfillmentCards.map(([title, text, Icon]) => (
               <div key={title} className="rounded-2xl bg-white/8 p-4">
                 <Icon className="size-5 text-gloria-200" />
@@ -246,6 +256,27 @@ export default async function HomePage() {
           className="scroll-mt-24 border-b border-border bg-white py-16 sm:py-20"
         >
           <div className="container mx-auto px-4">
+            <div className="mb-6 flex flex-col gap-4 rounded-[2rem] bg-gloria-200 p-6 text-gloria-950 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+              <div className="flex items-start gap-4">
+                <span className="grid size-12 shrink-0 place-items-center rounded-full bg-gloria-950 text-gloria-200">
+                  <Store className="size-5" />
+                </span>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-gloria-700">
+                    Local físico en la feria
+                  </p>
+                  <h2 className="mt-1 font-display text-2xl sm:text-3xl">
+                    {STORE_LOCATION_ADDRESS}
+                  </h2>
+                  <p className="mt-1 text-sm font-bold text-gloria-800">
+                    {STORE_LOCATION_REFERENCE}.
+                  </p>
+                </div>
+              </div>
+              <p className="max-w-sm text-sm leading-6 text-gloria-800 sm:text-right">
+                El retiro de pedidos online se coordina por separado en {settings.address_line}.
+              </p>
+            </div>
             <div className="grid overflow-hidden rounded-[2rem] border border-gloria-200 bg-gloria-950 shadow-[0_30px_80px_-45px_oklch(0.28_0.08_134/0.55)] lg:grid-cols-[0.8fr_1.2fr]">
               <div className="flex flex-col justify-center p-7 text-white sm:p-10 lg:p-12">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-gloria-200">
@@ -255,8 +286,9 @@ export default async function HomePage() {
                   Retire su compra en {settings.address_line}.
                 </h2>
                 <p className="mt-5 max-w-md text-sm leading-6 text-white/70 sm:text-base">
-                  El stock publicado online se retira en este local de la feria,
-                  con pedido confirmado y horario coordinado previamente.
+                  El stock publicado online se retira en este punto de
+                  Libertador General San Martín, con pedido confirmado y horario
+                  coordinado previamente.
                 </p>
 
                 <div className="mt-7 rounded-2xl border border-white/12 bg-white/8 p-4">

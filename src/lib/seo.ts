@@ -8,6 +8,7 @@ import {
   SITE_LOCALITY,
   SITE_NAME,
   SITE_REGION,
+  STORE_LOCATION_ADDRESS,
 } from "@/lib/site";
 
 type BreadcrumbItem = {
@@ -62,9 +63,7 @@ export function getStorefrontJsonLd(settings: StoreSettings) {
       : undefined,
     address: {
       "@type": "PostalAddress",
-      streetAddress: isConfigured(settings.address_line)
-        ? settings.address_line
-        : undefined,
+      streetAddress: STORE_LOCATION_ADDRESS,
       addressLocality: settings.city || SITE_LOCALITY,
       addressRegion: SITE_REGION,
       addressCountry: "AR",
