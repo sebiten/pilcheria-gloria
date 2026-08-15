@@ -25,6 +25,7 @@ const checkoutSchema = z.object({
       { message: "El checkout admite hasta 20 prendas por pedido" }
     ),
   expectedSubtotal: z.number().finite().nonnegative(),
+  analyticsSessionId: z.string().uuid().nullable().optional(),
   shippingMethod: z.enum(["pickup", "local_delivery"]),
   shippingAddress: z.object({
     name: z.string().trim().min(2).max(120),

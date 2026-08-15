@@ -32,6 +32,10 @@ import { isValidArgentinaContactPhone } from "@/lib/contact";
 import { FACEBOOK_PROMOTION } from "@/lib/promotions";
 import { validateCouponForCheckout } from "@/actions/coupons";
 import { refreshCheckoutCart } from "@/actions/cart";
+import {
+  getAnalyticsSessionId,
+  trackStorefrontEvent,
+} from "@/lib/analytics/client";
 
 interface CheckoutFormProps {
   addresses: Address[];
@@ -110,6 +114,14 @@ export function CheckoutForm({
     .join("|");
 
   useEffect(() => setIsMounted(true), []);
+  useEffect(() => {
+    if (!isMounted || !items.length) return;
+    trackStorefrontEvent({
+      event: "checkout_view",
+      quantity: getCartItemCount(items),
+      dedupe: true,
+    });
+  }, [cartSignature, isMounted, items]);
   useEffect(() => {
     if (!items.length || cartRefreshStarted.current) return;
     cartRefreshStarted.current = true;
@@ -295,6 +307,10 @@ export function CheckoutForm({
       }
 
       checkoutRequestId.current ??= crypto.randomUUID();
+      trackStorefrontEvent({
+        event: "checkout_submit",
+        quantity: getCartItemCount(items),
+      });
 
       if (
         profile &&
@@ -327,6 +343,7 @@ export function CheckoutForm({
         body: JSON.stringify({
           items,
           expectedSubtotal: subtotal,
+          analyticsSessionId: getAnalyticsSessionId(),
           shippingMethod: formData.shippingMethod,
           couponCode: appliedCoupon?.code,
           shippingAddress: {

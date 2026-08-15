@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCartStore } from "@/hooks/use-cart";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,7 @@ import {
   getVariantPricingSegments,
   getVariantQuantityTotal,
 } from "@/lib/inventory";
+import { trackStorefrontEvent } from "@/lib/analytics/client";
 
 interface AddToCartButtonProps {
   product: ProductWithDetails;
@@ -154,6 +155,24 @@ export function AddToCartButton({
         `Hola, quiero consultar por ${product.name}, ${selectedLabel}. ${productUrl}`
       )}`
     : null;
+
+  useEffect(() => {
+    trackStorefrontEvent({
+      event: "product_view",
+      productId: product.id,
+      dedupe: true,
+    });
+  }, [product.id]);
+
+  const handleAddToCart = () => {
+    if (!selectedVariant) return;
+    addItem(product, selectedVariant.id, quantity);
+    trackStorefrontEvent({
+      event: "add_to_cart",
+      productId: product.id,
+      quantity,
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -350,9 +369,7 @@ export function AddToCartButton({
           className="min-h-14 w-full text-base font-bold"
           size="lg"
           data-testid="add-to-cart-button"
-          onClick={() =>
-            selectedVariant && addItem(product, selectedVariant.id, quantity)
-          }
+          onClick={handleAddToCart}
           disabled={!canAddToCart}
         >
           {canAddToCart
@@ -393,7 +410,17 @@ export function AddToCartButton({
           className="min-h-12 w-full text-base"
           asChild
         >
-          <a href={whatsappUrl} target="_blank" rel="noreferrer">
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() =>
+              trackStorefrontEvent({
+                event: "whatsapp_click",
+                productId: product.id,
+              })
+            }
+          >
             {hasPurchasableVariants
               ? "¿No encontrás tu talle? Consultanos"
               : "Consultar disponibilidad por WhatsApp"}

@@ -6,6 +6,7 @@ import { Header } from "@/components/storefront/header";
 import { CartDrawer } from "@/components/storefront/cart-drawer";
 import { CartContent } from "@/components/storefront/cart-content";
 import { CartSync } from "@/components/storefront/cart-sync";
+import { AnalyticsTracker } from "@/components/storefront/analytics-tracker";
 import { hydrateCartStore, subscribeCartStorePersistence, useCartStore } from "@/hooks/use-cart";
 
 export function StorefrontClientShell() {
@@ -24,6 +25,7 @@ export function StorefrontClientShell() {
 
   return (
     <>
+      <AnalyticsTracker />
       <CartSync />
       <Header />
       <CartDrawer isOpen={isOpen} onClose={() => setIsOpen(false)}>

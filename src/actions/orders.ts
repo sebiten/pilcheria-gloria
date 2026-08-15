@@ -498,6 +498,7 @@ export async function createOrder(
     expectedSubtotal,
     checkoutRequestId,
     requestFingerprint,
+    analyticsSessionId,
   }: {
     items: CheckoutItem[];
     shippingMethod: string;
@@ -506,6 +507,7 @@ export async function createOrder(
     expectedSubtotal: number;
     checkoutRequestId: string;
     requestFingerprint: string;
+    analyticsSessionId?: string | null;
   },
   capability: CheckoutRouteCapability
 ) {
@@ -655,6 +657,7 @@ export async function createOrder(
       discount_total: discount.discount,
       status: "pending",
       reservation_expires_at: reservationExpiresAt,
+      analytics_session_id: analyticsSessionId ?? null,
     })
     .select()
     .single();

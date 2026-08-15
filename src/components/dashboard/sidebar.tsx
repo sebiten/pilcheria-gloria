@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BadgeCheck,
+  BarChart3,
   FolderTree,
   HandCoins,
   LayoutDashboard,
@@ -24,6 +25,7 @@ import type { AdminNotificationState } from "@/actions/admin-notifications";
 
 const sidebarItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/dashboard/analytics", icon: BarChart3, label: "Estadísticas" },
   { href: "/dashboard/products", icon: Package, label: "Productos" },
   { href: "/dashboard/orders", icon: ShoppingCart, label: "Órdenes" },
   { href: "/dashboard/finance", icon: HandCoins, label: "Inventario y saldos" },

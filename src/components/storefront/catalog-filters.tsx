@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SchoolUniformFilter } from "@/lib/school-uniforms";
+import { trackStorefrontEvent } from "@/lib/analytics/client";
 
 type CatalogFiltersProps = {
   schools: SchoolUniformFilter[];
@@ -34,7 +35,12 @@ export function CatalogFilters({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    navigate(String(data.get("school") ?? ""), String(data.get("q") ?? ""));
+    const school = String(data.get("school") ?? "");
+    trackStorefrontEvent({
+      event: "catalog_search",
+      schoolId: school || undefined,
+    });
+    navigate(school, String(data.get("q") ?? ""));
   };
 
   return (
@@ -52,7 +58,13 @@ export function CatalogFilters({
           key={selectedSchoolId || "all-schools"}
           name="school"
           defaultValue={selectedSchoolId || ""}
-          onChange={(event) => navigate(event.target.value, "")}
+          onChange={(event) => {
+            const schoolId = event.target.value;
+            if (schoolId) {
+              trackStorefrontEvent({ event: "select_school", schoolId });
+            }
+            navigate(schoolId, "");
+          }}
           className="min-h-14 w-full rounded-2xl border border-input bg-gloria-50 px-4 text-base font-bold text-gloria-950 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
         >
           <option value="">Todas las escuelas</option>

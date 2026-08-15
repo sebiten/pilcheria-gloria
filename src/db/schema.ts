@@ -131,6 +131,7 @@ export const orders = pgTable("orders", {
   shippingMethod: text("shipping_method"),
   shippingAddress: jsonb("shipping_address"),
   guestAccessToken: text("guest_access_token"),
+  analyticsSessionId: uuid("analytics_session_id"),
   couponCode: text("coupon_code"),
   discountTotal: numeric("discount_total", { precision: 10, scale: 2 }).default("0"),
   stockRestored: boolean("stock_restored").default(false),
@@ -321,6 +322,24 @@ export const adminPushSubscriptions = pgTable("admin_push_subscriptions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const storefrontAnalyticsEvents = pgTable("storefront_analytics_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id").notNull(),
+  eventName: text("event_name").notNull(),
+  path: text("path").notNull(),
+  productId: uuid("product_id").references(() => products.id, {
+    onDelete: "set null",
+  }),
+  schoolId: text("school_id"),
+  source: text("source").notNull().default("direct"),
+  deviceType: text("device_type").notNull(),
+  quantity: integer("quantity"),
+  orderId: uuid("order_id").references(() => orders.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const cartItems = pgTable("cart_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   profileId: text("profile_id").references(() => profiles.id, { onDelete: "cascade" }),
@@ -356,6 +375,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   variants: many(productVariants),
   orderItems: many(orderItems),
   cartItems: many(cartItems),
+  analyticsEvents: many(storefrontAnalyticsEvents),
 }));
 
 export const productImagesRelations = relations(productImages, ({ one }) => ({
@@ -405,7 +425,22 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   }),
   items: many(orderItems),
   manualRefunds: many(manualRefunds),
+  analyticsEvents: many(storefrontAnalyticsEvents),
 }));
+
+export const storefrontAnalyticsEventsRelations = relations(
+  storefrontAnalyticsEvents,
+  ({ one }) => ({
+    product: one(products, {
+      fields: [storefrontAnalyticsEvents.productId],
+      references: [products.id],
+    }),
+    order: one(orders, {
+      fields: [storefrontAnalyticsEvents.orderId],
+      references: [orders.id],
+    }),
+  })
+);
 
 export const orderItemsRelations = relations(orderItems, ({ one, many }) => ({
   order: one(orders, {
@@ -524,5 +559,7 @@ export type WithdrawalRequest = typeof withdrawalRequests.$inferSelect;
 export type NewWithdrawalRequest = typeof withdrawalRequests.$inferInsert;
 export type OrderNotification = typeof orderNotifications.$inferSelect;
 export type NewOrderNotification = typeof orderNotifications.$inferInsert;
+export type StorefrontAnalyticsEvent = typeof storefrontAnalyticsEvents.$inferSelect;
+export type NewStorefrontAnalyticsEvent = typeof storefrontAnalyticsEvents.$inferInsert;
 export type CartItem = typeof cartItems.$inferSelect;
 export type NewCartItem = typeof cartItems.$inferInsert;

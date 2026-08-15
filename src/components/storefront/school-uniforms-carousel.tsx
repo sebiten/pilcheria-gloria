@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, MessageCircle, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackStorefrontEvent } from "@/lib/analytics/client";
 import styles from "./school-uniforms-carousel.module.css";
 
 type SchoolIdentity = {
@@ -247,6 +248,9 @@ function SchoolCard({
   return (
     <Link
       href={productUrl}
+      onClick={() =>
+        trackStorefrontEvent({ event: "select_school", schoolId: school.id })
+      }
       className={className}
       tabIndex={duplicate ? -1 : undefined}
       aria-label={`Ver uniformes de ${school.name}`}
@@ -267,6 +271,7 @@ export function SchoolUniformsCarousel({
 
   const chooseSchool = (schoolId: string) => {
     if (!schoolId) return;
+    trackStorefrontEvent({ event: "select_school", schoolId });
     startTransition(() => router.push(`/products?school=${schoolId}`));
   };
 

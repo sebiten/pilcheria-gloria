@@ -34,6 +34,18 @@ export default async function PrivacyPage() {
           legales.
         </p>
       </LegalSection>
+      <LegalSection title="Estadísticas de navegación">
+        <p>
+          Registramos de forma anónima pasos básicos como páginas y prendas
+          vistas, uso del carrito, llegada al checkout y compras completadas.
+          Esto nos permite detectar dificultades y mejorar la tienda.
+        </p>
+        <p>
+          Estas estadísticas no guardan IP, email, teléfono, dirección ni el
+          texto escrito en las búsquedas. El navegador conserva un identificador
+          aleatorio para reconocer el recorrido entre páginas.
+        </p>
+      </LegalSection>
       <LegalSection title="Proveedores">
         <p>
           La operación puede involucrar a Mercado Pago para pagos, Supabase
