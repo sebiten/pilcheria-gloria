@@ -16,69 +16,72 @@ async function garment(relativePath, targetHeight) {
     .toBuffer();
 }
 
-const [dorrego, etha, normal] = await Promise.all([
-  garment("images/uniforms/catalog/dorrego-chomba-hero.webp", 430),
-  garment("images/uniforms/catalog/etha-remera-hero.webp", 315),
-  garment("images/uniforms/catalog/normal-remera-hero.webp", 305),
+const [backgroundPhoto, dorrego, etha, normal] = await Promise.all([
+  sharp(asset("social/og/textile-bg-mobile-safe.webp"))
+    .resize(width, height, { fit: "cover" })
+    .png()
+    .toBuffer(),
+  garment("images/uniforms/catalog/dorrego-chomba-hero.webp", 400),
+  garment("images/uniforms/catalog/etha-remera-hero.webp", 280),
+  garment("images/uniforms/catalog/normal-remera-hero.webp", 270),
 ]);
 
 const logoSource = await readFile(asset("gloria-logo.svg"), "utf8");
 const lightLogo = Buffer.from(
-  logoSource.replaceAll("#15210c", "#f7faef"),
+  logoSource.replaceAll("#15210c", "#f8fcf2"),
   "utf8"
 );
+const logo = await sharp(lightLogo).resize({ width: 220 }).png().toBuffer();
 
-const background = Buffer.from(`
+const artDirection = Buffer.from(`
   <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <pattern id="weave" width="8" height="8" patternUnits="userSpaceOnUse">
-        <path d="M0 1H8M1 0V8" stroke="#f7faef" stroke-opacity="0.025" stroke-width="1"/>
-      </pattern>
-      <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
-        <feDropShadow dx="0" dy="16" stdDeviation="13" flood-color="#071006" flood-opacity="0.34"/>
+      <linearGradient id="copyShade" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0" stop-color="#0c1a05" stop-opacity="0.62"/>
+        <stop offset="0.48" stop-color="#0c1a05" stop-opacity="0.36"/>
+        <stop offset="0.64" stop-color="#0c1a05" stop-opacity="0"/>
+      </linearGradient>
+      <filter id="garmentShadow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="11"/>
       </filter>
     </defs>
 
-    <rect width="1200" height="630" fill="#10230f"/>
-    <rect width="1200" height="630" fill="url(#weave)"/>
-    <path d="M754 -68C962 -40 1172 31 1260 180V686H716C652 558 658 403 724 286C781 183 822 73 754 -68Z" fill="#a8d829"/>
-    <path d="M695 0C765 123 731 221 686 306C629 416 635 533 697 630" fill="none" stroke="#d9ef8c" stroke-width="3" stroke-dasharray="9 14" opacity="0.65"/>
-    <path d="M1048 36C1130 126 1168 224 1152 331" fill="none" stroke="#628d16" stroke-width="3" stroke-dasharray="8 14" opacity="0.52"/>
+    <rect width="1200" height="630" fill="url(#copyShade)"/>
 
-    <text x="62" y="222" fill="#f7faef" font-family="Arial, sans-serif" font-size="74" font-weight="900" letter-spacing="-3">UNIFORMES</text>
-    <text x="58" y="318" fill="#a8d829" font-family="Arial, sans-serif" font-size="92" font-weight="900" letter-spacing="-5">ESCOLARES</text>
-    <text x="63" y="370" fill="#dfe9d6" font-family="Arial, sans-serif" font-size="27" font-weight="600">Elegí escuela, prenda y talle.</text>
+    <text x="90" y="178" fill="#f8fcf2" font-family="Arial Black, Arial, sans-serif" font-size="48" font-weight="900" letter-spacing="-1.5">ENCONTRÁ EL</text>
+    <text x="86" y="274" fill="#a7cc0a" font-family="Arial Black, Arial, sans-serif" font-size="90" font-weight="900" letter-spacing="-4">UNIFORME</text>
+    <text x="88" y="352" fill="#f8fcf2" font-family="Arial Black, Arial, sans-serif" font-size="62" font-weight="900" letter-spacing="-2.5">DE TU ESCUELA</text>
+    <text x="92" y="399" fill="#e8f0df" font-family="Arial, sans-serif" font-size="25" font-weight="700">Elegí escuela, prenda y talle desde el celular.</text>
 
-    <g transform="translate(58 421)">
-      <rect width="390" height="76" rx="38" fill="#f7faef"/>
-      <text x="32" y="50" fill="#10230f" font-family="Arial, sans-serif" font-size="30" font-weight="900">TOCÁ LA IMAGEN</text>
-      <path d="M342 38H365M355 27L366 38L355 49" fill="none" stroke="#10230f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(88 430)">
+      <rect width="474" height="72" rx="18" fill="#f8fcf2"/>
+      <text x="28" y="47" fill="#10230f" font-family="Arial Black, Arial, sans-serif" font-size="25" font-weight="900" letter-spacing="-0.4">TOCÁ PARA VER UNIFORMES</text>
+      <path d="M425 36H445M437 27L446 36L437 45" fill="none" stroke="#10230f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
 
-    <g transform="translate(62 535)">
-      <circle cx="15" cy="15" r="15" fill="#a8d829"/>
+    <g transform="translate(90 542)">
+      <circle cx="15" cy="15" r="15" fill="#a7cc0a"/>
       <path d="M8 15L13 20L22 10" fill="none" stroke="#10230f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="44" y="23" fill="#f7faef" font-family="Arial, sans-serif" font-size="23" font-weight="700">Envío gratis desde 2 prendas</text>
+      <text x="44" y="23" fill="#f8fcf2" font-family="Arial, sans-serif" font-size="21" font-weight="700">Mercado Pago · sin registrarte</text>
     </g>
 
-    <g filter="url(#softShadow)">
-      <rect x="716" y="58" width="434" height="506" rx="210" fill="#80b51c" opacity="0.36"/>
-    </g>
+    <ellipse cx="850" cy="577" rx="155" ry="22" fill="#0c1a05" fill-opacity="0.22" filter="url(#garmentShadow)"/>
+    <ellipse cx="1034" cy="578" rx="130" ry="20" fill="#0c1a05" fill-opacity="0.2" filter="url(#garmentShadow)"/>
+    <ellipse cx="947" cy="486" rx="170" ry="27" fill="#0c1a05" fill-opacity="0.24" filter="url(#garmentShadow)"/>
   </svg>
 `);
 
-const logo = await sharp(lightLogo).resize({ width: 246 }).png().toBuffer();
-
-const output = await sharp(background)
+const output = await sharp(backgroundPhoto)
   .composite([
-    { input: logo, left: 62, top: 48 },
-    { input: etha, left: 662, top: 285 },
-    { input: normal, left: 978, top: 300 },
-    { input: dorrego, left: 824, top: 78 },
+    { input: artDirection, left: 0, top: 0 },
+    { input: logo, left: 90, top: 48 },
+    { input: etha, left: 625, top: 315 },
+    { input: normal, left: 880, top: 326 },
+    { input: dorrego, left: 770, top: 77 },
   ])
-  .png({ compressionLevel: 9, adaptiveFiltering: true })
+  .jpeg({ quality: 91, chromaSubsampling: "4:4:4", mozjpeg: true })
   .toBuffer();
 
-const outputPath = asset("social/og/uniformes-escolares-click-2026.png");
+const outputPath = asset("social/og/uniformes-mobile-facebook-2026.jpg");
 await writeFile(outputPath, output);
-console.log(`OG generado: ${outputPath}`);
+console.log(`OG móvil generado: ${outputPath}`);

@@ -24,9 +24,9 @@ interface ProductsPageProps {
 
 type GarmentFilter = "remera" | "chomba";
 
-const PRODUCTS_SOCIAL_IMAGE = "/social/og/uniformes-escolares-click-2026.png";
+const PRODUCTS_SOCIAL_IMAGE = "/social/og/uniformes-mobile-facebook-2026.jpg";
 const PRODUCTS_SOCIAL_IMAGE_ALT =
-  "Uniformes escolares en Pilchería Gloria: tocá la imagen para entrar a la tienda";
+  "Encontrá el uniforme de tu escuela: tocá para elegir escuela, prenda y talle";
 
 function normalizeSearchValue(value: string) {
   return value
