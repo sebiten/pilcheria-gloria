@@ -87,7 +87,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     itemListElement: products.map((product, index) => ({
       "@type": "ListItem",
       position: index + 1,
-      url: absoluteUrl(`/products/${product.slug}`),
+      url: absoluteUrl(`/uniformes/${product.slug}`),
       name: product.name,
       image: product.images[0]?.url,
     })),
@@ -109,7 +109,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       itemList,
       getBreadcrumbJsonLd([
         { name: "Inicio", path: "/" },
-        { name: "Productos", path: "/products" },
+        { name: "Uniformes", path: "/uniformes" },
         { name: category.name, path: `/categories/${category.slug}` },
       ]),
     ],
@@ -131,7 +131,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           </p>
           {isSchoolUniforms ? (
             <Link
-              href="/products?category=uniformes-escolares"
+              href="/uniformes"
               className="mt-5 inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:bg-primary/90"
             >
               Guía de uniformes en Ledesma
@@ -176,7 +176,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                   Consultar uniformes
                 </a>
               ) : (
-                <Link href="/products">Ver catálogo</Link>
+                <Link href="/uniformes">Ver catálogo</Link>
               )}
             </Button>
           </div>

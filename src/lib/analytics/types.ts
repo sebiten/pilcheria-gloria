@@ -1,7 +1,10 @@
 export const ANALYTICS_EVENT_NAMES = [
   "page_view",
   "product_view",
+  "select_design",
+  "select_size",
   "add_to_cart",
+  "buy_now",
   "checkout_view",
   "checkout_submit",
   "select_school",
@@ -27,6 +30,9 @@ export type AnalyticsDashboardData = {
     visitors: number;
     page_views: number;
     product_viewers: number;
+    size_selection_sessions: number;
+    purchase_intent_sessions: number;
+    buy_now_sessions: number;
     cart_sessions: number;
     checkout_sessions: number;
     checkout_submits: number;
@@ -42,6 +48,8 @@ export type AnalyticsDashboardData = {
     date: string;
     visitors: number;
     product_viewers: number;
+    size_selections: number;
+    purchase_intents: number;
     carts: number;
     checkouts: number;
     purchases: number;
@@ -52,6 +60,8 @@ export type AnalyticsDashboardData = {
     name: string;
     slug: string;
     views: number;
+    size_selections: number;
+    purchase_intents: number;
     cart_adds: number;
   }>;
   top_schools: Array<{

@@ -24,8 +24,8 @@ export function GET() {
 
 ## Paginas importantes
 
-- Catalogo: ${absoluteUrl("/products")}
-- Tienda de uniformes escolares: ${absoluteUrl("/products")}
+- Catálogo: ${absoluteUrl("/uniformes")}
+- Tienda de uniformes escolares: ${absoluteUrl("/uniformes")}
 - Cambios y devoluciones: ${absoluteUrl("/cambios-y-devoluciones")}
 - Terminos: ${absoluteUrl("/terminos")}
 - Privacidad: ${absoluteUrl("/privacidad")}

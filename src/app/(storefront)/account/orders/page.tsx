@@ -20,7 +20,7 @@ export default async function AccountOrdersPage() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link href="/products">Seguir comprando</Link>
+          <Link href="/uniformes">Seguir comprando</Link>
         </Button>
       </div>
 

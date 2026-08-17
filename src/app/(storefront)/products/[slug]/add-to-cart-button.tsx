@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, ShoppingBag } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCartStore } from "@/hooks/use-cart";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -50,6 +52,7 @@ export function AddToCartButton({
   whatsappPhone,
   productUrl: providedProductUrl,
 }: AddToCartButtonProps) {
+  const router = useRouter();
   const variants = useMemo(() => {
     const unique = new Map<string, ProductVariant>();
 
@@ -81,15 +84,17 @@ export function AddToCartButton({
         variant.schoolLevel ? [variant.schoolLevel] : []
       )
     )
-  ).sort((first, second) =>
-    ["primary", "secondary"].indexOf(first) -
-    ["primary", "secondary"].indexOf(second)
+  ).sort(
+    (first, second) =>
+      ["primary", "secondary"].indexOf(first) -
+      ["primary", "secondary"].indexOf(second)
   );
   const [selectedSchoolLevel, setSelectedSchoolLevel] =
     useState<SchoolLevel | null>(null);
   const [selectedVariant, setSelectedVariant] =
     useState<ProductVariant | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [isBuyingNow, setIsBuyingNow] = useState(false);
   const activeSchoolLevel =
     selectedSchoolLevel ?? (schoolLevels.length === 1 ? schoolLevels[0] : null);
   const designSelected = schoolLevels.length === 0 || Boolean(activeSchoolLevel);
@@ -100,9 +105,7 @@ export function AddToCartButton({
           variant.schoolLevel === activeSchoolLevel
       )
     : [];
-  const sizeGroups = Array.from(
-    new Set(designVariants.map(getSizeGroup))
-  ).sort(
+  const sizeGroups = Array.from(new Set(designVariants.map(getSizeGroup))).sort(
     (first, second) =>
       SIZE_GROUP_ORDER.indexOf(first) - SIZE_GROUP_ORDER.indexOf(second)
   );
@@ -115,7 +118,7 @@ export function AddToCartButton({
     ? getVariantPricingSegments(selectedVariant, quantity).segments
     : [];
   const hasPurchasableVariants = availableVariants.length > 0;
-  const canAddToCart = Boolean(selectedVariant);
+  const canPurchase = Boolean(selectedVariant);
   const hasImmediateFulfillment = priceSegments.some(
     (segment) => segment.fulfillment === "immediate"
   );
@@ -149,7 +152,7 @@ export function AddToCartButton({
     providedProductUrl ||
     (typeof window === "undefined"
       ? ""
-      : `${window.location.origin}/products/${product.slug}`);
+      : `${window.location.origin}/uniformes/${product.slug}`);
   const whatsappUrl = whatsappPhone
     ? `https://wa.me/${whatsappPhone.replace(/\D/g, "")}?text=${encodeURIComponent(
         `Hola, quiero consultar por ${product.name}, ${selectedLabel}. ${productUrl}`
@@ -174,6 +177,24 @@ export function AddToCartButton({
     });
   };
 
+  const handleBuyNow = () => {
+    if (!selectedVariant || isBuyingNow) return;
+    setIsBuyingNow(true);
+    addItem(product, selectedVariant.id, quantity, { openCart: false });
+    trackStorefrontEvent({
+      event: "buy_now",
+      productId: product.id,
+      quantity,
+    });
+    router.push("/checkout");
+  };
+
+  const scrollToSelector = () => {
+    document
+      .getElementById("elegir-talle")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div className="space-y-5">
       {variants.length ? (
@@ -182,9 +203,9 @@ export function AddToCartButton({
             <div>
               <Label
                 id={designGroupLabelId}
-                className="mb-3 block text-base font-bold"
+                className="mb-3 block text-lg font-extrabold text-gloria-950"
               >
-                1. Elegí el diseño
+                ¿Es de Primaria o Secundaria?
               </Label>
               <RadioGroup
                 aria-labelledby={designGroupLabelId}
@@ -193,6 +214,10 @@ export function AddToCartButton({
                   setSelectedSchoolLevel(value as SchoolLevel);
                   setSelectedVariant(null);
                   setQuantity(1);
+                  trackStorefrontEvent({
+                    event: "select_design",
+                    productId: product.id,
+                  });
                 }}
                 className="grid grid-cols-2 gap-2"
               >
@@ -200,11 +225,11 @@ export function AddToCartButton({
                   <div key={schoolLevel}>
                     <RadioGroupItem
                       value={schoolLevel}
-                      id={`school-level-${schoolLevel}`}
+                      id={`${product.id}-school-level-${schoolLevel}`}
                       className="peer sr-only"
                     />
                     <Label
-                      htmlFor={`school-level-${schoolLevel}`}
+                      htmlFor={`${product.id}-school-level-${schoolLevel}`}
                       className="flex min-h-14 cursor-pointer items-center justify-center rounded-xl border bg-card px-3 py-3 text-center text-base font-bold peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-primary/20"
                     >
                       {getSchoolLevelLabel(schoolLevel)}
@@ -218,13 +243,16 @@ export function AddToCartButton({
           <div>
             <Label
               id={sizeGroupLabelId}
-              className="mb-3 block text-base font-bold"
+              className="mb-1 block text-lg font-extrabold text-gloria-950"
             >
-              {schoolLevels.length > 1 ? "2. Elegí el talle" : "Elegí el talle"}
+              Elegí el talle
             </Label>
+            <p className="mb-3 text-sm leading-5 text-muted-foreground">
+              Juvenil usa 8, 10, 12, 14 y 16. Adulto usa 1, 2, 3, 4 y 5.
+            </p>
             {!designSelected ? (
               <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950">
-                Primero elegí si buscás el diseño de Primaria o Secundaria.
+                Primero elegí Primaria o Secundaria.
               </p>
             ) : (
               <RadioGroup
@@ -239,6 +267,12 @@ export function AddToCartButton({
                       ? Math.max(1, Math.min(current, variant.maxQuantity ?? 10))
                       : 1
                   );
+                  if (variant) {
+                    trackStorefrontEvent({
+                      event: "select_size",
+                      productId: product.id,
+                    });
+                  }
                 }}
                 className="space-y-4"
               >
@@ -264,10 +298,15 @@ export function AddToCartButton({
                               />
                               <Label
                                 htmlFor={`variant-${variant.id}`}
-                                className="flex min-h-24 cursor-pointer flex-col justify-center rounded-xl border bg-card px-3 py-3 text-center text-base peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-primary/20"
+                                className="flex min-h-20 cursor-pointer flex-col justify-center rounded-xl border bg-card px-3 py-3 text-center text-base peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:ring-2 peer-data-[state=checked]:ring-primary/20 sm:min-h-24"
                               >
                                 <span className="font-bold">Talle {variant.size}</span>
-                                <span className="mt-2 font-bold text-foreground">
+                                {variant.color ? (
+                                  <span className="text-sm text-muted-foreground">
+                                    {variant.color}
+                                  </span>
+                                ) : null}
+                                <span className="mt-1 font-bold text-foreground">
                                   {formatPrice(unitPrice)}
                                 </span>
                               </Label>
@@ -314,20 +353,15 @@ export function AddToCartButton({
             ) : (
               <span className="font-bold">
                 {designSelected
-                  ? "Tocá un talle para poder continuar."
+                  ? "Tocá un talle para continuar."
                   : "Elegí el diseño y después el talle."}
               </span>
             )}
           </div>
-          {!availableVariants.length ? (
-            <p className="text-sm text-destructive">
-              No hay talles disponibles para comprar.
-            </p>
-          ) : null}
         </div>
       ) : null}
 
-      {canAddToCart ? (
+      {canPurchase ? (
         <div className="flex items-center gap-4">
           <Label className="text-base font-semibold">Cantidad</Label>
           <div className="flex items-center gap-2">
@@ -350,13 +384,9 @@ export function AddToCartButton({
               className="min-h-11 min-w-11 text-lg"
               aria-label="Sumar una prenda"
               onClick={() =>
-                setQuantity((current) =>
-                  variants.length
-                    ? Math.min(current + 1, selectedLimit)
-                    : current + 1
-                )
+                setQuantity((current) => Math.min(current + 1, selectedLimit))
               }
-              disabled={variants.length > 0 && quantity >= selectedLimit}
+              disabled={quantity >= selectedLimit}
             >
               +
             </Button>
@@ -365,17 +395,26 @@ export function AddToCartButton({
       ) : null}
 
       {hasPurchasableVariants ? (
-        <Button
-          className="min-h-14 w-full text-base font-bold"
-          size="lg"
-          data-testid="add-to-cart-button"
-          onClick={handleAddToCart}
-          disabled={!canAddToCart}
-        >
-          {canAddToCart
-            ? `Agregar al carrito - ${formatPrice(currentPrice)}`
-            : "Primero elegí un talle"}
-        </Button>
+        <div className="hidden gap-2 lg:grid lg:grid-cols-2">
+          <Button
+            className="min-h-14 text-base font-bold"
+            size="lg"
+            onClick={handleBuyNow}
+            disabled={!canPurchase || isBuyingNow}
+          >
+            {isBuyingNow ? "Abriendo…" : "Comprar ahora"}
+          </Button>
+          <Button
+            variant="outline"
+            className="min-h-14 text-base font-bold"
+            size="lg"
+            data-testid="add-to-cart-button"
+            onClick={handleAddToCart}
+            disabled={!canPurchase}
+          >
+            Agregar al carrito
+          </Button>
+        </div>
       ) : (
         <div
           className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950"
@@ -426,6 +465,50 @@ export function AddToCartButton({
               : "Consultar disponibilidad por WhatsApp"}
           </a>
         </Button>
+      ) : null}
+
+      {hasPurchasableVariants ? (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gloria-200 bg-background/98 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-18px_45px_-28px_oklch(0.2_0.045_136/0.55)] backdrop-blur lg:hidden">
+          <div className="mx-auto max-w-md">
+            {selectedVariant ? (
+              <>
+                <div className="mb-2 flex items-center justify-between gap-3 px-1 text-sm">
+                  <span className="truncate font-bold">
+                    {formatStorefrontVariantSize(selectedVariant)} · {quantity} prenda{quantity === 1 ? "" : "s"}
+                  </span>
+                  <span className="shrink-0 font-black">{formatPrice(currentPrice)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    className="min-h-12 px-3 text-sm font-extrabold"
+                    onClick={handleBuyNow}
+                    disabled={isBuyingNow}
+                  >
+                    {isBuyingNow ? "Abriendo…" : "Comprar ahora"}
+                    <ArrowRight className="ml-1 size-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="min-h-12 px-3 text-sm font-extrabold"
+                    data-testid="add-to-cart-button-mobile"
+                    onClick={handleAddToCart}
+                  >
+                    <ShoppingBag className="mr-1 size-4" />
+                    Al carrito
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <Button
+                className="min-h-12 w-full justify-between px-5 text-base font-extrabold"
+                onClick={scrollToSelector}
+              >
+                Elegir diseño y talle
+                <ArrowRight className="size-4" />
+              </Button>
+            )}
+          </div>
+        </div>
       ) : null}
     </div>
   );

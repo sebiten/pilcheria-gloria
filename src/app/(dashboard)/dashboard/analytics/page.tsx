@@ -8,6 +8,7 @@ import {
   Eye,
   Lightbulb,
   MousePointerClick,
+  Ruler,
   ShoppingCart,
   Smartphone,
   Users,
@@ -48,21 +49,36 @@ function percent(value: number, total: number) {
 function getRecommendations(data: Awaited<ReturnType<typeof getAnalyticsDashboard>>) {
   const { metrics } = data;
   const recommendations: string[] = [];
-  const productToCart = percent(metrics.cart_sessions, metrics.product_viewers);
-  const cartToCheckout = percent(metrics.checkout_sessions, metrics.cart_sessions);
+  const productToSize = percent(
+    metrics.size_selection_sessions,
+    metrics.product_viewers
+  );
+  const sizeToIntent = percent(
+    metrics.purchase_intent_sessions,
+    metrics.size_selection_sessions
+  );
+  const intentToCheckout = percent(
+    metrics.checkout_sessions,
+    metrics.purchase_intent_sessions
+  );
   const checkoutToPurchase = percent(
     metrics.purchasing_sessions,
     metrics.checkout_sessions
   );
 
-  if (metrics.product_viewers >= 10 && productToCart < 20) {
+  if (metrics.product_viewers >= 10 && productToSize < 30) {
     recommendations.push(
-      "Muchas personas miran prendas pero no las agregan. Revisá primero fotos, precio visible y claridad de talles."
+      "Muchas personas abren prendas pero no eligen talle. Revisá fotos, nombres de diseño y ayuda de talles."
     );
   }
-  if (metrics.cart_sessions >= 5 && cartToCheckout < 50) {
+  if (metrics.size_selection_sessions >= 5 && sizeToIntent < 40) {
     recommendations.push(
-      "Hay carritos que no llegan al checkout. Conviene revisar que envío, retiro y total se entiendan antes de continuar."
+      "Eligen talle pero no intentan comprar. Revisá precio final, entrega y claridad de los botones de compra."
+    );
+  }
+  if (metrics.purchase_intent_sessions >= 5 && intentToCheckout < 50) {
+    recommendations.push(
+      "Hay intenciones de compra que no llegan al checkout. Revisá el carrito y que envío, retiro y total se entiendan."
     );
   }
   if (metrics.checkout_sessions >= 5 && checkoutToPurchase < 50) {
@@ -94,7 +110,8 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const funnel = [
     { label: "Visitaron la tienda", value: metrics.visitors, icon: Users },
     { label: "Vieron una prenda", value: metrics.product_viewers, icon: Eye },
-    { label: "Agregaron al carrito", value: metrics.cart_sessions, icon: ShoppingCart },
+    { label: "Eligieron un talle", value: metrics.size_selection_sessions, icon: Ruler },
+    { label: "Intentaron comprar", value: metrics.purchase_intent_sessions, icon: ShoppingCart },
     { label: "Llegaron al checkout", value: metrics.checkout_sessions, icon: CreditCard },
     { label: "Compraron", value: metrics.purchasing_sessions, icon: Banknote },
   ];
@@ -139,7 +156,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       </header>
 
       <section className="overflow-hidden rounded-2xl bg-gloria-950 text-white">
-        <div className="grid gap-px bg-white/10 sm:grid-cols-[1.4fr_1fr_1fr]">
+        <div className="grid gap-px bg-white/10 sm:grid-cols-2 xl:grid-cols-4">
           <div className="bg-gloria-950 p-5 sm:p-7">
             <div className="flex items-center gap-2 text-sm font-semibold text-gloria-200">
               <Users className="size-4" /> Visitantes únicos
@@ -153,25 +170,39 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           </div>
           <div className="bg-gloria-950 p-5 sm:p-7">
             <div className="flex items-center gap-2 text-sm font-semibold text-gloria-200">
+              <MousePointerClick className="size-4" /> Intención de compra
+            </div>
+            <p className="mt-3 text-2xl font-black sm:text-3xl">
+              {metrics.purchase_intent_sessions}
+            </p>
+            <p className="mt-2 text-sm text-white/60">
+              {percent(metrics.purchase_intent_sessions, metrics.product_viewers)}% de quienes vieron una prenda
+            </p>
+          </div>
+          <div className="bg-gloria-950 p-5 sm:p-7">
+            <div className="flex items-center gap-2 text-sm font-semibold text-gloria-200">
+              <CreditCard className="size-4" /> Compras medidas
+            </div>
+            <p className="mt-3 text-2xl font-black sm:text-3xl">
+              {metrics.purchasing_sessions}
+            </p>
+            <p className="mt-2 text-sm text-white/60">
+              {percent(metrics.purchasing_sessions, metrics.visitors)}% de visita a compra
+            </p>
+          </div>
+          <div className="bg-gloria-950 p-5 sm:p-7">
+            <div className="flex items-center gap-2 text-sm font-semibold text-gloria-200">
               <Banknote className="size-4" /> Ventas cobradas
             </div>
             <p className="mt-3 text-2xl font-black sm:text-3xl">{formatPrice(metrics.revenue)}</p>
             <p className="mt-2 text-sm text-white/60">{metrics.paid_orders} pedidos</p>
           </div>
-          <div className="bg-gloria-950 p-5 sm:p-7">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gloria-200">
-              <MousePointerClick className="size-4" /> Conversión
-            </div>
-            <p className="mt-3 text-2xl font-black sm:text-3xl">
-              {percent(metrics.purchasing_sessions, metrics.visitors)}%
-            </p>
-            <p className="mt-2 text-sm text-white/60">de visita a compra</p>
-          </div>
         </div>
       </section>
       <p className="-mt-3 text-xs leading-5 text-muted-foreground">
-        El recorrido de las visitas se mide desde {trackingStartLabel}. Las ventas
-        cobradas incluyen el historial completo de pedidos del período elegido.
+        El recorrido medido empieza el {trackingStartLabel}. “Compras medidas” solo
+        cuenta pedidos vinculados a una sesión; “ventas cobradas” incluye todo el
+        historial del período.
       </p>
 
       <Card>
@@ -245,10 +276,10 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
             {data.top_products.length ? (
               <div className="divide-y">
                 {data.top_products.map((product, index) => (
-                  <Link key={product.product_id} href={`/products/${product.slug}`} className="grid min-h-14 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-3 py-3 hover:text-primary">
+                  <Link key={product.product_id} href={`/uniformes/${product.slug}`} className="grid min-h-14 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-3 py-3 hover:text-primary">
                     <span className="text-sm font-black text-muted-foreground">{index + 1}</span>
                     <span className="truncate text-sm font-bold">{product.name}</span>
-                    <span className="text-right text-xs text-muted-foreground">{product.views} vistas · {product.cart_adds} carritos</span>
+                    <span className="text-right text-xs text-muted-foreground">{product.views} vistas · {product.size_selections} talles · {product.purchase_intents} intenciones</span>
                   </Link>
                 ))}
               </div>

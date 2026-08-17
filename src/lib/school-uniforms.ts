@@ -54,3 +54,14 @@ export function getUniformDisplayName(productName: string) {
 
   return [garment, school.name, level].filter(Boolean).join(" · ");
 }
+
+export function getSchoolDisplayName(value: string) {
+  const normalizedValue = normalizeSchoolText(value);
+  const school = SCHOOL_UNIFORM_FILTERS.find(
+    (item) =>
+      normalizedValue.includes(normalizeSchoolText(item.query)) ||
+      normalizedValue.includes(normalizeSchoolText(item.fullName))
+  );
+
+  return school?.name || value;
+}

@@ -223,7 +223,7 @@ export async function submitProductReview(
   }
 
   updateTag(PRODUCT_REVIEWS_CACHE_TAG);
-  revalidatePath(`/products/${parsed.data.productSlug}`);
+  revalidatePath(`/uniformes/${parsed.data.productSlug}`);
   return {
     ok: true,
     message: "Reseña recibida. Se publicará después de revisarla.",
@@ -260,7 +260,7 @@ export async function setProductReviewApproval(
   updateTag(PRODUCT_REVIEWS_CACHE_TAG);
   revalidatePath("/dashboard/reviews");
   const product = Array.isArray(data.product) ? data.product[0] : data.product;
-  if (product?.slug) revalidatePath(`/products/${product.slug}`);
+  if (product?.slug) revalidatePath(`/uniformes/${product.slug}`);
 }
 
 export async function deleteProductReviewAdmin(
@@ -280,5 +280,5 @@ export async function deleteProductReviewAdmin(
   updateTag(PRODUCT_REVIEWS_CACHE_TAG);
   revalidatePath("/dashboard/reviews");
   const product = Array.isArray(data.product) ? data.product[0] : data.product;
-  if (product?.slug) revalidatePath(`/products/${product.slug}`);
+  if (product?.slug) revalidatePath(`/uniformes/${product.slug}`);
 }

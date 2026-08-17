@@ -213,7 +213,7 @@ export default async function OrderConfirmationPage({
 
         <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Button className="min-h-12 rounded-full px-6" asChild>
-            <Link href="/products">
+            <Link href="/uniformes">
               Seguir viendo uniformes <ArrowRight className="size-4" />
             </Link>
           </Button>

@@ -15,7 +15,7 @@ export function CopyProductLinkButton({
 
   async function copyLink() {
     await navigator.clipboard.writeText(
-      `${window.location.origin}/products/${slug}`
+      `${window.location.origin}/uniformes/${slug}`
     );
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);

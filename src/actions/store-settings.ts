@@ -155,7 +155,7 @@ export async function updateStoreSettings(
 
   updateTag(STORE_SETTINGS_CACHE_TAG);
   revalidatePath("/");
-  revalidatePath("/products");
+  revalidatePath("/uniformes");
   revalidatePath("/checkout");
   revalidatePath("/dashboard/settings");
 }

@@ -3,7 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, MapPin, Store, Truck } from "lucide-react";
+import {
+  ChevronDown,
+  ExternalLink,
+  MapPin,
+  MessageCircle,
+  ShieldCheck,
+  Store,
+  Truck,
+  UserRoundCheck,
+} from "lucide-react";
 import { addAddress, updateProfileContact } from "@/actions/auth";
 import { useCartStore } from "@/hooks/use-cart";
 import { Button } from "@/components/ui/button";
@@ -55,6 +64,21 @@ type CouponFeedback = {
   message: string;
 };
 
+type CheckoutFieldName =
+  | "shippingMethod"
+  | "name"
+  | "lastName"
+  | "email"
+  | "phone"
+  | "street"
+  | "city"
+  | "state"
+  | "zip"
+  | "references"
+  | "couponCode";
+
+type CheckoutFieldErrors = Partial<Record<CheckoutFieldName, string>>;
+
 function splitFullName(fullName: string | null | undefined) {
   const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
   return {
@@ -82,6 +106,8 @@ export function CheckoutForm({
   const defaultName = splitFullName(defaultAddress?.name || profile?.full_name);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<CheckoutFieldErrors>({});
+  const [isCouponOpen, setIsCouponOpen] = useState(false);
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [couponFeedback, setCouponFeedback] =
@@ -146,6 +172,7 @@ export function CheckoutForm({
 
     if (!promotionCode) return;
 
+    setIsCouponOpen(true);
     setFormData((current) =>
       current.couponCode
         ? current
@@ -202,6 +229,8 @@ export function CheckoutForm({
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     checkoutRequestId.current = null;
+    const fieldName = event.target.name as CheckoutFieldName;
+    setFieldErrors((current) => ({ ...current, [fieldName]: undefined }));
     if (event.target.name === "couponCode") {
       setAppliedCoupon(null);
       setCouponFeedback(null);
@@ -219,11 +248,14 @@ export function CheckoutForm({
         type: "error",
         message: "Ingresá un código de cupón.",
       });
+      setFieldErrors({ couponCode: "Ingresá un código de cupón." });
+      document.getElementById("couponCode")?.focus();
       return;
     }
 
     setIsApplyingCoupon(true);
     setCouponFeedback(null);
+    setFieldErrors((current) => ({ ...current, couponCode: undefined }));
     checkoutRequestId.current = null;
 
     try {
@@ -231,11 +263,13 @@ export function CheckoutForm({
       if (!result.valid) {
         setAppliedCoupon(null);
         setCouponFeedback({ type: "error", message: result.message });
+        setFieldErrors({ couponCode: result.message });
         return;
       }
 
       setFormData((current) => ({ ...current, couponCode: result.code }));
       setAppliedCoupon({ code: result.code, discount: result.discount });
+      setFieldErrors((current) => ({ ...current, couponCode: undefined }));
       setCouponFeedback({
         type: "success",
         message: `Cupón ${result.code} aplicado. Ahorrás ${formatPrice(result.discount)}.`,
@@ -245,6 +279,9 @@ export function CheckoutForm({
       setCouponFeedback({
         type: "error",
         message: "No pudimos validar el cupón. Intentá nuevamente.",
+      });
+      setFieldErrors({
+        couponCode: "No pudimos validar el cupón. Intentá nuevamente.",
       });
     } finally {
       setIsApplyingCoupon(false);
@@ -273,39 +310,66 @@ export function CheckoutForm({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setIsProcessing(true);
     setError(null);
+    setFieldErrors({});
+
+    const focusField = (field: string) => {
+      window.requestAnimationFrame(() => {
+        const element = document.getElementById(field);
+        element?.focus();
+        element?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    };
+
+    const showFieldError = (
+      field: CheckoutFieldName,
+      message: string
+    ) => {
+      setFieldErrors({ [field]: message });
+      focusField(field);
+    };
+
+    const fullName = `${formData.name} ${formData.lastName}`.trim();
+
+    if (!hasAvailableShippingMethod) {
+      showFieldError(
+        "shippingMethod",
+        "No hay un método de entrega disponible. Sumá otra prenda o contactanos."
+      );
+      return;
+    }
+
+    if (!isValidArgentinaContactPhone(formData.phone)) {
+      showFieldError(
+        "phone",
+        "Ingresá un teléfono válido con código de área para poder contactarte."
+      );
+      return;
+    }
+
+    if (
+      formData.shippingMethod === "local_delivery" &&
+      !localDeliveryAvailable
+    ) {
+      showFieldError(
+        "shippingMethod",
+        `La entrega local está disponible desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas.`
+      );
+      return;
+    }
+
+    if (formData.couponCode.trim() && !appliedCoupon) {
+      setIsCouponOpen(true);
+      showFieldError(
+        "couponCode",
+        "Aplicá el cupón antes de continuar o borrá el código ingresado."
+      );
+      return;
+    }
+
+    setIsProcessing(true);
 
     try {
-      const fullName = `${formData.name} ${formData.lastName}`.trim();
-
-      if (!hasAvailableShippingMethod) {
-        throw new Error(
-          "No hay un método de entrega disponible para este carrito. Sumá otra prenda o contactanos."
-        );
-      }
-
-      if (!isValidArgentinaContactPhone(formData.phone)) {
-        throw new Error(
-          "Ingresá un teléfono válido con código de área para poder contactarte."
-        );
-      }
-
-      if (
-        formData.shippingMethod === "local_delivery" &&
-        !localDeliveryAvailable
-      ) {
-        throw new Error(
-          `La entrega local está disponible desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas.`
-        );
-      }
-
-      if (formData.couponCode.trim() && !appliedCoupon) {
-        throw new Error(
-          "Aplicá el cupón antes de continuar o borrá el código ingresado."
-        );
-      }
-
       checkoutRequestId.current ??= crypto.randomUUID();
       trackStorefrontEvent({
         event: "checkout_submit",
@@ -382,6 +446,7 @@ export function CheckoutForm({
           : "No se pudo procesar el checkout"
       );
       setIsProcessing(false);
+      focusField("checkout-error");
     }
   };
 
@@ -404,15 +469,15 @@ export function CheckoutForm({
         <p className="mt-3 text-muted-foreground">
           Elegí una prenda para continuar con la compra.
         </p>
-        <Button className="mt-6" onClick={() => router.push("/products")}>
-          Ver productos
+        <Button className="mt-6" onClick={() => router.push("/uniformes")}>
+          Ver uniformes
         </Button>
       </div>
     );
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-12">
+    <main className="mx-auto w-full max-w-6xl px-4 pb-32 pt-8 sm:py-12">
       <div className="mb-8">
         <p className="text-sm font-semibold text-primary">Compra segura</p>
         <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
@@ -439,18 +504,39 @@ export function CheckoutForm({
           id={formId}
           data-testid="checkout-form"
           onSubmit={handleSubmit}
+          onInvalid={(event) => {
+            const field = event.target as HTMLInputElement;
+            if (!field.name) return;
+            const message = field.validity.valueMissing
+              ? "Completá este dato para continuar."
+              : field.validity.typeMismatch
+                ? "Ingresá un dato válido."
+                : field.validationMessage;
+            setFieldErrors((current) => ({
+              ...current,
+              [field.name as CheckoutFieldName]: message,
+            }));
+          }}
           className="space-y-6"
         >
           <Card>
             <CardHeader>
               <CardTitle>¿Cómo querés recibir tu compra?</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent
+              id="shippingMethod"
+              tabIndex={-1}
+              aria-invalid={Boolean(fieldErrors.shippingMethod)}
+            >
               <RadioGroup
                 aria-label="Método de entrega"
                 value={formData.shippingMethod}
                 onValueChange={(value) => {
                   checkoutRequestId.current = null;
+                  setFieldErrors((current) => ({
+                    ...current,
+                    shippingMethod: undefined,
+                  }));
                   setFormData((current) => ({
                     ...current,
                     shippingMethod: value as DeliveryMethod,
@@ -481,6 +567,11 @@ export function CheckoutForm({
                   />
                 ) : null}
               </RadioGroup>
+              {fieldErrors.shippingMethod ? (
+                <p className="mt-3 text-sm font-semibold text-destructive" role="alert">
+                  {fieldErrors.shippingMethod}
+                </p>
+              ) : null}
               {!hasAvailableShippingMethod ? (
                 <div
                   className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950"
@@ -529,8 +620,8 @@ export function CheckoutForm({
                   </p>
                 </div>
               ) : null}
-              <FormField label="Nombre" name="name" value={formData.name} onChange={handleInputChange} required />
-              <FormField label="Apellido" name="lastName" value={formData.lastName} onChange={handleInputChange} required />
+              <FormField label="Nombre" name="name" value={formData.name} onChange={handleInputChange} error={fieldErrors.name} required />
+              <FormField label="Apellido" name="lastName" value={formData.lastName} onChange={handleInputChange} error={fieldErrors.lastName} required />
               <FormField
                 label="Email (opcional)"
                 name="email"
@@ -538,6 +629,7 @@ export function CheckoutForm({
                 value={formData.email}
                 onChange={handleInputChange}
                 autoComplete="email"
+                error={fieldErrors.email}
                 hint="Si lo ingresás, también recibirás por email las novedades del pedido."
               />
               <FormField
@@ -550,6 +642,7 @@ export function CheckoutForm({
                 inputMode="tel"
                 placeholder="Ej. 388 4123456"
                 hint="Ingresá un número con código de área y WhatsApp, sin 0 ni 15."
+                error={fieldErrors.phone}
                 required
               />
             </CardContent>
@@ -596,12 +689,12 @@ export function CheckoutForm({
                 </CardHeader>
                 <CardContent className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <FormField label="Calle y número" name="street" value={formData.street} onChange={handleInputChange} required />
+                    <FormField label="Calle y número" name="street" value={formData.street} onChange={handleInputChange} error={fieldErrors.street} required />
                   </div>
-                  <FormField label="Localidad" name="city" value={formData.city} onChange={handleInputChange} required />
-                  <FormField label="Provincia" name="state" value={formData.state} onChange={handleInputChange} required />
-                  <FormField label="Código postal" name="zip" value={formData.zip} onChange={handleInputChange} />
-                  <FormField label="Referencias" name="references" value={formData.references} onChange={handleInputChange} placeholder="Barrio, entre calles..." />
+                  <FormField label="Localidad" name="city" value={formData.city} onChange={handleInputChange} error={fieldErrors.city} required />
+                  <FormField label="Provincia" name="state" value={formData.state} onChange={handleInputChange} error={fieldErrors.state} required />
+                  <FormField label="Código postal" name="zip" value={formData.zip} onChange={handleInputChange} error={fieldErrors.zip} />
+                  <FormField label="Referencias" name="references" value={formData.references} onChange={handleInputChange} error={fieldErrors.references} placeholder="Barrio, entre calles..." />
                   {shouldOfferSaveAddress ? (
                     <label className="flex min-h-11 items-center gap-3 text-sm sm:col-span-2">
                       <input type="checkbox" checked={saveAddress} onChange={(event) => setSaveAddress(event.target.checked)} />
@@ -633,10 +726,22 @@ export function CheckoutForm({
           )}
 
           <Card>
-            <CardHeader>
-              <CardTitle>Cupón de descuento</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            <button
+              type="button"
+              onClick={() => setIsCouponOpen((open) => !open)}
+              aria-expanded={isCouponOpen}
+              aria-controls="checkout-coupon-content"
+              className="flex min-h-14 w-full items-center justify-between gap-3 px-6 text-left font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+            >
+              <span>
+                ¿Tenés un cupón? <span className="font-medium text-muted-foreground">Es opcional</span>
+              </span>
+              <ChevronDown
+                className={`size-5 transition-transform ${isCouponOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            {isCouponOpen ? (
+            <CardContent id="checkout-coupon-content" className="space-y-4 border-t pt-5">
               <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                 <FormField
                   label="Código (opcional)"
@@ -644,6 +749,7 @@ export function CheckoutForm({
                   value={formData.couponCode}
                   onChange={handleInputChange}
                   placeholder="Ingresá tu código"
+                  error={fieldErrors.couponCode}
                 />
                 <Button
                   type="button"
@@ -655,23 +761,25 @@ export function CheckoutForm({
                   {isApplyingCoupon ? "Validando..." : "Aplicar"}
                 </Button>
               </div>
-              {couponFeedback ? (
+              {couponFeedback?.type === "success" ? (
                 <p
-                  role={couponFeedback.type === "error" ? "alert" : "status"}
-                  className={
-                    couponFeedback.type === "error"
-                      ? "rounded-xl bg-destructive/10 p-3 text-sm font-semibold leading-6 text-destructive"
-                      : "rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-semibold leading-6 text-primary"
-                  }
+                  role="status"
+                  className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-semibold leading-6 text-primary"
                 >
                   {couponFeedback.message}
                 </p>
               ) : null}
             </CardContent>
+            ) : null}
           </Card>
 
           {error ? (
-            <p role="alert" className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive">
+            <p
+              id="checkout-error"
+              role="alert"
+              tabIndex={-1}
+              className="rounded-xl bg-destructive/10 p-4 text-sm font-semibold text-destructive"
+            >
               {error}
             </p>
           ) : null}
@@ -743,7 +851,21 @@ export function CheckoutForm({
                 <span>{formatPrice(total)}</span>
               </div>
             </div>
-            <Button className="min-h-14 w-full text-base font-bold" size="lg" type="submit" form={formId} data-testid="checkout-submit" disabled={isProcessing || !hasAvailableShippingMethod}>
+            <ul className="space-y-2 rounded-xl bg-gloria-50 p-3 text-sm font-semibold text-gloria-900">
+              <li className="flex items-center gap-2">
+                <ShieldCheck className="size-4 text-gloria-700" />
+                Pago protegido por Mercado Pago
+              </li>
+              <li className="flex items-center gap-2">
+                <UserRoundCheck className="size-4 text-gloria-700" />
+                No necesitás crear una cuenta
+              </li>
+              <li className="flex items-center gap-2">
+                <MessageCircle className="size-4 text-gloria-700" />
+                Te confirmamos el pedido por WhatsApp
+              </li>
+            </ul>
+            <Button className="hidden min-h-14 w-full text-base font-bold lg:flex" size="lg" type="submit" form={formId} data-testid="checkout-submit" disabled={isProcessing || !hasAvailableShippingMethod}>
               {isProcessing ? "Abriendo Mercado Pago..." : "Continuar a Mercado Pago"}
             </Button>
             <PaymentConfidence amount={total} compact />
@@ -760,6 +882,27 @@ export function CheckoutForm({
             </p>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gloria-200 bg-background/98 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-18px_45px_-28px_oklch(0.2_0.045_136/0.55)] backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-md items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-muted-foreground">Total</p>
+            <p className="truncate text-lg font-black">{formatPrice(total)}</p>
+          </div>
+          <Button
+            className="min-h-12 shrink-0 px-4 text-sm font-extrabold"
+            type="submit"
+            form={formId}
+            data-testid="checkout-submit-mobile"
+            disabled={isProcessing || !hasAvailableShippingMethod}
+          >
+            {isProcessing ? "Abriendo…" : "Continuar a Mercado Pago"}
+          </Button>
+        </div>
+        <p className="mx-auto mt-1 max-w-md text-center text-[0.68rem] font-semibold text-muted-foreground">
+          Pago protegido · sin cuenta · confirmación por WhatsApp
+        </p>
       </div>
     </main>
   );
@@ -795,13 +938,17 @@ function FormField({
   label,
   name,
   hint,
+  error,
   ...props
 }: React.ComponentProps<typeof Input> & {
   label: string;
   name: string;
   hint?: string;
+  error?: string;
 }) {
   const hintId = hint ? `${name}-hint` : undefined;
+  const errorId = error ? `${name}-error` : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
 
   return (
     <div className="space-y-2">
@@ -809,13 +956,19 @@ function FormField({
       <Input
         id={name}
         name={name}
-        aria-describedby={hintId}
+        aria-describedby={describedBy}
+        aria-invalid={Boolean(error)}
         className="min-h-12 text-base"
         {...props}
       />
       {hint ? (
         <p id={hintId} className="text-sm leading-5 text-muted-foreground">
           {hint}
+        </p>
+      ) : null}
+      {error ? (
+        <p id={errorId} className="text-sm font-semibold text-destructive" role="alert">
+          {error}
         </p>
       ) : null}
     </div>

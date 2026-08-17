@@ -33,7 +33,7 @@ export function ProductGallery({
 
   return (
     <div className="space-y-3">
-      <div className="relative aspect-[4/5] overflow-hidden rounded-[1.75rem] border border-border bg-[#17151a]">
+      <div className="relative h-[min(72vw,18rem)] overflow-hidden rounded-[1.5rem] border border-border bg-[#17151a] sm:h-auto sm:aspect-[4/5] sm:rounded-[1.75rem]">
         <Image
           src={selectedImage.url}
           alt={selectedImage.alt || productName}

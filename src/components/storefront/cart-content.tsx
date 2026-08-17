@@ -39,8 +39,8 @@ export function CartContent() {
       <div className="flex flex-col items-center justify-center h-full text-center">
         <p className="text-muted-foreground mb-4">Tu carrito está vacío</p>
         <Button asChild>
-          <Link href="/products" onClick={() => setIsOpen(false)}>
-            Ver productos
+          <Link href="/uniformes" onClick={() => setIsOpen(false)}>
+            Ver uniformes
           </Link>
         </Button>
       </div>
@@ -49,6 +49,12 @@ export function CartContent() {
 
   return (
     <div className="flex flex-col h-full">
+      <p
+        className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary"
+        role="status"
+      >
+        Listo, la prenda está en tu carrito.
+      </p>
       <div className="flex-1 overflow-y-auto space-y-4">
         {items.map((item) => {
           const imageUrl =
@@ -87,7 +93,7 @@ export function CartContent() {
                   <h4 className="line-clamp-2 text-base font-bold leading-5">
                     {item.product?.slug ? (
                       <Link
-                        href={`/products/${item.product.slug}`}
+                        href={`/uniformes/${item.product.slug}`}
                         className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => setIsOpen(false)}
                       >
@@ -112,7 +118,7 @@ export function CartContent() {
                       </p>
                       {item.product?.slug ? (
                         <Link
-                          href={`/products/${item.product.slug}`}
+                          href={`/uniformes/${item.product.slug}#elegir-talle`}
                           className="inline-flex min-h-11 items-center font-bold text-primary underline underline-offset-4"
                           onClick={() => setIsOpen(false)}
                         >
@@ -225,15 +231,25 @@ export function CartContent() {
             </Button>
           </>
         ) : (
-          <Button className="min-h-12 w-full text-base font-bold" size="lg" asChild>
-            <Link
-              href="/checkout"
-              data-testid="cart-checkout-link"
+          <div className="grid gap-2">
+            <Button className="min-h-12 w-full text-base font-bold" size="lg" asChild>
+              <Link
+                href="/checkout"
+                data-testid="cart-checkout-link"
+                onClick={() => setIsOpen(false)}
+              >
+                Finalizar compra
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 w-full font-bold"
               onClick={() => setIsOpen(false)}
             >
-              Finalizar compra
-            </Link>
-          </Button>
+              Seguir eligiendo
+            </Button>
+          </div>
         )}
       </div>
     </div>

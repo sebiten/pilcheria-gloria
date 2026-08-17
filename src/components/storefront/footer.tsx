@@ -46,10 +46,10 @@ export function Footer({ settings }: FooterProps) {
           <FooterLinks
             title="Uniformes"
             links={[
-              ["/products", "Tienda escolar"],
+              ["/uniformes", "Tienda escolar"],
               ["/#escuelas", "Buscar por escuela"],
-              ["/products?q=remera", "Remeras"],
-              ["/products?q=chomba", "Chombas"],
+              ["/uniformes?garment=remera", "Remeras"],
+              ["/uniformes?garment=chomba", "Chombas"],
             ]}
           />
           <FooterLinks

@@ -89,7 +89,7 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2">
-          <form action="/products" className="relative hidden xl:block">
+          <form action="/uniformes" className="relative hidden xl:block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
@@ -180,7 +180,7 @@ export function Header() {
           className="border-t bg-background lg:hidden"
         >
           <div className="mx-auto max-w-[1440px] px-4 py-5">
-            <form action="/products" className="relative mb-5">
+            <form action="/uniformes" className="relative mb-5">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input type="search" name="q" placeholder="Buscar escuela o prenda..." aria-label="Buscar escuela o prenda" className="min-h-11 pl-9" />
             </form>

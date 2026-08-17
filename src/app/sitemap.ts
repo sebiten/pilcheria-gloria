@@ -20,7 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1,
     },
     {
-      url: absoluteUrl("/products"),
+      url: absoluteUrl("/uniformes"),
       lastModified: now,
       changeFrequency: "daily",
       priority: 0.9,
@@ -44,7 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: path === "/arrepentimiento" ? 0.6 : 0.5,
     })),
     ...indexableProducts.map((product) => ({
-      url: absoluteUrl(`/products/${product.slug}`),
+      url: absoluteUrl(`/uniformes/${product.slug}`),
       lastModified: new Date(product.createdAt),
       changeFrequency: "weekly" as const,
       priority: 0.8,

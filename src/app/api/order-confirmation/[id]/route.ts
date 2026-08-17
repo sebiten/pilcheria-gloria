@@ -56,7 +56,7 @@ export async function GET(
   );
 
   if (!parsedId.success) {
-    return NextResponse.redirect(new URL("/products", request.url), 303);
+    return NextResponse.redirect(new URL("/uniformes", request.url), 303);
   }
 
   const id = parsedId.data;

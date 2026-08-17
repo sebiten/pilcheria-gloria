@@ -57,7 +57,7 @@ export default async function ReviewsPage() {
                   <p className="mt-3 max-w-3xl text-sm leading-6">{review.comment}</p>
                   {product?.slug ? (
                     <Link
-                      href={`/products/${product.slug}`}
+                      href={`/uniformes/${product.slug}`}
                       className="mt-3 inline-block text-sm font-bold text-primary"
                     >
                       Ver {product.name}

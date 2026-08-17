@@ -219,7 +219,7 @@ function SchoolCard({
   school: SchoolIdentity;
   duplicate?: boolean;
 }) {
-  const productUrl = `/products?school=${school.id}`;
+  const productUrl = `/uniformes?school=${school.id}`;
   const content = (
     <>
       <span className="relative h-24 w-20 shrink-0 overflow-hidden rounded-2xl border border-gloria-200 bg-[#17151a]">
@@ -272,7 +272,7 @@ export function SchoolUniformsCarousel({
   const chooseSchool = (schoolId: string) => {
     if (!schoolId) return;
     trackStorefrontEvent({ event: "select_school", schoolId });
-    startTransition(() => router.push(`/products?school=${schoolId}`));
+    startTransition(() => router.push(`/uniformes?school=${schoolId}`));
   };
 
   return (

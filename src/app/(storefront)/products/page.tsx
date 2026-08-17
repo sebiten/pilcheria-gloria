@@ -17,9 +17,12 @@ interface ProductsPageProps {
   searchParams: Promise<{
     q?: string;
     school?: string;
+    garment?: string;
     promo?: string;
   }>;
 }
+
+type GarmentFilter = "remera" | "chomba";
 
 const PRODUCTS_SOCIAL_IMAGE = "/social/og/uniformes-escolares-click-2026.png";
 const PRODUCTS_SOCIAL_IMAGE_ALT =
@@ -36,18 +39,21 @@ function normalizeSearchValue(value: string) {
 function getProductsHref({
   q,
   school,
+  garment,
   promo,
 }: {
   q?: string;
   school?: string;
+  garment?: GarmentFilter;
   promo?: string;
 }) {
   const query = new URLSearchParams();
   if (q) query.set("q", q);
   if (school) query.set("school", school);
+  if (garment) query.set("garment", garment);
   if (promo) query.set("promo", promo);
   const suffix = query.toString();
-  return suffix ? `/products?${suffix}` : "/products";
+  return suffix ? `/uniformes?${suffix}` : "/uniformes";
 }
 
 export async function generateMetadata({
@@ -58,6 +64,10 @@ export async function generateMetadata({
   const selectedSchool = SCHOOL_UNIFORM_FILTERS.find(
     (school) => school.id === params.school
   );
+  const selectedGarment =
+    params.garment === "remera" || params.garment === "chomba"
+      ? params.garment
+      : undefined;
   const requestedPromotion = isFacebookPromotion(params.promo);
   const promotion = requestedPromotion
     ? await getFacebookPromotionAvailability()
@@ -80,9 +90,11 @@ export async function generateMetadata({
     description: hasPromotion
       ? `${promotionDescription} Remeras y chombas de distintas escuelas, con stock real por talle.`
       : SCHOOL_UNIFORMS_DESCRIPTION,
-    alternates: { canonical: "/products" },
+    alternates: { canonical: "/uniformes" },
     robots:
-      query || selectedSchool ? { index: false, follow: true } : undefined,
+      query || selectedSchool || selectedGarment
+        ? { index: false, follow: true }
+        : undefined,
     openGraph: query || selectedSchool
       ? undefined
       : {
@@ -93,8 +105,8 @@ export async function generateMetadata({
             ? `${promotionSocialDescription} ${promotionDescription}`
             : SCHOOL_UNIFORMS_DESCRIPTION,
           url: hasPromotion
-            ? `/products?promo=${FACEBOOK_PROMOTION.code}`
-            : "/products",
+            ? `/uniformes?promo=${FACEBOOK_PROMOTION.code}`
+            : "/uniformes",
           images: [
             {
               url: PRODUCTS_SOCIAL_IMAGE,
@@ -125,6 +137,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const selectedSchool = SCHOOL_UNIFORM_FILTERS.find(
     (school) => school.id === params.school
   );
+  const selectedGarment: GarmentFilter | undefined =
+    params.garment === "remera" || params.garment === "chomba"
+      ? params.garment
+      : undefined;
   const requestedPromotion = isFacebookPromotion(params.promo);
   const [allProducts, settings, promotion] = await Promise.all([
     getProducts({
@@ -135,7 +151,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       ? getFacebookPromotionAvailability()
       : Promise.resolve(null),
   ]);
-  const filters = [selectedSchool?.query, searchTerm]
+  const filters = [selectedSchool?.query, searchTerm, selectedGarment]
     .filter((value): value is string => Boolean(value))
     .map(normalizeSearchValue);
   const products = allProducts.filter((product) => {
@@ -149,6 +165,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const clearHref = getProductsHref({ promo: params.promo });
   const removeSchoolHref = getProductsHref({
     q: searchTerm,
+    garment: selectedGarment,
     promo: params.promo,
   });
   const whatsappUrl = settings.whatsapp_phone
@@ -166,16 +183,20 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </p>
           <div className="mt-2 flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="font-display text-3xl text-gloria-950 sm:text-6xl">
+              <h1 className="max-w-4xl font-display text-3xl leading-[1.02] text-gloria-950 sm:text-6xl">
                 {selectedSchool
                   ? selectedSchool.name
                   : searchTerm
                     ? `Resultados para “${searchTerm}”`
-                    : "Uniformes escolares"}
+                    : "Encontrá el uniforme de tu escuela"}
               </h1>
-              <p className={`mt-2 max-w-2xl text-sm leading-5 text-muted-foreground sm:mt-3 sm:block sm:text-base sm:leading-6 ${selectedSchool || searchTerm ? "hidden" : ""}`}>
-                Elegí tu escuela, la prenda y después el talle.
-              </p>
+              {!selectedSchool && !searchTerm ? (
+                <ol className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-bold text-gloria-800 sm:mt-4 sm:text-base" aria-label="Cómo comprar">
+                  <li><span className="text-gloria-600">1.</span> Escuela</li>
+                  <li><span className="text-gloria-600">2.</span> Prenda</li>
+                  <li><span className="text-gloria-600">3.</span> Talle</li>
+                </ol>
+              ) : null}
             </div>
             {searchTerm || selectedSchool ? (
               <Button variant="outline" className="hidden w-fit rounded-full sm:inline-flex" asChild>
@@ -216,6 +237,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           schools={SCHOOL_UNIFORM_FILTERS}
           selectedSchoolId={selectedSchool?.id}
           searchTerm={searchTerm}
+          selectedGarment={selectedGarment}
           promotion={params.promo}
         />
 
@@ -263,7 +285,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   </Link>
                 ) : null}
               </div>
-              <ProductGrid products={products} priorityFirst={1} />
+              <ProductGrid products={products} priorityFirst={2} />
             </>
           ) : (
             <div className="rounded-3xl border border-dashed border-gloria-300 bg-gloria-50 px-6 py-16 text-center">
@@ -281,7 +303,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 </Button>
               ) : (
                 <Button className="mt-6 rounded-full" asChild>
-                  <Link href="/products">Ver todos</Link>
+                  <Link href="/uniformes">Ver todos</Link>
                 </Button>
               )}
             </div>

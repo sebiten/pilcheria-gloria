@@ -43,13 +43,14 @@ test("guest user can go from product to checkout", async ({ page }) => {
       });
     });
 
-    await page.goto("/products");
-    await expect(page.locator(`a[href="/products/${seed.productSlug}"]`)).toBeVisible();
-    await page.goto(`/products/${seed.productSlug}`);
-    await expect(page).toHaveURL(new RegExp(`/products/${seed.productSlug}$`));
+    await page.goto("/uniformes");
+    await expect(page.locator(`a[href="/uniformes/${seed.productSlug}"]`).first()).toBeVisible();
+    await page.goto(`/uniformes/${seed.productSlug}`);
+    await expect(page).toHaveURL(new RegExp(`/uniformes/${seed.productSlug}$`));
     await expect(page.locator("main")).toHaveCount(1);
 
-    await expect(page.getByText("Negro", { exact: true }).first()).toBeVisible();
+    const variant = page.locator('#elegir-talle [role="radiogroup"]').last().locator('[role="radio"]').first();
+    await variant.click({ force: true });
     await page.getByTestId("add-to-cart-button").click();
 
     const cartDrawer = page.getByTestId("cart-drawer");
@@ -60,6 +61,7 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await expect(page).toHaveURL(/\/checkout$/);
     await expect(cartDrawer).not.toBeInViewport();
     await expect(page.locator("main")).toHaveCount(1);
+    await page.getByRole("button", { name: /cupón/i }).click();
     await expect(page.getByRole("button", { name: "Aplicar" })).toBeVisible();
 
     await page.getByLabel("Nombre").fill("QA");

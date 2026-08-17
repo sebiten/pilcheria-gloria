@@ -38,7 +38,8 @@ test("approved MercadoPago webhook marks guest order as paid", async ({ page }) 
       window.localStorage.clear();
     });
 
-    await page.goto(`/products/${seed.productSlug}`);
+    await page.goto(`/uniformes/${seed.productSlug}`);
+    await page.locator('#elegir-talle [role="radiogroup"]').last().locator('[role="radio"]').first().click({ force: true });
     await page.getByTestId("add-to-cart-button").click();
     await page.getByTestId("cart-checkout-link").click();
 

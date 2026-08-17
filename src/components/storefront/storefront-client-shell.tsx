@@ -7,6 +7,7 @@ import { CartDrawer } from "@/components/storefront/cart-drawer";
 import { CartContent } from "@/components/storefront/cart-content";
 import { CartSync } from "@/components/storefront/cart-sync";
 import { AnalyticsTracker } from "@/components/storefront/analytics-tracker";
+import { MobileCartBar } from "@/components/storefront/mobile-cart-bar";
 import { hydrateCartStore, subscribeCartStorePersistence, useCartStore } from "@/hooks/use-cart";
 
 export function StorefrontClientShell() {
@@ -31,6 +32,7 @@ export function StorefrontClientShell() {
       <CartDrawer isOpen={isOpen} onClose={() => setIsOpen(false)}>
         <CartContent />
       </CartDrawer>
+      <MobileCartBar />
     </>
   );
 }

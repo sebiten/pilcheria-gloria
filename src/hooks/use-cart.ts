@@ -6,7 +6,12 @@ import { sanitizeStorefrontProduct } from "@/lib/inventory";
 interface CartStore {
   items: CartItem[];
   isOpen: boolean;
-  addItem: (product: ProductWithDetails, variantId: string | null, quantity?: number) => void;
+  addItem: (
+    product: ProductWithDetails,
+    variantId: string | null,
+    quantity?: number,
+    options?: { openCart?: boolean }
+  ) => void;
   removeItem: (productId: string, variantId?: string | null) => void;
   updateQuantity: (productId: string, variantId: string | null, quantity: number) => void;
   setItems: (items: CartItem[]) => void;
@@ -53,7 +58,12 @@ function normalizeCartItems(items: CartItem[]) {
 export const useCartStore = create<CartStore>()((set, get) => ({
   ...initialState,
 
-  addItem: (product: ProductWithDetails, variantId: string | null, quantity = 1) => {
+  addItem: (
+    product: ProductWithDetails,
+    variantId: string | null,
+    quantity = 1,
+    options = {}
+  ) => {
     set((state) => {
       const selectedVariant = variantId
         ? product.variants.find((item) => item.id === variantId)
@@ -75,11 +85,14 @@ export const useCartStore = create<CartStore>()((set, get) => ({
             quantityLimit
           ),
         };
-        return { items: newItems, isOpen: true };
+        return {
+          items: newItems,
+          isOpen: options.openCart === false ? state.isOpen : true,
+        };
       }
 
       return {
-        isOpen: true,
+        isOpen: options.openCart === false ? state.isOpen : true,
         items: [
           ...state.items,
           {

@@ -5,13 +5,13 @@ export const PRODUCT_DETAILS_CACHE_TAG = "product-details";
 
 function revalidateProductPaths(slug?: string) {
   revalidatePath("/");
-  revalidatePath("/products");
+  revalidatePath("/uniformes");
   revalidatePath("/dashboard/products");
 
   if (slug) {
-    revalidatePath(`/products/${slug}`);
+    revalidatePath(`/uniformes/${slug}`);
   } else {
-    revalidatePath("/products/[slug]", "page");
+    revalidatePath("/uniformes/[slug]", "page");
   }
 }
 

@@ -48,7 +48,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 function revalidateCategoryPaths() {
   updateTag(CATEGORIES_CACHE_TAG);
   revalidatePath("/");
-  revalidatePath("/products");
+  revalidatePath("/uniformes");
   revalidatePath("/dashboard/categories");
 }
 

@@ -53,7 +53,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
     itemListElement: products.map((product, index) => ({
       "@type": "ListItem",
       position: index + 1,
-      url: absoluteUrl(`/products/${product.slug}`),
+      url: absoluteUrl(`/uniformes/${product.slug}`),
       name: product.name,
       image: product.images[0]?.url,
     })),
@@ -70,7 +70,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
       itemList,
       getBreadcrumbJsonLd([
         { name: "Inicio", path: "/" },
-        { name: "Productos", path: "/products" },
+        { name: "Uniformes", path: "/uniformes" },
         { name: brand, path: `/brands/${encodeURIComponent(brand)}` },
       ]),
     ],
@@ -100,7 +100,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
               No hay prendas disponibles de esta marca.
             </p>
             <Button className="mt-6 rounded-full" asChild>
-              <Link href="/products">Ver catálogo</Link>
+              <Link href="/uniformes">Ver catálogo</Link>
             </Button>
           </div>
         )}
