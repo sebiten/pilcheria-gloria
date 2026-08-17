@@ -205,7 +205,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
             Volver a uniformes
           </Link>
 
-          <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:grid-rows-[auto_1fr] lg:items-start lg:gap-8">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:grid-rows-[auto_1fr] lg:items-start lg:gap-8">
             <header className="order-1 lg:col-start-2 lg:row-start-1">
               <p className="hidden text-xs font-bold uppercase tracking-[0.18em] text-gloria-700 lg:block">
                 Uniforme de {schoolDisplayName}
