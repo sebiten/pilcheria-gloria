@@ -9,6 +9,7 @@ import {
   getPickupAddress,
   PICKUP_LOCATION_REFERENCE,
 } from "@/lib/maps";
+import { createGuestReviewLinks } from "@/lib/reviews/guest-invites";
 
 type EmailInput = {
   to: string;
@@ -213,6 +214,34 @@ export async function sendOrderEmail(
       </div>
     `
     : "";
+  let reviewInvitationHtml = "";
+  if (event === "delivered" && order.guest_access_token && customerEmail) {
+    const reviewLinks = await createGuestReviewLinks(orderId).catch((inviteError) => {
+      console.error("No se pudieron crear las invitaciones de reseña:", inviteError);
+      return [];
+    });
+
+    if (reviewLinks.length) {
+      reviewInvitationHtml = `
+        <div style="margin:24px 0;padding:18px;border:1px solid #d8e8c5;border-radius:14px;background:#f7fbf2">
+          <p style="margin:0 0 8px;font-size:18px"><strong>¿Cómo te fue con las prendas?</strong></p>
+          <p style="margin:0 0 14px;line-height:1.6">Tu opinión ayuda a otras familias a elegir con más confianza.</p>
+          ${reviewLinks
+            .map(
+              (link) => `
+                <p style="margin:10px 0">
+                  <a href="${escapeHtml(link.url)}" style="display:inline-block;padding:12px 16px;border-radius:10px;background:#35680f;color:#fff;text-decoration:none;font-weight:700">
+                    Opinar sobre ${escapeHtml(link.productName)}
+                  </a>
+                </p>
+              `
+            )
+            .join("")}
+          <p style="margin:12px 0 0;font-size:12px;color:#54703a">Cada enlace es personal, se usa una sola vez y vence en 90 días.</p>
+        </div>
+      `;
+    }
+  }
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#17210f">
       <p style="font-size:14px;color:#54703a">${escapeHtml(SITE_NAME)}</p>
@@ -225,6 +254,7 @@ export async function sendOrderEmail(
       </div>
       ${pickupDetailsHtml}
       ${guestOrderHtml}
+      ${reviewInvitationHtml}
     </div>
   `;
 

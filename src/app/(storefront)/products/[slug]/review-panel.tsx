@@ -60,6 +60,8 @@ export function ReviewPanel({ productId, productSlug }: ReviewPanelProps) {
     };
   }, [isLoaded, isSignedIn, productId]);
 
+  if (isLoaded && !isSignedIn) return null;
+
   if (!eligibility) {
     return (
       <div className="rounded-xl border bg-card p-5">

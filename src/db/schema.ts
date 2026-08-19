@@ -3,6 +3,7 @@ import {
   text,
   boolean,
   integer,
+  smallint,
   numeric,
   timestamp,
   uuid,
@@ -185,6 +186,50 @@ export const orderItems = pgTable("order_items", {
   }),
 });
 
+export const productReviewInvites = pgTable("product_review_invites", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: uuid("order_id")
+    .references(() => orders.id, { onDelete: "cascade" })
+    .notNull(),
+  productId: uuid("product_id")
+    .references(() => products.id, { onDelete: "cascade" })
+    .notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const productReviews = pgTable("product_reviews", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  productId: uuid("product_id")
+    .references(() => products.id, { onDelete: "cascade" })
+    .notNull(),
+  clerkUserId: text("clerk_user_id").references(() => profiles.clerkUserId, {
+    onDelete: "cascade",
+  }),
+  orderId: uuid("order_id").references(() => orders.id, {
+    onDelete: "set null",
+  }),
+  guestInviteId: uuid("guest_invite_id").references(
+    () => productReviewInvites.id,
+    { onDelete: "set null" }
+  ),
+  rating: integer("rating").notNull(),
+  title: text("title"),
+  comment: text("comment").notNull(),
+  reviewerName: text("reviewer_name"),
+  approved: boolean("approved").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const partnerSettlements = pgTable("partner_settlements", {
   id: uuid("id").primaryKey().defaultRandom(),
   sourceId: uuid("source_id")
@@ -337,6 +382,9 @@ export const storefrontAnalyticsEvents = pgTable("storefront_analytics_events", 
   orderId: uuid("order_id").references(() => orders.id, {
     onDelete: "set null",
   }),
+  analyticsVersion: smallint("analytics_version").notNull().default(1),
+  campaign: text("campaign"),
+  eventDetail: text("event_detail"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -356,6 +404,7 @@ export const profilesRelations = relations(profiles, ({ many }) => ({
   addresses: many(addresses),
   orders: many(orders),
   cartItems: many(cartItems),
+  reviews: many(productReviews),
 }));
 
 export const categoriesRelations = relations(categories, ({ one, many }) => ({
@@ -376,6 +425,8 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   orderItems: many(orderItems),
   cartItems: many(cartItems),
   analyticsEvents: many(storefrontAnalyticsEvents),
+  reviews: many(productReviews),
+  reviewInvites: many(productReviewInvites),
 }));
 
 export const productImagesRelations = relations(productImages, ({ one }) => ({
@@ -426,6 +477,41 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   items: many(orderItems),
   manualRefunds: many(manualRefunds),
   analyticsEvents: many(storefrontAnalyticsEvents),
+  reviews: many(productReviews),
+  reviewInvites: many(productReviewInvites),
+}));
+
+export const productReviewInvitesRelations = relations(
+  productReviewInvites,
+  ({ one }) => ({
+    order: one(orders, {
+      fields: [productReviewInvites.orderId],
+      references: [orders.id],
+    }),
+    product: one(products, {
+      fields: [productReviewInvites.productId],
+      references: [products.id],
+    }),
+  })
+);
+
+export const productReviewsRelations = relations(productReviews, ({ one }) => ({
+  product: one(products, {
+    fields: [productReviews.productId],
+    references: [products.id],
+  }),
+  profile: one(profiles, {
+    fields: [productReviews.clerkUserId],
+    references: [profiles.clerkUserId],
+  }),
+  order: one(orders, {
+    fields: [productReviews.orderId],
+    references: [orders.id],
+  }),
+  guestInvite: one(productReviewInvites, {
+    fields: [productReviews.guestInviteId],
+    references: [productReviewInvites.id],
+  }),
 }));
 
 export const storefrontAnalyticsEventsRelations = relations(

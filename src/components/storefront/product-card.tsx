@@ -18,12 +18,16 @@ function getAvailableVariants(product: ProductWithDetails) {
   );
 }
 
-function getDisplayPrice(product: ProductWithDetails) {
+function getDisplayPriceRange(product: ProductWithDetails) {
   const prices = getAvailableVariants(product)
     .map((variant) => Number(variant.priceOverride ?? product.basePrice))
     .filter((price) => Number.isFinite(price) && price >= 0);
 
-  return prices.length ? Math.min(...prices) : Number(product.basePrice);
+  const fallback = Number(product.basePrice);
+  return {
+    min: prices.length ? Math.min(...prices) : fallback,
+    max: prices.length ? Math.max(...prices) : fallback,
+  };
 }
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
@@ -36,13 +40,8 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
       (variant) => `${variant.sizeSystem ?? "legacy"}:${variant.size}`
     )
   ).size;
-  const price = getDisplayPrice(product);
-  const hasVariablePrice =
-    new Set(
-      availableVariants.map((variant) =>
-        Number(variant.priceOverride ?? product.basePrice)
-      )
-    ).size > 1;
+  const { min: price, max: maximumPrice } = getDisplayPriceRange(product);
+  const hasVariablePrice = maximumPrice > price;
   const compareAtPrice = Number(product.compareAtPrice ?? 0);
   const isOffer = compareAtPrice > price;
 
@@ -104,8 +103,9 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             </p>
           ) : null}
           <p className="text-base font-black tracking-tight text-foreground sm:text-xl">
-            {hasVariablePrice ? "Desde " : ""}
-            {formatPrice(price)}
+            {hasVariablePrice
+              ? `${formatPrice(price)} – ${formatPrice(maximumPrice)}`
+              : formatPrice(price)}
           </p>
           <Link
             href={`${productHref}#elegir-talle`}

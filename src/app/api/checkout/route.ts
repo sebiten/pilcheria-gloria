@@ -85,7 +85,7 @@ export async function POST(request: Request) {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
-          path: `/order-confirmation/${result.order.id}`,
+          path: "/",
           priority: "high",
           maxAge: 7 * 24 * 60 * 60,
         }

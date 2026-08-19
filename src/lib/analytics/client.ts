@@ -1,19 +1,57 @@
 "use client";
 
 import type {
+  AnalyticsEventDetail,
   AnalyticsDevice,
-  AnalyticsEventName,
+  ClientAnalyticsEventName,
   AnalyticsSource,
 } from "@/lib/analytics/types";
+import { ANALYTICS_VERSION } from "@/lib/analytics/types";
 
 const SESSION_STORAGE_KEY = "gloria-analytics-session";
 const SOURCE_STORAGE_KEY = "gloria-analytics-source";
+const CAMPAIGN_STORAGE_KEY = "gloria-analytics-campaign";
 const LAST_ACTIVITY_STORAGE_KEY = "gloria-analytics-last-activity";
+const EXCLUDED_STORAGE_KEY = "gloria-analytics-excluded";
 const SESSION_TIMEOUT_MS = 30 * 60 * 1_000;
 const recentEvents = new Map<string, number>();
 
 function analyticsAllowed() {
-  return typeof window !== "undefined" && navigator.doNotTrack !== "1";
+  if (typeof window === "undefined" || navigator.doNotTrack === "1") {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(EXCLUDED_STORAGE_KEY) !== "1";
+  } catch {
+    return false;
+  }
+}
+
+export function isAnalyticsExcluded() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(EXCLUDED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setAnalyticsExcluded(excluded: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    if (excluded) {
+      window.localStorage.setItem(EXCLUDED_STORAGE_KEY, "1");
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      window.localStorage.removeItem(SOURCE_STORAGE_KEY);
+      window.localStorage.removeItem(CAMPAIGN_STORAGE_KEY);
+      window.localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY);
+    } else {
+      window.localStorage.removeItem(EXCLUDED_STORAGE_KEY);
+    }
+  } catch {
+    return;
+  }
 }
 
 function isUuid(value: string | null) {
@@ -44,6 +82,7 @@ export function getAnalyticsSessionId() {
     window.localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
     window.localStorage.setItem(LAST_ACTIVITY_STORAGE_KEY, String(now));
     window.localStorage.removeItem(SOURCE_STORAGE_KEY);
+    window.localStorage.removeItem(CAMPAIGN_STORAGE_KEY);
     return sessionId;
   } catch {
     return null;
@@ -87,6 +126,32 @@ function getSource(): AnalyticsSource {
   }
 }
 
+function getCampaign() {
+  try {
+    const stored = window.localStorage.getItem(CAMPAIGN_STORAGE_KEY);
+    if (stored) return stored;
+
+    const rawCampaign = new URLSearchParams(window.location.search)
+      .get("utm_campaign")
+      ?.toLocaleLowerCase("es-AR");
+    const campaign = rawCampaign
+      ?.normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 64);
+
+    if (campaign) {
+      window.localStorage.setItem(CAMPAIGN_STORAGE_KEY, campaign);
+      return campaign;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
 function getDeviceType(): AnalyticsDevice {
   if (window.innerWidth < 640) return "mobile";
   if (window.innerWidth < 1024) return "tablet";
@@ -94,10 +159,11 @@ function getDeviceType(): AnalyticsDevice {
 }
 
 type TrackEventInput = {
-  event: AnalyticsEventName;
+  event: ClientAnalyticsEventName;
   productId?: string;
   schoolId?: string;
   quantity?: number;
+  eventDetail?: AnalyticsEventDetail;
   dedupe?: boolean;
 };
 
@@ -106,6 +172,7 @@ export function trackStorefrontEvent({
   productId,
   schoolId,
   quantity,
+  eventDetail,
   dedupe = false,
 }: TrackEventInput) {
   const sessionId = getAnalyticsSessionId();
@@ -115,7 +182,9 @@ export function trackStorefrontEvent({
   const path = (
     rawPath.startsWith("/order-confirmation/")
       ? "/order-confirmation"
-      : rawPath.replace(/^\/account\/orders\/[^/]+$/, "/account/orders/detail")
+      : rawPath
+          .replace(/^\/account\/orders\/[^/]+$/, "/account/orders/detail")
+          .replace(/^\/review\/[^/]+$/, "/review")
   ).slice(0, 200) || "/";
   const signature = `${event}:${path}:${productId ?? ""}:${schoolId ?? ""}`;
   const now = Date.now();
@@ -133,6 +202,9 @@ export function trackStorefrontEvent({
       productId,
       schoolId,
       quantity,
+      analyticsVersion: ANALYTICS_VERSION,
+      campaign: getCampaign(),
+      eventDetail,
       source: getSource(),
       deviceType: getDeviceType(),
     }),

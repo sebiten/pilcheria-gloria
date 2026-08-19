@@ -24,16 +24,15 @@ export function RatingStars({ rating }: { rating: number }) {
 
 export async function ProductReviewSummary({ productId }: { productId: string }) {
   const stats = await getProductReviewStats(productId);
+  if (stats.count === 0) return null;
 
   return (
     <div className="flex items-center gap-2">
       <RatingStars rating={stats.average} />
       <span className="text-sm text-muted-foreground">
-        {stats.count > 0
-          ? `${stats.average.toFixed(1)} (${stats.count} ${
-              stats.count === 1 ? "reseña" : "reseñas"
-            })`
-          : "Sin reseñas todavía"}
+        {`${stats.average.toFixed(1)} (${stats.count} ${
+          stats.count === 1 ? "reseña" : "reseñas"
+        })`}
       </span>
     </div>
   );
@@ -48,6 +47,10 @@ export async function ProductReviews({
 }) {
   const reviews = await getProductReviews(productId);
 
+  if (reviews.length === 0) {
+    return <ReviewPanel productId={productId} productSlug={productSlug} />;
+  }
+
   return (
     <section className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
       <div className="space-y-4">
@@ -58,8 +61,7 @@ export async function ProductReviews({
           </p>
         </div>
 
-        {reviews.length > 0 ? (
-          <div className="space-y-3">
+        <div className="space-y-3">
             {reviews.map((review) => (
               <article key={review.id} className="rounded-xl border bg-card p-5">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -79,12 +81,7 @@ export async function ProductReviews({
                 <p className="text-sm text-muted-foreground">{review.comment}</p>
               </article>
             ))}
-          </div>
-        ) : (
-          <div className="rounded-xl border bg-muted/30 p-6 text-sm text-muted-foreground">
-            Este producto todavía no tiene reseñas.
-          </div>
-        )}
+        </div>
       </div>
 
       <div>

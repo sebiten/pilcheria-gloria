@@ -40,13 +40,13 @@ test("approved MercadoPago webhook marks guest order as paid", async ({ page }) 
 
     await page.goto(`/uniformes/${seed.productSlug}`);
     await page.locator('#elegir-talle [role="radiogroup"]').last().locator('[role="radio"]').first().click({ force: true });
-    await page.getByTestId("add-to-cart-button").click();
+    await page.locator('[data-testid^="add-to-cart-button"]:visible').click();
     await page.getByTestId("cart-checkout-link").click();
 
-    await page.getByLabel("Nombre").fill("QA");
-    await page.getByLabel("Apellido").fill("Gloria");
-    await page.getByLabel("Email").fill("qa+gloria@example.com");
-    await page.getByLabel("Teléfono").fill("3884000000");
+    await page.getByLabel("Nombre y apellido").fill("QA Gloria");
+    await page.getByRole("button", { name: "Agregar email (opcional)" }).click();
+    await page.getByLabel("Email (opcional)").fill("qa+gloria@example.com");
+    await page.getByLabel("WhatsApp").fill("3884000000");
 
     const checkoutResponsePromise = page.waitForResponse(
       (response) =>
@@ -54,7 +54,7 @@ test("approved MercadoPago webhook marks guest order as paid", async ({ page }) 
         response.request().method() === "POST"
     );
 
-    await page.getByTestId("checkout-submit").click();
+    await page.locator('[data-testid^="checkout-submit"]:visible').click();
     const checkoutResponse = await checkoutResponsePromise;
     expect(checkoutResponse.ok()).toBe(true);
 

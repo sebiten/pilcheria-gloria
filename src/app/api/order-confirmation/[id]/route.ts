@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { getPayment } from "@/lib/mercadopago/client";
+import {
+  getPayment,
+  searchPaymentsByExternalReference,
+} from "@/lib/mercadopago/client";
 import { applyMercadoPagoPayment } from "@/lib/orders/payment-state";
 import { sendOrderEmail } from "@/lib/notifications/email";
 import { revalidateProductCacheFromRouteHandler } from "@/lib/cache/products";
@@ -21,13 +26,14 @@ const PAYMENT_RETURN_COOKIE_MAX_AGE = 10 * 60;
 function setOrderAccessCookie(
   response: NextResponse,
   orderId: string,
-  guestToken: string
+  guestToken: string | null
 ) {
+  if (!guestToken) return;
   response.cookies.set(getOrderConfirmationCookieName(orderId), guestToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    path: `/order-confirmation/${orderId}`,
+    path: "/",
     priority: "high",
     maxAge: ACCESS_COOKIE_MAX_AGE,
   });
@@ -62,33 +68,69 @@ export async function GET(
   const id = parsedId.data;
   const legacyToken = requestUrl.searchParams.get("token");
   const paymentCookieName = getOrderPaymentReturnCookieName(id);
-  const paymentId =
+  let paymentId =
     requestUrl.searchParams.get("payment_id") ||
     request.cookies.get(paymentCookieName)?.value ||
     "";
+  const retryRequested = requestUrl.searchParams.get("retry") === "1";
 
   const supabase = getSupabaseAdmin();
   const { data: order, error } = await supabase
     .from("orders")
-    .select("guest_access_token")
+    .select("guest_access_token, clerk_user_id, status")
     .eq("id", id)
     .maybeSingle();
 
-  const guestToken = order?.guest_access_token;
-  if (error || !guestToken) {
+  if (error || !order) {
     cleanUrl.searchParams.set("verification", "failed");
     return NextResponse.redirect(cleanUrl, 303);
   }
+  const guestToken = order.guest_access_token;
+  const orderAccessCookie = request.cookies.get(
+    getOrderConfirmationCookieName(id)
+  )?.value;
+  const { userId } = await auth();
+  const ownsSignedOrder = Boolean(
+    order.clerk_user_id && userId === order.clerk_user_id
+  );
+  const ownsGuestOrder = Boolean(
+    guestToken &&
+      orderAccessCookie &&
+      secureTokenEquals(orderAccessCookie, guestToken)
+  );
+  const hasOrderAccess = ownsSignedOrder || ownsGuestOrder;
 
-  if (legacyToken && secureTokenEquals(legacyToken, guestToken)) {
+  if (legacyToken && guestToken && secureTokenEquals(legacyToken, guestToken)) {
     const response = NextResponse.redirect(cleanUrl, 303);
     setOrderAccessCookie(response, id, guestToken);
     response.headers.set("Cache-Control", "no-store");
     return response;
   }
 
+  if (!paymentId && retryRequested && hasOrderAccess) {
+    try {
+      const search = await searchPaymentsByExternalReference(id);
+      const payments: Array<{ id?: string | number; status?: string }> =
+        Array.isArray(search?.results) ? search.results : [];
+      const payment =
+        payments.find((item) => item.status === "approved") ??
+        payments.find((item) => Boolean(item.status));
+      paymentId = payment?.id ? String(payment.id) : "";
+    } catch (searchError) {
+      console.error("No se pudo buscar el pago por referencia externa:", {
+        orderId: id,
+        error: searchError,
+      });
+      cleanUrl.searchParams.set("verification", "pending");
+      return NextResponse.redirect(cleanUrl, 303);
+    }
+  }
+
   if (!/^\d{1,32}$/.test(paymentId)) {
-    cleanUrl.searchParams.set("verification", "failed");
+    cleanUrl.searchParams.set(
+      "verification",
+      retryRequested && hasOrderAccess ? "pending" : "failed"
+    );
     const response = NextResponse.redirect(cleanUrl, 303);
     clearPaymentReturnCookie(response, id);
     return response;
@@ -116,11 +158,13 @@ export async function GET(
           : null;
 
     if (emailEvent) {
-      await sendOrderEmail(id, emailEvent).catch((notificationError) => {
-        console.error(
-          "No se pudo enviar la notificación del retorno de Mercado Pago:",
-          notificationError
-        );
+      after(async () => {
+        await sendOrderEmail(id, emailEvent).catch((notificationError) => {
+          console.error(
+            "No se pudo enviar la notificación del retorno de Mercado Pago:",
+            notificationError
+          );
+        });
       });
     }
 

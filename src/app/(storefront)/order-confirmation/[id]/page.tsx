@@ -86,6 +86,13 @@ export default async function OrderConfirmationPage({
   }
 
   const returnPaymentId = payment_id || collection_id;
+
+  if (returnPaymentId) {
+    redirect(
+      `/api/order-confirmation/${encodeURIComponent(id)}?payment_id=${encodeURIComponent(returnPaymentId)}`
+    );
+  }
+
   const accessToken = (await cookies()).get(
     getOrderConfirmationCookieName(id)
   )?.value;
@@ -97,19 +104,10 @@ export default async function OrderConfirmationPage({
     order = null;
   }
 
-  if (returnPaymentId && !order) {
-    redirect(
-      `/api/order-confirmation/${encodeURIComponent(id)}?payment_id=${encodeURIComponent(returnPaymentId)}`
-    );
-  }
-
-  if (returnPaymentId && order) {
-    redirect(`/order-confirmation/${encodeURIComponent(id)}?payment=confirmed`);
-  }
+  const isConfirmed = Boolean(order && CONFIRMED_STATUSES.has(order.status));
 
   const orderCode = id.slice(0, 8).toUpperCase();
   const retryPath = `/api/order-confirmation/${encodeURIComponent(id)}?retry=1`;
-  const isConfirmed = Boolean(order && CONFIRMED_STATUSES.has(order.status));
   const isPending = order?.status === "pending";
 
   if (isConfirmed && order) {
@@ -241,9 +239,7 @@ export default async function OrderConfirmationPage({
           puede tardar unos instantes en enviarnos la confirmación.
         </p>
         <Button className="mt-7 min-h-12 w-full sm:w-auto" asChild>
-          <a href={`/order-confirmation/${encodeURIComponent(id)}`}>
-            Actualizar estado
-          </a>
+          <a href={retryPath}>Verificar de nuevo</a>
         </Button>
       </main>
     );

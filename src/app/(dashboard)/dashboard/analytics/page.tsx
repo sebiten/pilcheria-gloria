@@ -2,12 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
+  BadgeCheck,
   Banknote,
   BarChart3,
   CreditCard,
   Eye,
   Lightbulb,
   MousePointerClick,
+  PackageCheck,
+  Send,
   Ruler,
   ShoppingCart,
   Smartphone,
@@ -19,6 +22,7 @@ import { getAnalyticsDashboard } from "@/lib/analytics/server";
 import { SCHOOL_UNIFORM_FILTERS } from "@/lib/school-uniforms";
 import { formatPrice } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AnalyticsDeviceControl } from "@/components/dashboard/analytics-device-control";
 
 export const metadata: Metadata = { title: "Estadísticas de la tienda" };
 
@@ -41,6 +45,18 @@ const deviceLabels = {
   desktop: "Computadora",
 } as const;
 
+const checkoutErrorLabels = {
+  missing_name: "Falta nombre",
+  invalid_email: "Email inválido",
+  invalid_phone: "WhatsApp inválido",
+  shipping_unavailable: "Entrega no disponible",
+  missing_address: "Falta dirección",
+  coupon_pending: "Cupón sin aplicar",
+  api_client_error: "Datos rechazados",
+  api_server_error: "Error al iniciar el pago",
+  missing_payment_link: "Faltó enlace de Mercado Pago",
+} as const;
+
 function percent(value: number, total: number) {
   if (!total) return 0;
   return Math.min(100, Math.round((value / total) * 100));
@@ -49,6 +65,14 @@ function percent(value: number, total: number) {
 function getRecommendations(data: Awaited<ReturnType<typeof getAnalyticsDashboard>>) {
   const { metrics } = data;
   const recommendations: string[] = [];
+
+  if (data.sample_warning) {
+    return [
+      `Hay ${data.comparable_sessions} sesiones comparables. Esperá al menos 10 entradas al catálogo antes de decidir un cambio grande.`,
+      "Compartí enlaces con utm_source y utm_campaign para comparar cada publicación.",
+    ];
+  }
+
   const productToSize = percent(
     metrics.size_selection_sessions,
     metrics.product_viewers
@@ -57,13 +81,13 @@ function getRecommendations(data: Awaited<ReturnType<typeof getAnalyticsDashboar
     metrics.purchase_intent_sessions,
     metrics.size_selection_sessions
   );
-  const intentToCheckout = percent(
-    metrics.checkout_sessions,
-    metrics.purchase_intent_sessions
-  );
-  const checkoutToPurchase = percent(
-    metrics.purchasing_sessions,
+  const checkoutToRedirect = percent(
+    metrics.payment_redirect_sessions,
     metrics.checkout_sessions
+  );
+  const redirectToPayment = percent(
+    metrics.payment_approved_sessions,
+    metrics.payment_redirect_sessions
   );
 
   if (metrics.product_viewers >= 10 && productToSize < 30) {
@@ -76,14 +100,14 @@ function getRecommendations(data: Awaited<ReturnType<typeof getAnalyticsDashboar
       "Eligen talle pero no intentan comprar. Revisá precio final, entrega y claridad de los botones de compra."
     );
   }
-  if (metrics.purchase_intent_sessions >= 5 && intentToCheckout < 50) {
+  if (metrics.checkout_sessions >= 5 && checkoutToRedirect < 50) {
     recommendations.push(
-      "Hay intenciones de compra que no llegan al checkout. Revisá el carrito y que envío, retiro y total se entiendan."
+      "Entran al checkout pero no llegan a Mercado Pago. Revisá los errores de campos y que el total se entienda."
     );
   }
-  if (metrics.checkout_sessions >= 5 && checkoutToPurchase < 50) {
+  if (metrics.payment_redirect_sessions >= 5 && redirectToPayment < 50) {
     recommendations.push(
-      "La mayor caída está al pagar. Probá el flujo de Mercado Pago desde un celular y revisá los errores recientes."
+      "Llegan a Mercado Pago pero no aprueban el pago. Revisá estados y medios de pago, sin cambiar el catálogo todavía."
     );
   }
   if (data.sources.length && (data.sources[0]?.source === "direct")) {
@@ -108,16 +132,20 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const data = await getAnalyticsDashboard(days);
   const { metrics } = data;
   const funnel = [
-    { label: "Visitaron la tienda", value: metrics.visitors, icon: Users },
+    { label: "Entraron al catálogo", value: metrics.catalog_sessions, icon: Users },
     { label: "Vieron una prenda", value: metrics.product_viewers, icon: Eye },
     { label: "Eligieron un talle", value: metrics.size_selection_sessions, icon: Ruler },
-    { label: "Intentaron comprar", value: metrics.purchase_intent_sessions, icon: ShoppingCart },
+    { label: "Tocaron una compra", value: metrics.purchase_intent_sessions, icon: ShoppingCart },
     { label: "Llegaron al checkout", value: metrics.checkout_sessions, icon: CreditCard },
-    { label: "Compraron", value: metrics.purchasing_sessions, icon: Banknote },
+    { label: "Tocaron “Ir a pagar”", value: metrics.checkout_cta_sessions, icon: MousePointerClick },
+    { label: "Fueron a Mercado Pago", value: metrics.payment_redirect_sessions, icon: Send },
+    { label: "Mercado Pago aprobó", value: metrics.payment_approved_sessions, icon: BadgeCheck },
+    { label: "Pedido confirmado", value: metrics.purchasing_sessions, icon: PackageCheck },
+    { label: "Vieron la confirmación", value: metrics.confirmation_sessions, icon: Banknote },
   ];
   const recommendations = getRecommendations(data);
-  const trackingStartLabel = data.tracking_started_at
-    ? new Date(data.tracking_started_at).toLocaleDateString("es-AR", {
+  const trackingStartLabel = data.comparable_started_at
+    ? new Date(data.comparable_started_at).toLocaleDateString("es-AR", {
         day: "2-digit",
         month: "short",
         year: "numeric",
@@ -155,17 +183,26 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </nav>
       </header>
 
+      <AnalyticsDeviceControl />
+
+      {data.sample_warning ? (
+        <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-950">
+          Muestra chica: hay {data.comparable_sessions} sesiones comparables. Mirá
+          los errores concretos, pero esperá más visitas antes de sacar conclusiones.
+        </p>
+      ) : null}
+
       <section className="overflow-hidden rounded-2xl bg-gloria-950 text-white">
-        <div className="grid gap-px bg-white/10 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-px bg-white/10 sm:grid-cols-2 xl:grid-cols-5">
           <div className="bg-gloria-950 p-5 sm:p-7">
             <div className="flex items-center gap-2 text-sm font-semibold text-gloria-200">
-              <Users className="size-4" /> Visitantes únicos
+              <Users className="size-4" /> Entraron al catálogo
             </div>
             <p className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
-              {metrics.visitors.toLocaleString("es-AR")}
+              {metrics.catalog_sessions.toLocaleString("es-AR")}
             </p>
             <p className="mt-2 text-sm text-white/60">
-              {metrics.page_views.toLocaleString("es-AR")} páginas vistas
+              {metrics.visitors.toLocaleString("es-AR")} visitantes del sitio
             </p>
           </div>
           <div className="bg-gloria-950 p-5 sm:p-7">
@@ -181,18 +218,29 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           </div>
           <div className="bg-gloria-950 p-5 sm:p-7">
             <div className="flex items-center gap-2 text-sm font-semibold text-gloria-200">
-              <CreditCard className="size-4" /> Compras medidas
+              <CreditCard className="size-4" /> Pagos aprobados
+            </div>
+            <p className="mt-3 text-2xl font-black sm:text-3xl">
+              {metrics.payment_approved_sessions}
+            </p>
+            <p className="mt-2 text-sm text-white/60">
+              {percent(metrics.payment_approved_sessions, metrics.catalog_sessions)}% del catálogo a pago
+            </p>
+          </div>
+          <div className="bg-gloria-950 p-5 sm:p-7">
+            <div className="flex items-center gap-2 text-sm font-semibold text-gloria-200">
+              <PackageCheck className="size-4" /> Pedidos confirmados
             </div>
             <p className="mt-3 text-2xl font-black sm:text-3xl">
               {metrics.purchasing_sessions}
             </p>
             <p className="mt-2 text-sm text-white/60">
-              {percent(metrics.purchasing_sessions, metrics.visitors)}% de visita a compra
+              Operativamente confirmados
             </p>
           </div>
           <div className="bg-gloria-950 p-5 sm:p-7">
             <div className="flex items-center gap-2 text-sm font-semibold text-gloria-200">
-              <Banknote className="size-4" /> Ventas cobradas
+              <Banknote className="size-4" /> Ventas históricas
             </div>
             <p className="mt-3 text-2xl font-black sm:text-3xl">{formatPrice(metrics.revenue)}</p>
             <p className="mt-2 text-sm text-white/60">{metrics.paid_orders} pedidos</p>
@@ -200,9 +248,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </div>
       </section>
       <p className="-mt-3 text-xs leading-5 text-muted-foreground">
-        El recorrido medido empieza el {trackingStartLabel}. “Compras medidas” solo
-        cuenta pedidos vinculados a una sesión; “ventas cobradas” incluye todo el
-        historial del período.
+        Datos comparables desde el {trackingStartLabel}. “Pagos aprobados” viene del
+        estado autorizado de Mercado Pago; “ventas históricas” incluye el historial
+        completo del período.
       </p>
 
       <Card>
@@ -221,7 +269,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                   <span className="truncate text-sm font-bold">{step.label}</span>
                 </div>
                 <div className="hidden h-2 overflow-hidden rounded-full bg-muted sm:block">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${percent(step.value, metrics.visitors)}%` }} />
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${percent(step.value, metrics.catalog_sessions)}%` }} />
                 </div>
                 <strong className="text-right text-lg">{step.value}</strong>
                 <span className="col-span-2 pl-12 text-xs font-semibold text-muted-foreground sm:col-span-1 sm:pl-0 sm:text-right">
@@ -237,7 +285,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         <Card className="min-w-0">
           <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
             <CardTitle>Actividad diaria</CardTitle>
-            <p className="text-sm text-muted-foreground">Visitantes por día; el punto verde indica una compra.</p>
+            <p className="text-sm text-muted-foreground">Entradas al catálogo por día; el punto verde indica un pago aprobado.</p>
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
             <div className="overflow-x-auto pb-2">
@@ -306,6 +354,27 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
             ) : <p className="py-8 text-center text-sm text-muted-foreground">Las escuelas elegidas aparecerán acá.</p>}
           </CardContent>
         </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Distribution
+          title="Errores del checkout"
+          items={data.checkout_errors.map((item) => ({
+            label: checkoutErrorLabels[item.detail],
+            value: item.sessions,
+          }))}
+          max={Math.max(1, ...data.checkout_errors.map((item) => item.sessions))}
+          icon={CreditCard}
+        />
+        <Distribution
+          title="Campañas"
+          items={data.campaigns.map((item) => ({
+            label: item.campaign,
+            value: item.sessions,
+          }))}
+          max={Math.max(1, ...data.campaigns.map((item) => item.sessions))}
+          icon={BarChart3}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

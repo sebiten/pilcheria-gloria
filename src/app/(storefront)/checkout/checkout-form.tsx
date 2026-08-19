@@ -66,8 +66,7 @@ type CouponFeedback = {
 
 type CheckoutFieldName =
   | "shippingMethod"
-  | "name"
-  | "lastName"
+  | "fullName"
   | "email"
   | "phone"
   | "street"
@@ -78,14 +77,6 @@ type CheckoutFieldName =
   | "couponCode";
 
 type CheckoutFieldErrors = Partial<Record<CheckoutFieldName, string>>;
-
-function splitFullName(fullName: string | null | undefined) {
-  const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
-  return {
-    name: parts[0] || "",
-    lastName: parts.slice(1).join(" "),
-  };
-}
 
 function getDefaultAddress(addresses: Address[]) {
   return addresses.find((address) => address.is_default) || addresses[0] || null;
@@ -101,13 +92,15 @@ export function CheckoutForm({
   const { items, getTotal, setItems } = useCartStore();
   const checkoutRequestId = useRef<string | null>(null);
   const cartRefreshStarted = useRef(false);
+  const invalidFocusScheduled = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
   const defaultAddress = getDefaultAddress(addresses);
-  const defaultName = splitFullName(defaultAddress?.name || profile?.full_name);
+  const defaultFullName = (defaultAddress?.name || profile?.full_name || "").trim();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<CheckoutFieldErrors>({});
   const [isCouponOpen, setIsCouponOpen] = useState(false);
+  const [isEmailOpen, setIsEmailOpen] = useState(Boolean(profile?.email));
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [couponFeedback, setCouponFeedback] =
@@ -117,8 +110,7 @@ export function CheckoutForm({
   );
   const [saveAddress, setSaveAddress] = useState(addresses.length === 0);
   const [formData, setFormData] = useState({
-    name: defaultName.name,
-    lastName: defaultName.lastName,
+    fullName: defaultFullName,
     email: profile?.email || "",
     phone: profile?.phone || "",
     street: defaultAddress?.street || "",
@@ -188,6 +180,7 @@ export function CheckoutForm({
   const itemCount = getCartItemCount(items);
   const localDeliveryAvailable =
     settings.local_delivery_enabled && canUseLocalDelivery(items);
+  const canChooseShipping = settings.pickup_enabled && localDeliveryAvailable;
   const hasAvailableShippingMethod =
     settings.pickup_enabled || localDeliveryAvailable;
   const subtotal = getTotal();
@@ -296,11 +289,9 @@ export function CheckoutForm({
     const address = addresses.find((item) => item.id === value);
     if (!address) return;
 
-    const recipient = splitFullName(address.name || profile?.full_name);
     setFormData((current) => ({
       ...current,
-      name: recipient.name,
-      lastName: recipient.lastName,
+      fullName: (address.name || profile?.full_name || "").trim(),
       street: address.street,
       city: address.city,
       state: address.state,
@@ -323,18 +314,39 @@ export function CheckoutForm({
 
     const showFieldError = (
       field: CheckoutFieldName,
-      message: string
+      message: string,
+      eventDetail:
+        | "missing_name"
+        | "invalid_phone"
+        | "shipping_unavailable"
+        | "missing_address"
+        | "coupon_pending"
     ) => {
       setFieldErrors({ [field]: message });
+      trackStorefrontEvent({
+        event: "checkout_validation_error",
+        eventDetail,
+        quantity: getCartItemCount(items),
+      });
       focusField(field);
     };
 
-    const fullName = `${formData.name} ${formData.lastName}`.trim();
+    const fullName = formData.fullName.trim();
+
+    if (fullName.length < 2) {
+      showFieldError(
+        "fullName",
+        "Escribí tu nombre y apellido para identificar el pedido.",
+        "missing_name"
+      );
+      return;
+    }
 
     if (!hasAvailableShippingMethod) {
       showFieldError(
         "shippingMethod",
-        "No hay un método de entrega disponible. Sumá otra prenda o contactanos."
+        "No hay un método de entrega disponible. Sumá otra prenda o contactanos.",
+        "shipping_unavailable"
       );
       return;
     }
@@ -342,7 +354,8 @@ export function CheckoutForm({
     if (!isValidArgentinaContactPhone(formData.phone)) {
       showFieldError(
         "phone",
-        "Ingresá un teléfono válido con código de área para poder contactarte."
+        "Ingresá un WhatsApp válido con código de área, sin 0 ni 15.",
+        "invalid_phone"
       );
       return;
     }
@@ -353,7 +366,8 @@ export function CheckoutForm({
     ) {
       showFieldError(
         "shippingMethod",
-        `La entrega local está disponible desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas.`
+        `La entrega local está disponible desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas.`,
+        "shipping_unavailable"
       );
       return;
     }
@@ -362,7 +376,8 @@ export function CheckoutForm({
       setIsCouponOpen(true);
       showFieldError(
         "couponCode",
-        "Aplicá el cupón antes de continuar o borrá el código ingresado."
+        "Aplicá el cupón antes de continuar o borrá el código ingresado.",
+        "coupon_pending"
       );
       return;
     }
@@ -427,6 +442,12 @@ export function CheckoutForm({
 
       const data = await response.json();
       if (!response.ok) {
+        trackStorefrontEvent({
+          event: "checkout_validation_error",
+          eventDetail:
+            response.status >= 500 ? "api_server_error" : "api_client_error",
+          quantity: getCartItemCount(items),
+        });
         if (response.status < 500 && response.status !== 409) {
           checkoutRequestId.current = null;
         }
@@ -434,10 +455,19 @@ export function CheckoutForm({
       }
 
       if (!data.preference?.init_point) {
+        trackStorefrontEvent({
+          event: "checkout_validation_error",
+          eventDetail: "missing_payment_link",
+          quantity: getCartItemCount(items),
+        });
         throw new Error("Mercado Pago no devolvió un enlace de pago");
       }
 
       window.sessionStorage.removeItem(FACEBOOK_PROMOTION.storageKey);
+      trackStorefrontEvent({
+        event: "payment_redirect",
+        quantity: getCartItemCount(items),
+      });
       window.location.assign(data.preference.init_point);
     } catch (submitError) {
       setError(
@@ -448,6 +478,13 @@ export function CheckoutForm({
       setIsProcessing(false);
       focusField("checkout-error");
     }
+  };
+
+  const handleCheckoutCtaClick = () => {
+    trackStorefrontEvent({
+      event: "checkout_cta_click",
+      quantity: getCartItemCount(items),
+    });
   };
 
   if (!isMounted) {
@@ -477,27 +514,47 @@ export function CheckoutForm({
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-32 pt-8 sm:py-12">
-      <div className="mb-8">
-        <p className="text-sm font-semibold text-primary">Compra segura</p>
+    <main className="mx-auto w-full max-w-6xl px-4 pb-36 pt-6 sm:py-12">
+      <div className="mb-6 sm:mb-8">
+        <p className="text-sm font-semibold text-primary">Último paso en la tienda</p>
         <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
-          Finalizar compra
+          Ya casi está
         </h1>
-        <ol
-          className="mt-5 grid grid-cols-3 gap-2 text-center text-xs font-bold sm:text-sm"
-          aria-label="Pasos de la compra"
-        >
-          <li className="rounded-full bg-primary px-2 py-2 text-primary-foreground">
-            1. Tus datos
-          </li>
-          <li className="rounded-full bg-muted px-2 py-2 text-muted-foreground">
-            2. Mercado Pago
-          </li>
-          <li className="rounded-full bg-muted px-2 py-2 text-muted-foreground">
-            3. Confirmación
-          </li>
-        </ol>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+          Completá tu nombre y WhatsApp. Después pagás de forma segura en Mercado Pago.
+        </p>
+        <p className="mt-3 text-xs font-bold text-gloria-700 sm:text-sm">
+          Tus datos → Mercado Pago → Confirmación
+        </p>
       </div>
+
+      <section className="mb-4 rounded-2xl border border-gloria-200 bg-gloria-50 p-4 lg:hidden" aria-label="Resumen de la compra">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-extrabold text-gloria-950">Tu compra</h2>
+          <strong className="text-lg text-gloria-950">{formatPrice(total)}</strong>
+        </div>
+        <div className="mt-3 space-y-2 border-t border-dashed border-gloria-300 pt-3">
+          {items.slice(0, 2).map((item) => {
+            const variant = item.variant_id
+              ? item.product?.variants?.find((current) => current.id === item.variant_id)
+              : null;
+            return (
+              <p key={`${item.product_id}-${item.variant_id}`} className="flex justify-between gap-3 text-sm leading-5">
+                <span className="min-w-0 truncate">
+                  {item.product?.name}
+                  {variant ? ` · ${formatStorefrontVariantSize(variant)}` : ""}
+                </span>
+                <span className="shrink-0 font-bold">× {item.quantity}</span>
+              </p>
+            );
+          })}
+          {items.length > 2 ? (
+            <p className="text-xs font-semibold text-muted-foreground">
+              Y {items.length - 2} prenda{items.length - 2 === 1 ? "" : "s"} más
+            </p>
+          ) : null}
+        </div>
+      </section>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_22rem]">
         <form
@@ -505,6 +562,7 @@ export function CheckoutForm({
           data-testid="checkout-form"
           onSubmit={handleSubmit}
           onInvalid={(event) => {
+            event.preventDefault();
             const field = event.target as HTMLInputElement;
             if (!field.name) return;
             const message = field.validity.valueMissing
@@ -516,57 +574,103 @@ export function CheckoutForm({
               ...current,
               [field.name as CheckoutFieldName]: message,
             }));
+            const eventDetail =
+              field.name === "fullName"
+                ? "missing_name"
+                : field.name === "phone"
+                  ? "invalid_phone"
+                  : field.name === "email"
+                    ? "invalid_email"
+                    : "missing_address";
+            trackStorefrontEvent({
+              event: "checkout_validation_error",
+              eventDetail,
+              quantity: getCartItemCount(items),
+            });
+            if (!invalidFocusScheduled.current) {
+              invalidFocusScheduled.current = true;
+              window.requestAnimationFrame(() => {
+                field.focus();
+                field.scrollIntoView({ behavior: "smooth", block: "center" });
+                window.setTimeout(() => {
+                  invalidFocusScheduled.current = false;
+                }, 300);
+              });
+            }
           }}
           className="space-y-6"
         >
-          <Card>
-            <CardHeader>
-              <CardTitle>¿Cómo querés recibir tu compra?</CardTitle>
-            </CardHeader>
-            <CardContent
-              id="shippingMethod"
-              tabIndex={-1}
-              aria-invalid={Boolean(fieldErrors.shippingMethod)}
-            >
-              <RadioGroup
-                aria-label="Método de entrega"
-                value={formData.shippingMethod}
-                onValueChange={(value) => {
-                  checkoutRequestId.current = null;
-                  setFieldErrors((current) => ({
-                    ...current,
-                    shippingMethod: undefined,
-                  }));
-                  setFormData((current) => ({
-                    ...current,
-                    shippingMethod: value as DeliveryMethod,
-                  }));
-                }}
-                className="grid gap-3 sm:grid-cols-2"
-              >
-                {settings.pickup_enabled ? (
-                  <DeliveryOption
-                    id="pickup"
-                    icon={Store}
-                    title="Retiro coordinado"
-                    description={pickupLocation}
-                    price="Sin costo"
-                  />
-                ) : null}
-                {localDeliveryAvailable ? (
-                  <DeliveryOption
-                    id="local_delivery"
-                    icon={Truck}
-                    title={freeLocalDelivery ? "Envío local gratis" : "Entrega local"}
-                    description="Ledesma y localidades cercanas, desde 2 prendas"
-                    price={
-                      localDeliveryCost > 0
-                        ? formatPrice(localDeliveryCost)
-                        : "Sin costo"
-                    }
-                  />
-                ) : null}
-              </RadioGroup>
+          <div
+            id="shippingMethod"
+            tabIndex={-1}
+            aria-invalid={Boolean(fieldErrors.shippingMethod)}
+          >
+            {canChooseShipping ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>¿Cómo querés recibir tu compra?</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup
+                    aria-label="Método de entrega"
+                    value={formData.shippingMethod}
+                    onValueChange={(value) => {
+                      checkoutRequestId.current = null;
+                      setFieldErrors((current) => ({
+                        ...current,
+                        shippingMethod: undefined,
+                      }));
+                      setFormData((current) => ({
+                        ...current,
+                        shippingMethod: value as DeliveryMethod,
+                      }));
+                    }}
+                    className="grid gap-3 sm:grid-cols-2"
+                  >
+                    <DeliveryOption
+                      id="pickup"
+                      icon={Store}
+                      title="Retiro coordinado"
+                      description={pickupLocation}
+                      price="Sin costo"
+                    />
+                    <DeliveryOption
+                      id="local_delivery"
+                      icon={Truck}
+                      title={freeLocalDelivery ? "Envío local gratis" : "Entrega local"}
+                      description="Ledesma y localidades cercanas, desde 2 prendas"
+                      price={
+                        localDeliveryCost > 0
+                          ? formatPrice(localDeliveryCost)
+                          : "Sin costo"
+                      }
+                    />
+                  </RadioGroup>
+                </CardContent>
+              </Card>
+            ) : hasAvailableShippingMethod ? (
+              <section className="flex items-start gap-3 rounded-2xl border border-gloria-200 bg-gloria-50 p-4">
+                {formData.shippingMethod === "pickup" ? (
+                  <Store className="mt-0.5 size-5 shrink-0 text-gloria-700" />
+                ) : (
+                  <Truck className="mt-0.5 size-5 shrink-0 text-gloria-700" />
+                )}
+                <div>
+                  <p className="font-extrabold text-gloria-950">
+                    {formData.shippingMethod === "pickup"
+                      ? "Retiro coordinado, sin costo"
+                      : freeLocalDelivery
+                        ? "Envío local gratis"
+                        : `Entrega local · ${formatPrice(localDeliveryCost)}`}
+                  </p>
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                    {formData.shippingMethod === "pickup"
+                      ? pickupLocation
+                      : "Ledesma y localidades cercanas"}
+                  </p>
+                </div>
+              </section>
+            ) : null}
               {fieldErrors.shippingMethod ? (
                 <p className="mt-3 text-sm font-semibold text-destructive" role="alert">
                   {fieldErrors.shippingMethod}
@@ -585,7 +689,7 @@ export function CheckoutForm({
                   antes de pagar.
                 </div>
               ) : null}
-              {settings.local_delivery_enabled ? (
+              {settings.local_delivery_enabled && !canChooseShipping ? (
                 <p
                   data-testid="local-delivery-condition"
                   className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm font-semibold leading-6"
@@ -599,41 +703,28 @@ export function CheckoutForm({
                       : `La entrega local en Ledesma se habilita desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas. Con una sola prenda, el pedido se retira de forma coordinada.`}
                 </p>
               ) : null}
-            </CardContent>
-          </Card>
+          </div>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Datos de contacto</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle>¿A nombre de quién queda el pedido?</CardTitle>
+              <p className="text-sm leading-5 text-muted-foreground">
+                Usamos tu WhatsApp para confirmar la compra y coordinar la entrega.
+              </p>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              {!profile ? (
-                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-base leading-6 sm:col-span-2">
-                  <p className="font-bold">Podés comprar sin registrarte.</p>
-                  <p className="mt-2 text-muted-foreground">
-                    Tu pedido queda protegido con un código único y el pago se
-                    hace de forma segura en Mercado Pago.
-                  </p>
-                  <p className="mt-2 font-semibold text-foreground">
-                    Escribí un WhatsApp real para confirmar el pedido y
-                    coordinar el retiro. El email es opcional.
-                  </p>
-                </div>
-              ) : null}
-              <FormField label="Nombre" name="name" value={formData.name} onChange={handleInputChange} error={fieldErrors.name} required />
-              <FormField label="Apellido" name="lastName" value={formData.lastName} onChange={handleInputChange} error={fieldErrors.lastName} required />
+            <CardContent className="space-y-4">
               <FormField
-                label="Email (opcional)"
-                name="email"
-                type="email"
-                value={formData.email}
+                label="Nombre y apellido"
+                name="fullName"
+                value={formData.fullName}
                 onChange={handleInputChange}
-                autoComplete="email"
-                error={fieldErrors.email}
-                hint="Si lo ingresás, también recibirás por email las novedades del pedido."
+                autoComplete="name"
+                error={fieldErrors.fullName}
+                placeholder="Ej. María López"
+                required
               />
               <FormField
-                label="Teléfono"
+                label="WhatsApp"
                 name="phone"
                 type="tel"
                 value={formData.phone}
@@ -645,6 +736,30 @@ export function CheckoutForm({
                 error={fieldErrors.phone}
                 required
               />
+              <button
+                type="button"
+                onClick={() => setIsEmailOpen((open) => !open)}
+                aria-expanded={isEmailOpen}
+                aria-controls="checkout-email-field"
+                className="flex min-h-11 items-center gap-2 rounded-lg text-sm font-bold text-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <ChevronDown className={`size-4 transition-transform ${isEmailOpen ? "rotate-180" : ""}`} />
+                {isEmailOpen ? "Ocultar email" : "Agregar email (opcional)"}
+              </button>
+              {isEmailOpen ? (
+                <div id="checkout-email-field">
+                  <FormField
+                    label="Email (opcional)"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    autoComplete="email"
+                    error={fieldErrors.email}
+                    hint="Si lo agregás, también recibirás las novedades por email."
+                  />
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -705,9 +820,10 @@ export function CheckoutForm({
               </Card>
             </>
           ) : (
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
-              <p className="font-semibold">{pickupLocation}</p>
-              <p className="mt-2 text-base leading-7 text-muted-foreground">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+              <p className="font-bold">Retiro de la compra online</p>
+              <p className="mt-1 text-sm font-semibold">{pickupLocation}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {settings.pickup_instructions}
               </p>
               {pickupConfigured ? (
@@ -715,7 +831,7 @@ export function CheckoutForm({
                   href={pickupMapsUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-4 inline-flex min-h-12 items-center gap-2 rounded-full border border-primary/25 bg-background px-4 text-base font-bold text-primary hover:bg-primary/5"
+                  className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/25 bg-background px-4 text-sm font-bold text-primary hover:bg-primary/5"
                 >
                   <MapPin className="size-4" />
                   Cómo llegar con Google Maps
@@ -724,6 +840,21 @@ export function CheckoutForm({
               ) : null}
             </div>
           )}
+
+          <ul className="space-y-2 rounded-2xl bg-gloria-50 p-4 text-sm font-semibold text-gloria-950 lg:hidden">
+            <li className="flex items-center gap-2">
+              <ShieldCheck className="size-4 shrink-0 text-gloria-700" />
+              Pago protegido por Mercado Pago
+            </li>
+            <li className="flex items-center gap-2">
+              <UserRoundCheck className="size-4 shrink-0 text-gloria-700" />
+              Podés pagar con tarjeta aunque no tengas cuenta
+            </li>
+            <li className="flex items-center gap-2">
+              <MessageCircle className="size-4 shrink-0 text-gloria-700" />
+              Te confirmamos el pedido por WhatsApp
+            </li>
+          </ul>
 
           <Card>
             <button
@@ -865,8 +996,8 @@ export function CheckoutForm({
                 Te confirmamos el pedido por WhatsApp
               </li>
             </ul>
-            <Button className="hidden min-h-14 w-full text-base font-bold lg:flex" size="lg" type="submit" form={formId} data-testid="checkout-submit" disabled={isProcessing || !hasAvailableShippingMethod}>
-              {isProcessing ? "Abriendo Mercado Pago..." : "Continuar a Mercado Pago"}
+            <Button className="hidden min-h-14 w-full text-base font-bold lg:flex" size="lg" type="submit" form={formId} data-testid="checkout-submit" onClick={handleCheckoutCtaClick} disabled={isProcessing || !hasAvailableShippingMethod}>
+              {isProcessing ? "Abriendo Mercado Pago..." : "Ir a pagar con Mercado Pago"}
             </Button>
             <PaymentConfidence amount={total} compact />
             <p className="text-xs leading-5 text-muted-foreground">
@@ -891,17 +1022,18 @@ export function CheckoutForm({
             <p className="truncate text-lg font-black">{formatPrice(total)}</p>
           </div>
           <Button
-            className="min-h-12 shrink-0 px-4 text-sm font-extrabold"
+            className="min-h-12 flex-1 px-3 text-sm font-extrabold"
             type="submit"
             form={formId}
             data-testid="checkout-submit-mobile"
+            onClick={handleCheckoutCtaClick}
             disabled={isProcessing || !hasAvailableShippingMethod}
           >
-            {isProcessing ? "Abriendo…" : "Continuar a Mercado Pago"}
+            {isProcessing ? "Abriendo…" : "Ir a pagar con Mercado Pago"}
           </Button>
         </div>
         <p className="mx-auto mt-1 max-w-md text-center text-[0.68rem] font-semibold text-muted-foreground">
-          Pago protegido · sin cuenta · confirmación por WhatsApp
+          Tarjeta o dinero disponible · sin registrarte
         </p>
       </div>
     </main>

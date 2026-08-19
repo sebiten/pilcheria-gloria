@@ -51,7 +51,7 @@ test("guest user can go from product to checkout", async ({ page }) => {
 
     const variant = page.locator('#elegir-talle [role="radiogroup"]').last().locator('[role="radio"]').first();
     await variant.click({ force: true });
-    await page.getByTestId("add-to-cart-button").click();
+    await page.locator('[data-testid^="add-to-cart-button"]:visible').click();
 
     const cartDrawer = page.getByTestId("cart-drawer");
     await expect(cartDrawer).toBeVisible();
@@ -64,13 +64,16 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await page.getByRole("button", { name: /cupón/i }).click();
     await expect(page.getByRole("button", { name: "Aplicar" })).toBeVisible();
 
-    await page.getByLabel("Nombre").fill("QA");
-    await page.getByLabel("Apellido").fill("Gloria");
+    await page.getByLabel("Nombre y apellido").fill("QA Gloria");
+    await page.getByRole("button", { name: "Agregar email (opcional)" }).click();
     await expect(page.getByLabel("Email (opcional)")).not.toHaveAttribute(
       "required"
     );
-    await page.getByLabel("Teléfono").fill("3884000000");
-    await page.getByTestId("checkout-submit").click();
+    await page.getByLabel("WhatsApp").fill("123");
+    await page.locator('[data-testid^="checkout-submit"]:visible').click();
+    await expect(page.getByRole("alert")).toContainText("WhatsApp válido");
+    await page.getByLabel("WhatsApp").fill("3884000000");
+    await page.locator('[data-testid^="checkout-submit"]:visible').click();
     await expect(page).toHaveURL(/mercadopago\.com\.ar\/checkout/);
   } finally {
     await cleanupCheckoutSmokeProduct(seed);
@@ -116,8 +119,8 @@ test("repeated checkout request is idempotent", async ({ request }) => {
 
     const firstBody = await firstResponse.json();
     const secondBody = await secondResponse.json();
-    expect(firstBody.order.id).toBe(checkoutRequestId);
-    expect(secondBody.order.id).toBe(checkoutRequestId);
+    expect(firstBody.order).toBeUndefined();
+    expect(secondBody.order).toBeUndefined();
     expect(secondBody.preference.init_point).toBe(
       firstBody.preference.init_point
     );

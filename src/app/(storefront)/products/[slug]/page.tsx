@@ -9,13 +9,20 @@ import {
   MessageCircle,
   PackageCheck,
   Shirt,
+  Store,
 } from "lucide-react";
 import { getProductBySlug } from "@/actions/products";
 import { getStoreSettings } from "@/actions/store-settings";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getBreadcrumbJsonLd } from "@/lib/seo";
 import { formatPrice } from "@/lib/utils";
-import { absoluteUrl, SITE_LOCALITY, SITE_NAME } from "@/lib/site";
+import {
+  absoluteUrl,
+  SITE_LOCALITY,
+  SITE_NAME,
+  STORE_LOCATION_ADDRESS,
+  STORE_LOCATION_REFERENCE,
+} from "@/lib/site";
 import { sanitizeStorefrontProduct } from "@/lib/inventory";
 import {
   getSchoolDisplayName,
@@ -30,14 +37,16 @@ interface ProductPageProps {
   params: Promise<{ slug: string }>;
 }
 
-function getProductPrice(product: NonNullable<Awaited<ReturnType<typeof getProductBySlug>>>) {
+function getProductPriceRange(product: NonNullable<Awaited<ReturnType<typeof getProductBySlug>>>) {
   const availablePrices = product.variants
     .filter((variant) => variant.active !== false && variant.available)
     .map((variant) => Number(variant.priceOverride ?? product.basePrice));
 
-  return availablePrices.length
-    ? Math.min(...availablePrices)
-    : Number(product.basePrice);
+  const fallback = Number(product.basePrice);
+  return {
+    min: availablePrices.length ? Math.min(...availablePrices) : fallback,
+    max: availablePrices.length ? Math.max(...availablePrices) : fallback,
+  };
 }
 
 export async function generateMetadata({
@@ -48,7 +57,7 @@ export async function generateMetadata({
   if (!product) return { title: "Producto no encontrado" };
 
   const isDemoProduct = product.slug.startsWith("gloria-demo-");
-  const price = getProductPrice(product);
+  const { min: price } = getProductPriceRange(product);
   const productDescription = product.description?.trim();
   const brandTitle =
     product.brand?.toLowerCase() === SITE_NAME.toLowerCase()
@@ -97,13 +106,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const activeVariants = product.variants.filter(
     (variant) => variant.active !== false && variant.available
   );
-  const availablePrices = new Set(
-    activeVariants.map((variant) =>
-      Number(variant.priceOverride ?? product.basePrice)
-    )
-  );
-  const hasVariablePrice = availablePrices.size > 1;
-  const price = getProductPrice(product);
+  const { min: price, max: maximumPrice } = getProductPriceRange(product);
+  const hasVariablePrice = maximumPrice > price;
   const compareAtPrice = Number(product.compareAtPrice ?? 0);
   const isOffer = compareAtPrice > price;
   const productUrl = absoluteUrl(`/uniformes/${product.slug}`);
@@ -157,24 +161,34 @@ export default async function ProductPage({ params }: ProductPageProps) {
       ? { "@type": "Brand", name: product.brand }
       : undefined,
     category: product.category?.name,
-    offers: {
-      "@type": "Offer",
-      url: productUrl,
-      priceCurrency: "ARS",
-      price,
-      availability:
-        activeVariants.length > 0
-          ? "https://schema.org/InStock"
-          : "https://schema.org/OutOfStock",
-      itemCondition: "https://schema.org/NewCondition",
-      seller: {
-        "@id": absoluteUrl("/#store"),
-      },
-      areaServed: {
-        "@type": "City",
-        name: SITE_LOCALITY,
-      },
-    },
+    offers: hasVariablePrice
+      ? {
+          "@type": "AggregateOffer",
+          url: productUrl,
+          priceCurrency: "ARS",
+          lowPrice: price,
+          highPrice: maximumPrice,
+          offerCount: activeVariants.length,
+          availability: "https://schema.org/InStock",
+        }
+      : {
+          "@type": "Offer",
+          url: productUrl,
+          priceCurrency: "ARS",
+          price,
+          availability:
+            activeVariants.length > 0
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+          itemCondition: "https://schema.org/NewCondition",
+          seller: {
+            "@id": absoluteUrl("/#store"),
+          },
+          areaServed: {
+            "@type": "City",
+            name: SITE_LOCALITY,
+          },
+        },
   };
   const breadcrumbJsonLd = getBreadcrumbJsonLd([
     { name: "Inicio", path: "/" },
@@ -191,7 +205,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   ]);
 
   return (
-    <main className="bg-background pb-28 lg:pb-0">
+    <main className="bg-background pb-44 lg:pb-0">
       <JsonLd data={productJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
 
@@ -221,8 +235,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     </p>
                   ) : null}
                   <p className="text-[clamp(1.625rem,8vw,2.25rem)] font-black tracking-tight text-foreground">
-                    {hasVariablePrice ? "Desde " : ""}
-                    {formatPrice(price)}
+                    {hasVariablePrice
+                      ? `${formatPrice(price)} – ${formatPrice(maximumPrice)}`
+                      : formatPrice(price)}
                   </p>
                 </div>
                 <span
@@ -256,6 +271,22 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   whatsappPhone={settings.whatsapp_phone}
                   productUrl={productUrl}
                 />
+                <div className="mt-5 space-y-3 border-t border-dashed border-gloria-200 pt-4 text-sm leading-5 text-gloria-900">
+                  <p className="flex items-start gap-2">
+                    <Store className="mt-0.5 size-4 shrink-0 text-gloria-700" />
+                    <span>
+                      <strong>Pilchería Gloria</strong> · {STORE_LOCATION_ADDRESS}. {STORE_LOCATION_REFERENCE}.
+                    </span>
+                  </p>
+                  {settings.pickup_enabled ? (
+                    <p className="flex items-start gap-2">
+                      <MapPin className="mt-0.5 size-4 shrink-0 text-gloria-700" />
+                      <span>
+                        Retiro de compras online coordinado en {settings.address_line}.
+                      </span>
+                    </p>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>

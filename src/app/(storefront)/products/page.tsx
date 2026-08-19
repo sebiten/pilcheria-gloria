@@ -77,7 +77,7 @@ export async function generateMetadata({
   const promotionTitle =
     "Uniformes para distintas escuelas con $3.000 de descuento";
   const promotionSocialDescription =
-    "Remeras y chombas desde $20.000, con stock real por talle. Hay más escuelas y opciones disponibles por consulta.";
+    "Remeras y chombas con precios por talle. Hay más escuelas y opciones disponibles por consulta.";
 
   return {
     title: selectedSchool
@@ -88,7 +88,7 @@ export async function generateMetadata({
         ? promotionTitle
         : "Tienda de uniformes escolares en Ledesma",
     description: hasPromotion
-      ? `${promotionDescription} Remeras y chombas de distintas escuelas, con stock real por talle.`
+      ? `${promotionDescription} Remeras y chombas de distintas escuelas, con precios por talle.`
       : SCHOOL_UNIFORMS_DESCRIPTION,
     alternates: { canonical: "/uniformes" },
     robots:

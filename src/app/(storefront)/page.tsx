@@ -14,6 +14,7 @@ import { getProducts } from "@/actions/products";
 import { getStoreSettings } from "@/actions/store-settings";
 import { PaymentConfidence } from "@/components/storefront/payment-confidence";
 import { HeroUniformCollage } from "@/components/storefront/hero-uniform-collage";
+import { HeroSchoolPicker } from "@/components/storefront/hero-school-picker";
 import { ProductGrid } from "@/components/storefront/product-grid";
 import { SchoolUniformsCarousel } from "@/components/storefront/school-uniforms-carousel";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ import {
   hasPickupAddress,
   PICKUP_LOCATION_REFERENCE,
 } from "@/lib/maps";
+import { SCHOOL_UNIFORM_FILTERS } from "@/lib/school-uniforms";
 
 export const metadata: Metadata = {
   title: "Uniformes escolares en Ledesma, Jujuy",
@@ -113,15 +115,16 @@ export default async function HomePage() {
               </span>
             </p>
 
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row lg:mt-5">
+            <HeroSchoolPicker schools={SCHOOL_UNIFORM_FILTERS} />
+
+            <div className="mt-3 hidden flex-col gap-3 sm:flex-row lg:mt-5 lg:flex">
               <Button
                 size="lg"
                 className="group min-h-12 w-[min(15rem,100%)] justify-between rounded-full bg-gloria-500 px-7 text-gloria-950 shadow-[0_16px_32px_-18px_oklch(0.2_0.045_136/0.5)] transition-transform hover:-translate-y-0.5 hover:bg-gloria-400 sm:w-auto sm:justify-center"
                 asChild
               >
                 <Link href={catalogHref}>
-                  <span className="lg:hidden">Ver tienda</span>
-                  <span className="hidden lg:inline">Elegir uniforme</span>
+                  <span>Elegir uniforme</span>
                   <ArrowRight className="ml-2 size-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
@@ -192,14 +195,14 @@ export default async function HomePage() {
           <div className="mb-8 flex items-end justify-between gap-4">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-gloria-700">
-                Stock en casa
+                Elegí por escuela
               </p>
               <h2 className="mt-2 font-display text-3xl text-gloria-950 sm:text-5xl">
-                Uniformes disponibles online
+                Uniformes listos para elegir
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Estos son los modelos cargados. En el negocio hay más talles y
-                uniformes de otras escuelas.
+                Elegí la escuela, abrí una prenda y tocá el talle que necesitás.
+                Si no aparece, consultanos.
               </p>
             </div>
             <Button variant="outline" className="hidden rounded-full sm:flex" asChild>
@@ -220,7 +223,7 @@ export default async function HomePage() {
                   rel="noreferrer"
                   className="mt-4 inline-flex font-bold text-gloria-800 underline"
                 >
-                  Consultar stock por WhatsApp
+                  Consultar por WhatsApp
                 </a>
               ) : null}
             </div>
@@ -286,7 +289,7 @@ export default async function HomePage() {
                   Retire su compra en {settings.address_line}.
                 </h2>
                 <p className="mt-5 max-w-md text-sm leading-6 text-white/70 sm:text-base">
-                  El stock publicado online se retira en este punto de
+                  Las compras hechas online se retiran en este punto de
                   Libertador General San Martín, con pedido confirmado y horario
                   coordinado previamente.
                 </p>
@@ -350,8 +353,8 @@ export default async function HomePage() {
               Lo buscamos en el negocio.
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Díganos escuela, prenda y talle. Confirmamos el stock real antes
-              de que vaya al local.
+              Díganos escuela, prenda y talle. Confirmamos la disponibilidad
+              antes de que vaya al local.
             </p>
           </div>
           <Button size="lg" className="min-h-12 rounded-full px-7" asChild>

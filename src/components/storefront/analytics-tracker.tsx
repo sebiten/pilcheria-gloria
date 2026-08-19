@@ -9,6 +9,9 @@ export function AnalyticsTracker() {
 
   useEffect(() => {
     trackStorefrontEvent({ event: "page_view", dedupe: true });
+    if (pathname === "/uniformes") {
+      trackStorefrontEvent({ event: "catalog_view", dedupe: true });
+    }
   }, [pathname]);
 
   return null;

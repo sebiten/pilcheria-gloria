@@ -5,12 +5,19 @@ import { revalidatePath, unstable_cache, updateTag } from "next/cache";
 import { z } from "zod";
 import { ensureUserProfile, requireAdmin } from "@/actions/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { getGuestReviewTokenHash } from "@/lib/reviews/guest-invites";
 import type { PublicProductReview, ProductReviewStats } from "@/types";
 import { reportDataFallback } from "@/lib/logging";
 
 type ReviewFormState = {
   ok: boolean;
   message: string;
+};
+
+export type GuestReviewInvite = {
+  productId: string;
+  productName: string;
+  productSlug: string;
 };
 
 const PRODUCT_REVIEWS_CACHE_TAG = "product-reviews";
@@ -22,6 +29,24 @@ const reviewSchema = z.object({
   title: z.string().trim().max(80).optional(),
   comment: z.string().trim().min(10).max(1000),
 });
+
+const guestReviewSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  rating: z.coerce.number().int().min(1).max(5),
+  title: z.string().trim().max(80).optional(),
+  comment: z.string().trim().min(10).max(1000),
+});
+
+function getSafeReviewerName(shippingAddress: unknown) {
+  if (!shippingAddress || typeof shippingAddress !== "object") {
+    return "Cliente verificado";
+  }
+
+  const rawName = (shippingAddress as { name?: unknown }).name;
+  if (typeof rawName !== "string") return "Cliente verificado";
+  const name = rawName.trim().replace(/\s+/g, " ");
+  return name && !name.includes("@") ? name.slice(0, 80) : "Cliente verificado";
+}
 
 function mapPublicReview(row: any): PublicProductReview {
   return {
@@ -227,6 +252,139 @@ export async function submitProductReview(
   return {
     ok: true,
     message: "Reseña recibida. Se publicará después de revisarla.",
+  };
+}
+
+export async function getGuestReviewInvite(
+  token: string
+): Promise<GuestReviewInvite | null> {
+  const parsedToken = guestReviewSchema.shape.token.safeParse(token);
+  if (!parsedToken.success) return null;
+
+  const supabase = getSupabaseAdmin();
+  const { data: invite, error } = await supabase
+    .from("product_review_invites")
+    .select(`
+      id,
+      expires_at,
+      used_at,
+      order:orders(status),
+      product:products(id, name, slug)
+    `)
+    .eq("token_hash", getGuestReviewTokenHash(parsedToken.data))
+    .maybeSingle();
+
+  if (error || !invite || invite.used_at) return null;
+  if (new Date(invite.expires_at).getTime() <= Date.now()) return null;
+
+  const order = Array.isArray(invite.order) ? invite.order[0] : invite.order;
+  const product = Array.isArray(invite.product)
+    ? invite.product[0]
+    : invite.product;
+
+  if (order?.status !== "delivered" || !product?.id || !product.slug) {
+    return null;
+  }
+
+  return {
+    productId: product.id,
+    productName: product.name,
+    productSlug: product.slug,
+  };
+}
+
+export async function submitGuestProductReview(
+  _state: ReviewFormState,
+  formData: FormData
+): Promise<ReviewFormState> {
+  const parsed = guestReviewSchema.safeParse({
+    token: formData.get("token"),
+    rating: formData.get("rating"),
+    title: formData.get("title"),
+    comment: formData.get("comment"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: "Completá la reseña con datos válidos." };
+  }
+
+  const supabase = getSupabaseAdmin();
+  const tokenHash = getGuestReviewTokenHash(parsed.data.token);
+  const { data: invite, error: inviteError } = await supabase
+    .from("product_review_invites")
+    .select(`
+      id,
+      order_id,
+      product_id,
+      expires_at,
+      used_at,
+      order:orders(status, shipping_address),
+      product:products(slug)
+    `)
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  const order = Array.isArray(invite?.order) ? invite.order[0] : invite?.order;
+  const product = Array.isArray(invite?.product)
+    ? invite.product[0]
+    : invite?.product;
+  const isExpired = invite
+    ? new Date(invite.expires_at).getTime() <= Date.now()
+    : true;
+
+  if (
+    inviteError ||
+    !invite ||
+    invite.used_at ||
+    isExpired ||
+    order?.status !== "delivered" ||
+    !product?.slug
+  ) {
+    return {
+      ok: false,
+      message: "Este enlace ya fue usado o dejó de estar disponible.",
+    };
+  }
+
+  const { error: reviewError } = await supabase.from("product_reviews").insert({
+    product_id: invite.product_id,
+    clerk_user_id: null,
+    order_id: invite.order_id,
+    guest_invite_id: invite.id,
+    rating: parsed.data.rating,
+    title: parsed.data.title || null,
+    comment: parsed.data.comment,
+    reviewer_name: getSafeReviewerName(order.shipping_address),
+    approved: false,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (reviewError) {
+    if (reviewError.code === "23505") {
+      return {
+        ok: false,
+        message: "La reseña de esta compra ya fue enviada.",
+      };
+    }
+    console.error("Error saving guest review:", reviewError);
+    return { ok: false, message: "No se pudo guardar la reseña." };
+  }
+
+  const { error: usedError } = await supabase
+    .from("product_review_invites")
+    .update({ used_at: new Date().toISOString() })
+    .eq("id", invite.id)
+    .is("used_at", null);
+
+  if (usedError) {
+    console.error("No se pudo cerrar la invitación de reseña:", usedError);
+  }
+
+  updateTag(PRODUCT_REVIEWS_CACHE_TAG);
+  revalidatePath(`/uniformes/${product.slug}`);
+  return {
+    ok: true,
+    message: "¡Gracias! La reseña se publicará después de revisarla.",
   };
 }
 

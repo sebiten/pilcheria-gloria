@@ -37,6 +37,7 @@ yarn-error.log*
 .env*
 !.env.example
 /.vapid-keys.local
+/supabase/.temp/
 
 # vercel
 .vercel

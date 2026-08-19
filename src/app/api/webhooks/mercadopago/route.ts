@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { revalidateProductCacheFromRouteHandler } from "@/lib/cache/products";
 import { getPayment } from "@/lib/mercadopago/client";
@@ -173,14 +174,16 @@ export async function POST(request: Request) {
                 ? "cancelled"
                 : null;
         if (emailEvent) {
-          await sendOrderEmail(externalReference, emailEvent).catch(
-            (notificationError) => {
+          after(async () => {
+            await sendOrderEmail(externalReference, emailEvent).catch(
+              (notificationError) => {
               console.error(
                 "No se pudo enviar la notificación del webhook:",
                 notificationError
               );
-            }
-          );
+              }
+            );
+          });
         }
 
         if (["paid", "payment_review", "cancelled"].includes(nextStatus)) {
