@@ -15,6 +15,14 @@ export type SizeSystem = "infant" | "adult";
 export type SchoolLevel = "primary" | "secondary";
 export type FulfillmentSpeed = "immediate" | "24_48_hours";
 export type RefundStatus = "none" | "pending" | "partial" | "refunded";
+export type UniformPriceGroupCode = "remera" | "chomba";
+
+export interface UniformPriceGroup {
+  code: UniformPriceGroupCode;
+  name: string;
+  price: number;
+  updatedAt?: string;
+}
 
 export interface PricingTier {
   unitPrice: number;
@@ -53,6 +61,7 @@ export interface Product {
   compareAtPrice: number | null;
   brand: string | null;
   categoryId: string | null;
+  uniformPriceGroup: UniformPriceGroup | null;
   featured: boolean;
   active: boolean;
   createdAt: string;

@@ -33,6 +33,15 @@ export const categories = pgTable("categories", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const uniformPriceGroups = pgTable("uniform_price_groups", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const products = pgTable("products", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
@@ -42,6 +51,10 @@ export const products = pgTable("products", {
   compareAtPrice: numeric("compare_at_price", { precision: 10, scale: 2 }),
   brand: text("brand"),
   categoryId: uuid("category_id").references(() => categories.id),
+  uniformPriceGroupCode: text("uniform_price_group_code").references(
+    () => uniformPriceGroups.code,
+    { onUpdate: "cascade", onDelete: "restrict" }
+  ),
   featured: boolean("featured").default(false),
   active: boolean("active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -420,6 +433,10 @@ export const productsRelations = relations(products, ({ one, many }) => ({
     fields: [products.categoryId],
     references: [categories.id],
   }),
+  uniformPriceGroup: one(uniformPriceGroups, {
+    fields: [products.uniformPriceGroupCode],
+    references: [uniformPriceGroups.code],
+  }),
   images: many(productImages),
   variants: many(productVariants),
   orderItems: many(orderItems),
@@ -617,6 +634,7 @@ export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
+export type UniformPriceGroup = typeof uniformPriceGroups.$inferSelect;
 export type ProductImage = typeof productImages.$inferSelect;
 export type NewProductImage = typeof productImages.$inferInsert;
 export type ProductVariant = typeof productVariants.$inferSelect;

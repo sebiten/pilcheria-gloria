@@ -1,4 +1,4 @@
-export const ANALYTICS_VERSION = 3;
+export const ANALYTICS_VERSION = 4;
 
 export const CLIENT_ANALYTICS_EVENT_NAMES = [
   "page_view",

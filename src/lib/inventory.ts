@@ -31,6 +31,9 @@ export const PRODUCT_OFFERS_SELECT = `
   )
 `;
 
+export const PRODUCT_PRICE_GROUP_SELECT =
+  "uniform_price_group:uniform_price_groups(code, name, price, updated_at)";
+
 type RawOffer = {
   id: string;
   variant_id: string;
@@ -82,7 +85,10 @@ export type CheckoutOffer = {
   leadTimeMaxHours: number;
 };
 
-function getActiveOffers(variant: RawVariantWithOffers): CheckoutOffer[] {
+function getActiveOffers(
+  variant: RawVariantWithOffers,
+  publicUnitPrice?: number | null
+): CheckoutOffer[] {
   return (variant.offers ?? [])
     .filter((offer) => offer.active !== false && offer.source?.active !== false)
     .map((offer) => ({
@@ -92,7 +98,12 @@ function getActiveOffers(variant: RawVariantWithOffers): CheckoutOffer[] {
       sourceCode: offer.source?.code ?? "unknown",
       sourceName: offer.source?.name ?? "Origen no disponible",
       availabilityMode: offer.availability_mode,
-      salePrice: Number(offer.sale_price),
+      salePrice:
+        publicUnitPrice != null &&
+        Number.isFinite(publicUnitPrice) &&
+        publicUnitPrice > 0
+          ? publicUnitPrice
+          : Number(offer.sale_price),
       stockQuantity:
         offer.availability_mode === "finite"
           ? Number(offer.stock_quantity ?? 0)
@@ -115,15 +126,22 @@ function getActiveOffers(variant: RawVariantWithOffers): CheckoutOffer[] {
     );
 }
 
-export function getCheckoutOffers(variant: RawVariantWithOffers) {
-  return getActiveOffers(variant);
+export function getCheckoutOffers(
+  variant: RawVariantWithOffers,
+  publicUnitPrice?: number | null
+) {
+  return getActiveOffers(variant, publicUnitPrice);
 }
 
-export function mapProductVariant(variant: RawVariantWithOffers): ProductVariant {
+export function mapProductVariant(
+  variant: RawVariantWithOffers,
+  publicUnitPrice?: number | null
+): ProductVariant {
   const hasConfiguredOffers = (variant.offers ?? []).some(
     (offer) => offer.active !== false && offer.source?.active !== false
   );
-  const offers = getActiveOffers(variant);
+  const referenceOffers = getActiveOffers(variant);
+  const offers = getActiveOffers(variant, publicUnitPrice);
   const pricingTiers: PricingTier[] = offers.map((offer) => ({
     unitPrice: offer.salePrice,
     availableQuantity: offer.stockQuantity,
@@ -140,7 +158,7 @@ export function mapProductVariant(variant: RawVariantWithOffers): ProductVariant
   const onDemandAvailable = offers.some(
     (offer) => offer.availabilityMode === "on_demand"
   );
-  const partnerOffer = offers.find(
+  const partnerOffer = referenceOffers.find(
     (offer) => offer.sourceCode === "grandma_store"
   );
 
@@ -167,16 +185,27 @@ export function mapProductVariant(variant: RawVariantWithOffers): ProductVariant
 }
 
 export function mapProductRow(product: any): ProductWithDetails {
+  const uniformPrice = Number(product.uniform_price_group?.price);
+  const hasUniformPrice = Number.isFinite(uniformPrice) && uniformPrice > 0;
+
   return {
     id: product.id,
     name: product.name,
     slug: product.slug,
     description: product.description,
-    basePrice: Number(product.base_price) || 0,
+    basePrice: hasUniformPrice ? uniformPrice : Number(product.base_price) || 0,
     compareAtPrice:
       product.compare_at_price == null ? null : Number(product.compare_at_price),
     brand: product.brand || null,
     categoryId: product.category_id,
+    uniformPriceGroup: product.uniform_price_group
+      ? {
+          code: product.uniform_price_group.code,
+          name: product.uniform_price_group.name,
+          price: uniformPrice,
+          updatedAt: product.uniform_price_group.updated_at,
+        }
+      : null,
     featured: product.featured || false,
     active: product.active !== false,
     createdAt: product.created_at,
@@ -204,7 +233,9 @@ export function mapProductRow(product: any): ProductWithDetails {
         alt: image.alt,
         sort_order: image.sort_order || 0,
       })),
-    variants: (product.variants || []).map(mapProductVariant),
+    variants: (product.variants || []).map((variant: RawVariantWithOffers) =>
+      mapProductVariant(variant, hasUniformPrice ? uniformPrice : null)
+    ),
   };
 }
 

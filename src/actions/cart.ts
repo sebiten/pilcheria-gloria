@@ -9,6 +9,7 @@ import type { CartItem, ProductWithDetails } from "@/types";
 import {
   mapProductRow,
   PRODUCT_OFFERS_SELECT,
+  PRODUCT_PRICE_GROUP_SELECT,
   sanitizeStorefrontProduct,
 } from "@/lib/inventory";
 
@@ -80,6 +81,7 @@ async function selectUserCart(userId: string): Promise<CartItem[]> {
       quantity,
       product:products(
         *,
+        ${PRODUCT_PRICE_GROUP_SELECT},
         category:categories(*),
         images:product_images(*),
         variants:product_variants(${PRODUCT_OFFERS_SELECT})
@@ -233,6 +235,7 @@ export async function refreshCheckoutCart(
     .from("products")
     .select(`
       *,
+      ${PRODUCT_PRICE_GROUP_SELECT},
       category:categories(*),
       images:product_images(*),
       variants:product_variants(${PRODUCT_OFFERS_SELECT})

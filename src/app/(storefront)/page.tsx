@@ -31,6 +31,8 @@ import {
   PICKUP_LOCATION_REFERENCE,
 } from "@/lib/maps";
 import { SCHOOL_UNIFORM_FILTERS } from "@/lib/school-uniforms";
+import { getUniformPriceGroups } from "@/lib/uniform-pricing";
+import { formatPrice } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Uniformes escolares en Ledesma, Jujuy",
@@ -45,10 +47,13 @@ export const metadata: Metadata = {
 
 const catalogHref = "/uniformes";
 export default async function HomePage() {
-  const [products, settings] = await Promise.all([
+  const [products, settings, priceGroups] = await Promise.all([
     getProducts({ categorySlug: "uniformes-escolares", limit: 8 }),
     getStoreSettings(),
+    getUniformPriceGroups(),
   ]);
+  const remeraPrice = priceGroups.find((group) => group.code === "remera")?.price;
+  const chombaPrice = priceGroups.find((group) => group.code === "chomba")?.price;
   const whatsappUrl = settings.whatsapp_phone
     ? `https://wa.me/${settings.whatsapp_phone.replace(/\D/g, "")}?text=${encodeURIComponent(
         "Hola, busco un uniforme escolar. Escuela: __. Prenda: __. Talle: __."
@@ -114,6 +119,13 @@ export default async function HomePage() {
                 online, la buscamos en el negocio.
               </span>
             </p>
+
+            {remeraPrice && chombaPrice ? (
+              <p className="mt-2 text-sm font-extrabold text-gloria-950 sm:text-base">
+                Remeras {formatPrice(remeraPrice)} · Chombas{" "}
+                {formatPrice(chombaPrice)}
+              </p>
+            ) : null}
 
             <HeroSchoolPicker schools={SCHOOL_UNIFORM_FILTERS} />
 

@@ -14,7 +14,15 @@ import {
 } from "@/lib/cache/products";
 import type { Category, ProductWithDetails } from "@/types";
 import { reportDataFallback } from "@/lib/logging";
-import { mapProductRow, PRODUCT_OFFERS_SELECT } from "@/lib/inventory";
+import {
+  mapProductRow,
+  PRODUCT_OFFERS_SELECT,
+  PRODUCT_PRICE_GROUP_SELECT,
+} from "@/lib/inventory";
+import {
+  getUniformPriceGroup,
+  inferUniformPriceGroupCode,
+} from "@/lib/uniform-pricing";
 
 const productImageSchema = z.object({
   url: z.string().url(),
@@ -85,6 +93,30 @@ const productPayloadSchema = z
   });
 
 type ProductPayload = z.infer<typeof productPayloadSchema>;
+
+async function resolveUniformProductPricing(payload: ProductPayload) {
+  const uniformPriceGroupCode = inferUniformPriceGroupCode(payload.name);
+  if (!uniformPriceGroupCode) {
+    return { payload, uniformPriceGroupCode: null };
+  }
+
+  const group = await getUniformPriceGroup(uniformPriceGroupCode);
+  if (!group) {
+    throw new Error("Falta configurar el precio general de este uniforme");
+  }
+
+  return {
+    uniformPriceGroupCode,
+    payload: {
+      ...payload,
+      basePrice: group.price,
+      variants: payload.variants.map((variant) => ({
+        ...variant,
+        priceOverride: group.price,
+      })),
+    },
+  };
+}
 
 type ProductMutationResult =
   | { ok: true }
@@ -545,6 +577,7 @@ async function fetchProducts(
       .from("products")
       .select(`
         *,
+        ${PRODUCT_PRICE_GROUP_SELECT},
         category:categories(*),
         images:product_images(*),
         variants:product_variants(${PRODUCT_OFFERS_SELECT})
@@ -606,7 +639,7 @@ async function fetchProducts(
 
 const getProductsCached = unstable_cache(
   fetchProducts,
-  ["products-public-v8"],
+  ["products-public-v9"],
   {
     tags: [PRODUCTS_CACHE_TAG],
     revalidate: 3600,
@@ -669,6 +702,7 @@ const getProductBySlugCached = unstable_cache(
         .from("products")
         .select(`
           *,
+          ${PRODUCT_PRICE_GROUP_SELECT},
           category:categories(*),
           images:product_images(*),
           variants:product_variants(${PRODUCT_OFFERS_SELECT})
@@ -677,7 +711,7 @@ const getProductBySlugCached = unstable_cache(
         .eq("active", true)
     );
   },
-  ["product-by-slug-v7"],
+  ["product-by-slug-v8"],
   {
     tags: [PRODUCT_DETAILS_CACHE_TAG],
     revalidate: 3600,
@@ -693,6 +727,7 @@ export async function getProductByIdAdmin(id: string): Promise<ProductWithDetail
       .from("products")
       .select(`
         *,
+        ${PRODUCT_PRICE_GROUP_SELECT},
         category:categories(*),
         images:product_images(*),
         variants:product_variants(${PRODUCT_OFFERS_SELECT})
@@ -707,7 +742,10 @@ export async function getCategories(): Promise<Category[]> {
 
 export async function createProduct(input: ProductPayload) {
   await requireAdmin();
-  const payload = productPayloadSchema.parse(input);
+  const parsedPayload = productPayloadSchema.parse(input);
+  const { payload, uniformPriceGroupCode } = await resolveUniformProductPricing(
+    parsedPayload
+  );
   const supabase = getSupabaseAdmin();
 
   const { data: product, error } = await supabase
@@ -720,6 +758,7 @@ export async function createProduct(input: ProductPayload) {
       compare_at_price: payload.compareAtPrice ?? null,
       brand: payload.brand || null,
       category_id: payload.categoryId || null,
+      uniform_price_group_code: uniformPriceGroupCode,
       featured: payload.featured || false,
       active: payload.active ?? true,
     })
@@ -803,7 +842,10 @@ export async function uploadProductImage(formData: FormData) {
 
 export async function updateProduct(id: string, input: ProductPayload) {
   await requireAdmin();
-  const payload = productPayloadSchema.parse(input);
+  const parsedPayload = productPayloadSchema.parse(input);
+  const { payload, uniformPriceGroupCode } = await resolveUniformProductPricing(
+    parsedPayload
+  );
   const supabase = getSupabaseAdmin();
 
   const existing = await getProductByIdAdmin(id);
@@ -821,6 +863,7 @@ export async function updateProduct(id: string, input: ProductPayload) {
       compare_at_price: payload.compareAtPrice ?? null,
       brand: payload.brand || null,
       category_id: payload.categoryId || null,
+      uniform_price_group_code: uniformPriceGroupCode,
       featured: payload.featured || false,
       active: payload.active ?? true,
     })
@@ -844,6 +887,7 @@ export async function updateProduct(id: string, input: ProductPayload) {
         compare_at_price: existing.compareAtPrice,
         brand: existing.brand,
         category_id: existing.categoryId,
+        uniform_price_group_code: existing.uniformPriceGroup?.code ?? null,
         featured: existing.featured,
         active: existing.active,
       })

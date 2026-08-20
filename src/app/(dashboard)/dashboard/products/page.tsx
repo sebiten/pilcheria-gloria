@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/utils";
 import { DeleteProductButton } from "./delete-product-button";
 import { CopyProductLinkButton } from "./copy-product-link-button";
 import { requireAdmin } from "@/actions/auth";
+import { PRODUCT_PRICE_GROUP_SELECT } from "@/lib/inventory";
 
 export default async function ProductsPage() {
   await requireAdmin();
@@ -16,6 +17,7 @@ export default async function ProductsPage() {
     .from("products")
     .select(`
       *,
+      ${PRODUCT_PRICE_GROUP_SELECT},
       category:categories(name, slug),
       images:product_images(url)
     `)
@@ -91,7 +93,11 @@ export default async function ProductsPage() {
                     {product.category?.name || "Sin categoría"}
                   </td>
                   <td className="p-4" data-label="Precio">
-                    {formatPrice(Number(product.base_price))}
+                    {formatPrice(
+                      Number(
+                        product.uniform_price_group?.price ?? product.base_price
+                      )
+                    )}
                   </td>
                   <td className="p-4" data-label="Estado">
                     <span

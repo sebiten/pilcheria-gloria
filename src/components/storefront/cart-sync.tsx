@@ -2,8 +2,16 @@
 
 import * as React from "react";
 import { useUser } from "@clerk/nextjs";
-import { mergeCartItems, replaceCartItems } from "@/actions/cart";
-import { useCartStore } from "@/hooks/use-cart";
+import {
+  mergeCartItems,
+  refreshCheckoutCart,
+  replaceCartItems,
+} from "@/actions/cart";
+import {
+  cartNeedsPriceRefresh,
+  markCartPricingFresh,
+  useCartStore,
+} from "@/hooks/use-cart";
 import type { CartItem } from "@/types";
 
 const SYNC_DEBOUNCE_MS = 500;
@@ -22,6 +30,28 @@ export function CartSync() {
   const setItems = useCartStore((state) => state.setItems);
   const syncedUserIdRef = React.useRef<string | null>(null);
   const skipNextReplaceRef = React.useRef(false);
+  const pricingRefreshStartedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (
+      pricingRefreshStartedRef.current ||
+      items.length === 0 ||
+      !cartNeedsPriceRefresh()
+    ) {
+      return;
+    }
+
+    pricingRefreshStartedRef.current = true;
+    void refreshCheckoutCart(toSyncPayload(items))
+      .then((refreshedItems) => {
+        markCartPricingFresh();
+        setItems(refreshedItems);
+      })
+      .catch((error) => {
+        pricingRefreshStartedRef.current = false;
+        console.error("No se pudieron actualizar los precios del carrito:", error);
+      });
+  }, [items, setItems]);
 
   React.useEffect(() => {
     if (!isLoaded) {
@@ -49,6 +79,7 @@ export function CartSync() {
 
         skipNextReplaceRef.current = true;
         syncedUserIdRef.current = user.id;
+        markCartPricingFresh();
         setItems(mergedItems);
       } catch (error) {
         console.error("Error sincronizando carrito al iniciar sesión:", error);

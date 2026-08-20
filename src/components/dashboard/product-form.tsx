@@ -457,6 +457,10 @@ export function ProductForm({
               </select>
             </Field>
           </div>
+          <p className="text-sm text-muted-foreground">
+            En remeras y chombas, el precio público se toma automáticamente de
+            la sección <strong>Precios</strong> del panel.
+          </p>
 
           <div className="flex flex-wrap gap-6">
             <Check label="Destacado" checked={featured} onChange={setFeatured} />
@@ -472,7 +476,8 @@ export function ProductForm({
         <CardContent className="space-y-4">
           <p className="text-sm leading-6 text-muted-foreground">
             Crea o actualiza todos los talles disponibles en 24–48 horas. Los
-            precios corresponden a la última columna de la guía.
+            precios corresponden a la última columna de la guía y quedan como
+            referencia interna; el cliente paga el precio general de la prenda.
           </p>
           <div className="grid gap-4 md:grid-cols-5">
             <Field label="Color / modelo">
@@ -588,13 +593,13 @@ export function ProductForm({
               <Field label="SKU">
                 <Input value={variant.sku} onChange={(event) => updateVariant(index, "sku", event.target.value)} placeholder="Opcional" />
               </Field>
-              <Field label="Precio especial">
+              <Field label="Precio propio de referencia">
                 <Input type="number" min="0" step="0.01" value={variant.priceOverride ?? ""} onChange={(event) => updateVariant(index, "priceOverride", event.target.value ? Number(event.target.value) : null)} />
               </Field>
               <Field label="Stock">
                 <Input type="number" min="0" value={variant.stock} onChange={(event) => updateVariant(index, "stock", Number(event.target.value))} />
               </Field>
-              <Field label="Precio negocio">
+              <Field label="Precio guía (referencia)">
                 <Input
                   type="number"
                   min="0"

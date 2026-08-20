@@ -32,6 +32,7 @@ import { calculateCouponDiscount } from "@/lib/coupons/server";
 import {
   formatStorefrontVariantSize,
   getCheckoutOffers,
+  PRODUCT_PRICE_GROUP_SELECT,
   type CheckoutOffer,
   type RawVariantWithOffers,
 } from "@/lib/inventory";
@@ -168,6 +169,7 @@ async function resolveCheckoutItems(
       slug,
       base_price,
       active,
+      ${PRODUCT_PRICE_GROUP_SELECT},
       images:product_images(url, sort_order),
       variants:product_variants(
         id,
@@ -266,7 +268,15 @@ async function resolveCheckoutItems(
     };
 
     let remaining = item.quantity;
-    const offers = getCheckoutOffers(variant as RawVariantWithOffers);
+    const configuredPublicPrice = Number(product.uniform_price_group?.price);
+    const publicUnitPrice =
+      Number.isFinite(configuredPublicPrice) && configuredPublicPrice > 0
+        ? configuredPublicPrice
+        : null;
+    const offers = getCheckoutOffers(
+      variant as RawVariantWithOffers,
+      publicUnitPrice
+    );
 
     for (const offer of offers) {
       if (remaining <= 0) break;

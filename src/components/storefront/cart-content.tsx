@@ -144,7 +144,9 @@ export function CartContent() {
                         <p
                           key={`${segment.fulfillment}-${segment.unitPrice}-${index}`}
                         >
-                          {segment.quantity} × {formatPrice(segment.unitPrice)} ·{" "}
+                          {item.product?.uniformPriceGroup
+                            ? `${segment.quantity} prenda${segment.quantity === 1 ? "" : "s"} · `
+                            : `${segment.quantity} × ${formatPrice(segment.unitPrice)} · `}
                           {segment.fulfillment === "immediate"
                             ? "inmediata"
                             : "24–48 h"}

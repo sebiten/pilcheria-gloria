@@ -3,6 +3,10 @@ import type { CartItem, ProductWithDetails } from "@/types";
 import { getCartSubtotal } from "@/lib/commerce";
 import { sanitizeStorefrontProduct } from "@/lib/inventory";
 
+const CART_STORAGE_KEY = "pilcheria-gloria-cart";
+export const CART_PRICING_VERSION = 4;
+let cartPricingIsFresh = true;
+
 interface CartStore {
   items: CartItem[];
   isOpen: boolean;
@@ -158,10 +162,11 @@ export function hydrateCartStore() {
     return;
   }
 
-  const stored = localStorage.getItem("pilcheria-gloria-cart");
+  const stored = localStorage.getItem(CART_STORAGE_KEY);
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
+      cartPricingIsFresh = parsed.pricingVersion === CART_PRICING_VERSION;
       if (parsed.state?.items) {
         useCartStore.setState({ items: normalizeCartItems(parsed.state.items) }, false);
       }
@@ -171,6 +176,14 @@ export function hydrateCartStore() {
   }
 }
 
+export function cartNeedsPriceRefresh() {
+  return !cartPricingIsFresh;
+}
+
+export function markCartPricingFresh() {
+  cartPricingIsFresh = true;
+}
+
 export function subscribeCartStorePersistence() {
   if (typeof window === "undefined") {
     return () => {};
@@ -178,8 +191,11 @@ export function subscribeCartStorePersistence() {
 
   return useCartStore.subscribe((state) => {
     localStorage.setItem(
-      "pilcheria-gloria-cart",
-      JSON.stringify({ state: { items: state.items } })
+      CART_STORAGE_KEY,
+      JSON.stringify({
+        pricingVersion: cartPricingIsFresh ? CART_PRICING_VERSION : 0,
+        state: { items: state.items },
+      })
     );
   });
 }

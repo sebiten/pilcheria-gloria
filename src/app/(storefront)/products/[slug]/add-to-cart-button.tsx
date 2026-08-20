@@ -124,6 +124,8 @@ export function AddToCartButton({
   const priceSegments = selectedVariant
     ? getVariantPricingSegments(selectedVariant, quantity).segments
     : [];
+  const hasMultipleUnitPrices =
+    new Set(priceSegments.map((segment) => segment.unitPrice)).size > 1;
   const hasPurchasableVariants = availableVariants.length > 0;
   const canPurchase = Boolean(selectedVariant);
   const hasImmediateFulfillment = priceSegments.some(
@@ -253,6 +255,11 @@ export function AddToCartButton({
             >
               Elegí el talle
             </Label>
+            {product.uniformPriceGroup ? (
+              <p className="mt-1 text-sm font-bold text-gloria-700">
+                Mismo precio en todos los talles: {formatPrice(product.basePrice)}
+              </p>
+            ) : null}
             <details className="mb-3 mt-1 rounded-xl border border-gloria-200 bg-gloria-50 px-3 py-2">
               <summary className="flex min-h-9 cursor-pointer list-none items-center text-sm font-bold text-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 ¿No sabés qué talle elegir?
@@ -322,9 +329,11 @@ export function AddToCartButton({
                                     {variant.color}
                                   </span>
                                 ) : null}
-                                <span className="mt-1 font-bold text-foreground">
-                                  {formatPrice(unitPrice)}
-                                </span>
+                                {!product.uniformPriceGroup ? (
+                                  <span className="mt-1 font-bold text-foreground">
+                                    {formatPrice(unitPrice)}
+                                  </span>
+                                ) : null}
                               </span>
                             </div>
                           );
@@ -442,7 +451,7 @@ export function AddToCartButton({
         </div>
       )}
 
-      {priceSegments.length > 1 ? (
+      {priceSegments.length > 1 && hasMultipleUnitPrices ? (
         <div className="rounded-xl border bg-muted/40 p-3 text-sm">
           <p className="font-semibold">El total combina estos precios:</p>
           {priceSegments.map((segment, index) => (

@@ -41,7 +41,8 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
     )
   ).size;
   const { min: price, max: maximumPrice } = getDisplayPriceRange(product);
-  const hasVariablePrice = maximumPrice > price;
+  const hasVariablePrice =
+    !product.uniformPriceGroup && maximumPrice > price;
   const compareAtPrice = Number(product.compareAtPrice ?? 0);
   const isOffer = compareAtPrice > price;
 

@@ -107,7 +107,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
     (variant) => variant.active !== false && variant.available
   );
   const { min: price, max: maximumPrice } = getProductPriceRange(product);
-  const hasVariablePrice = maximumPrice > price;
+  const hasVariablePrice =
+    !product.uniformPriceGroup && maximumPrice > price;
   const compareAtPrice = Number(product.compareAtPrice ?? 0);
   const isOffer = compareAtPrice > price;
   const productUrl = absoluteUrl(`/uniformes/${product.slug}`);

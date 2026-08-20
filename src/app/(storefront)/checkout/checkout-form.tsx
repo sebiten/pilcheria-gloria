@@ -952,7 +952,9 @@ export function CheckoutForm({
                         key={`${segment.fulfillment}-${segment.unitPrice}-${index}`}
                         className="mt-1 text-xs text-muted-foreground"
                       >
-                        {segment.quantity} × {formatPrice(segment.unitPrice)} ·{" "}
+                        {item.product?.uniformPriceGroup
+                          ? `${segment.quantity} prenda${segment.quantity === 1 ? "" : "s"} · `
+                          : `${segment.quantity} × ${formatPrice(segment.unitPrice)} · `}
                         {segment.fulfillment === "immediate"
                           ? "entrega inmediata"
                           : "preparación en 24–48 h"}

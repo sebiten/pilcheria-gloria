@@ -77,7 +77,7 @@ export async function generateMetadata({
   const promotionTitle =
     "Uniformes para distintas escuelas con $3.000 de descuento";
   const promotionSocialDescription =
-    "Remeras y chombas con precios por talle. Hay más escuelas y opciones disponibles por consulta.";
+    "Remeras y chombas con precio único para todos los talles. Hay más escuelas y opciones disponibles por consulta.";
 
   return {
     title: selectedSchool
@@ -88,7 +88,7 @@ export async function generateMetadata({
         ? promotionTitle
         : "Tienda de uniformes escolares en Ledesma",
     description: hasPromotion
-      ? `${promotionDescription} Remeras y chombas de distintas escuelas, con precios por talle.`
+      ? `${promotionDescription} Remeras y chombas de distintas escuelas, con precio único por tipo de prenda.`
       : SCHOOL_UNIFORMS_DESCRIPTION,
     alternates: { canonical: "/uniformes" },
     robots:
@@ -161,6 +161,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     return filters.every((filter) => searchable.includes(filter));
   });
   const hasPromotion = Boolean(promotion?.available);
+  const remeraPrice = allProducts.find(
+    (product) => product.uniformPriceGroup?.code === "remera"
+  )?.basePrice;
+  const chombaPrice = allProducts.find(
+    (product) => product.uniformPriceGroup?.code === "chomba"
+  )?.basePrice;
   const schoolName = selectedSchool?.name || searchTerm || "__";
   const clearHref = getProductsHref({ promo: params.promo });
   const removeSchoolHref = getProductsHref({
@@ -191,11 +197,22 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     : "Encontrá el uniforme de tu escuela"}
               </h1>
               {!selectedSchool && !searchTerm ? (
-                <ol className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-bold text-gloria-800 sm:mt-4 sm:text-base" aria-label="Cómo comprar">
-                  <li><span className="text-gloria-600">1.</span> Escuela</li>
-                  <li><span className="text-gloria-600">2.</span> Prenda</li>
-                  <li><span className="text-gloria-600">3.</span> Talle</li>
-                </ol>
+                <>
+                  <ol className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-bold text-gloria-800 sm:mt-4 sm:text-base" aria-label="Cómo comprar">
+                    <li><span className="text-gloria-600">1.</span> Escuela</li>
+                    <li><span className="text-gloria-600">2.</span> Prenda</li>
+                    <li><span className="text-gloria-600">3.</span> Talle</li>
+                  </ol>
+                  {remeraPrice && chombaPrice ? (
+                    <p className="mt-3 text-sm font-extrabold text-gloria-950 sm:text-base">
+                      Remeras {formatPrice(remeraPrice)} · Chombas{" "}
+                      {formatPrice(chombaPrice)}
+                      <span className="ml-2 font-semibold text-gloria-700">
+                        Mismo precio en todos los talles.
+                      </span>
+                    </p>
+                  ) : null}
+                </>
               ) : null}
             </div>
             {searchTerm || selectedSchool ? (

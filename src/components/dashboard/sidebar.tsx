@@ -27,6 +27,7 @@ const sidebarItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/dashboard/analytics", icon: BarChart3, label: "Estadísticas" },
   { href: "/dashboard/products", icon: Package, label: "Productos" },
+  { href: "/dashboard/pricing", icon: Tags, label: "Precios" },
   { href: "/dashboard/orders", icon: ShoppingCart, label: "Órdenes" },
   { href: "/dashboard/finance", icon: HandCoins, label: "Inventario y saldos" },
   { href: "/dashboard/categories", icon: FolderTree, label: "Categorías" },
