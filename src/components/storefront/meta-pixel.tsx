@@ -12,6 +12,7 @@ export function MetaPixel({ pixelId }: { pixelId?: string }) {
         {`!function(f,n){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
 n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
 n.push=n;n.loaded=!0;n.version='2.0';n.queue=[]}(window);
+fbq('set','autoConfig',false,${JSON.stringify(pixelId)});
 fbq('init',${JSON.stringify(pixelId)});`}
       </Script>
       <Script
