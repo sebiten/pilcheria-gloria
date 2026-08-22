@@ -56,9 +56,15 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
-  verification: process.env.GOOGLE_SITE_VERIFICATION
-    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
-    : undefined,
+  verification: {
+    ...(process.env.GOOGLE_SITE_VERIFICATION
+      ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+      : {}),
+    other: {
+      "facebook-domain-verification":
+        "189jfuhhet6b520ay4sk6j1uj9mmz1",
+    },
+  },
   openGraph: {
     type: "website",
     locale: "es_AR",
