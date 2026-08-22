@@ -2,6 +2,7 @@ import Script from "next/script";
 import { getStoreSettings } from "@/actions/store-settings";
 import { JsonLd } from "@/components/seo/json-ld";
 import { StorefrontShell } from "@/components/storefront/storefront-shell";
+import { MetaPixel } from "@/components/storefront/meta-pixel";
 import { getStorefrontJsonLd } from "@/lib/seo";
 
 export default async function StorefrontLayout({
@@ -15,6 +16,7 @@ export default async function StorefrontLayout({
     <>
       <JsonLd data={getStorefrontJsonLd(settings)} />
       <StorefrontShell settings={settings}>{children}</StorefrontShell>
+      <MetaPixel pixelId={process.env.NEXT_PUBLIC_META_PIXEL_ID} />
       <Script id="google-analytics" strategy="afterInteractive">
         {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}

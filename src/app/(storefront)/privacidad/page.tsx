@@ -45,13 +45,19 @@ export default async function PrivacyPage() {
           texto escrito en las búsquedas. El navegador conserva un identificador
           aleatorio para reconocer el recorrido entre páginas.
         </p>
+        <p>
+          Cuando una campaña de Meta está activa, el navegador puede usar el
+          píxel de Meta para medir visitas y acciones de compra. Al aprobarse un
+          pago, enviamos a Meta el valor de la compra y datos de contacto
+          transformados mediante hash; no enviamos datos de tarjeta.
+        </p>
       </LegalSection>
       <LegalSection title="Proveedores">
         <p>
           La operación puede involucrar a Mercado Pago para pagos, Supabase
           para infraestructura de datos, Clerk para cuentas de usuario, Vercel
-          para alojamiento y Resend para emails transaccionales cuando esté
-          configurado.
+          para alojamiento, Meta para medición publicitaria y Resend para emails
+          transaccionales cuando esté configurado.
         </p>
       </LegalSection>
       <LegalSection title="Consultas y derechos">

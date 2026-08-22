@@ -173,6 +173,8 @@ export function AddToCartButton({
     trackStorefrontEvent({
       event: "product_view",
       productId: product.id,
+      value: Number(product.basePrice),
+      contentName: product.name,
       dedupe: true,
     });
   }, [product.id]);
@@ -184,6 +186,8 @@ export function AddToCartButton({
       event: "add_to_cart",
       productId: product.id,
       quantity,
+      value: currentPrice,
+      contentName: product.name,
     });
   };
 
@@ -195,6 +199,8 @@ export function AddToCartButton({
       event: "buy_now",
       productId: product.id,
       quantity,
+      value: currentPrice,
+      contentName: product.name,
     });
     router.push("/checkout");
   };

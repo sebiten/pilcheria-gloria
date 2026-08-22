@@ -3,6 +3,7 @@ import "server-only";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getMercadoPagoAccountId } from "@/lib/mercadopago/client";
 import { sendAdminSalePush } from "@/lib/notifications/admin-push";
+import { sendMetaPurchaseEvent } from "@/lib/meta/conversions";
 
 export const ORDER_RESERVATION_MINUTES = 30;
 export const PENDING_PAYMENT_EXTENSION_HOURS = 24;
@@ -124,9 +125,16 @@ export async function applyMercadoPagoPayment(
   }
 
   if (String(data) === "paid") {
-    await sendAdminSalePush(orderId).catch((notificationError) => {
-      console.error("No se pudo enviar el aviso push de la venta:", notificationError);
-    });
+    const [pushResult, metaResult] = await Promise.allSettled([
+      sendAdminSalePush(orderId),
+      sendMetaPurchaseEvent(orderId),
+    ]);
+    if (pushResult.status === "rejected") {
+      console.error("No se pudo enviar el aviso push de la venta:", pushResult.reason);
+    }
+    if (metaResult.status === "rejected") {
+      console.error("No se pudo registrar la compra en Meta:", metaResult.reason);
+    }
   }
 
   return String(data);

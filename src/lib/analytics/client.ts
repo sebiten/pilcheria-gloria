@@ -7,10 +7,13 @@ import type {
   AnalyticsSource,
 } from "@/lib/analytics/types";
 import { ANALYTICS_VERSION } from "@/lib/analytics/types";
+import { trackMetaEvent, type MetaEventParameters } from "@/lib/meta/client";
 
 const SESSION_STORAGE_KEY = "gloria-analytics-session";
 const SOURCE_STORAGE_KEY = "gloria-analytics-source";
 const CAMPAIGN_STORAGE_KEY = "gloria-analytics-campaign";
+const MEDIUM_STORAGE_KEY = "gloria-analytics-medium";
+const CONTENT_STORAGE_KEY = "gloria-analytics-content";
 const LAST_ACTIVITY_STORAGE_KEY = "gloria-analytics-last-activity";
 const EXCLUDED_STORAGE_KEY = "gloria-analytics-excluded";
 const SESSION_TIMEOUT_MS = 30 * 60 * 1_000;
@@ -45,6 +48,8 @@ export function setAnalyticsExcluded(excluded: boolean) {
       window.localStorage.removeItem(SESSION_STORAGE_KEY);
       window.localStorage.removeItem(SOURCE_STORAGE_KEY);
       window.localStorage.removeItem(CAMPAIGN_STORAGE_KEY);
+      window.localStorage.removeItem(MEDIUM_STORAGE_KEY);
+      window.localStorage.removeItem(CONTENT_STORAGE_KEY);
       window.localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY);
     } else {
       window.localStorage.removeItem(EXCLUDED_STORAGE_KEY);
@@ -83,6 +88,8 @@ export function getAnalyticsSessionId() {
     window.localStorage.setItem(LAST_ACTIVITY_STORAGE_KEY, String(now));
     window.localStorage.removeItem(SOURCE_STORAGE_KEY);
     window.localStorage.removeItem(CAMPAIGN_STORAGE_KEY);
+    window.localStorage.removeItem(MEDIUM_STORAGE_KEY);
+    window.localStorage.removeItem(CONTENT_STORAGE_KEY);
     return sessionId;
   } catch {
     return null;
@@ -91,6 +98,23 @@ export function getAnalyticsSessionId() {
 
 function getSource(): AnalyticsSource {
   try {
+    const taggedSource = new URLSearchParams(window.location.search)
+      .get("utm_source")
+      ?.toLocaleLowerCase("es-AR");
+    if (taggedSource) {
+      const explicitSource: AnalyticsSource = taggedSource.includes("whatsapp")
+        ? "whatsapp"
+        : taggedSource === "fb" || taggedSource.includes("facebook")
+          ? "facebook"
+          : taggedSource === "ig" || taggedSource.includes("instagram")
+            ? "instagram"
+            : taggedSource.includes("google")
+              ? "google"
+              : "other";
+      window.localStorage.setItem(SOURCE_STORAGE_KEY, explicitSource);
+      return explicitSource;
+    }
+
     const stored = window.localStorage.getItem(SOURCE_STORAGE_KEY);
     if (
       stored === "direct" ||
@@ -103,19 +127,14 @@ function getSource(): AnalyticsSource {
       return stored;
     }
 
-    const taggedSource = new URLSearchParams(window.location.search)
-      .get("utm_source")
-      ?.toLocaleLowerCase("es-AR");
     const referrer = document.referrer.toLocaleLowerCase("es-AR");
-    const source: AnalyticsSource = taggedSource?.includes("whatsapp")
-      ? "whatsapp"
-      : taggedSource?.includes("facebook") || referrer.includes("facebook")
+    const source: AnalyticsSource = referrer.includes("facebook")
         ? "facebook"
-        : taggedSource?.includes("instagram") || referrer.includes("instagram")
+        : referrer.includes("instagram")
           ? "instagram"
-          : taggedSource?.includes("google") || referrer.includes("google")
+          : referrer.includes("google")
             ? "google"
-            : taggedSource || (referrer && !referrer.includes(window.location.host))
+            : referrer && !referrer.includes(window.location.host)
               ? "other"
               : "direct";
 
@@ -128,9 +147,6 @@ function getSource(): AnalyticsSource {
 
 function getCampaign() {
   try {
-    const stored = window.localStorage.getItem(CAMPAIGN_STORAGE_KEY);
-    if (stored) return stored;
-
     const rawCampaign = new URLSearchParams(window.location.search)
       .get("utm_campaign")
       ?.toLocaleLowerCase("es-AR");
@@ -145,11 +161,42 @@ function getCampaign() {
       window.localStorage.setItem(CAMPAIGN_STORAGE_KEY, campaign);
       return campaign;
     }
+
+    const stored = window.localStorage.getItem(CAMPAIGN_STORAGE_KEY);
+    if (stored) return stored;
   } catch {
     return undefined;
   }
 
   return undefined;
+}
+
+function sanitizeAttribution(value: string | null, maxLength: number) {
+  return value
+    ?.toLocaleLowerCase("es-AR")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, maxLength) || undefined;
+}
+
+function getStoredAttribution(
+  storageKey: string,
+  queryKey: "utm_medium" | "utm_content",
+  maxLength: number
+) {
+  try {
+    const value = sanitizeAttribution(
+      new URLSearchParams(window.location.search).get(queryKey),
+      maxLength
+    );
+    if (value) window.localStorage.setItem(storageKey, value);
+    if (value) return value;
+    return window.localStorage.getItem(storageKey) || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function getDeviceType(): AnalyticsDevice {
@@ -164,8 +211,20 @@ type TrackEventInput = {
   schoolId?: string;
   quantity?: number;
   eventDetail?: AnalyticsEventDetail;
+  value?: number;
+  contentIds?: string[];
+  contentName?: string;
   dedupe?: boolean;
 };
+
+function getMetaEventName(event: ClientAnalyticsEventName) {
+  if (event === "page_view") return "PageView" as const;
+  if (event === "product_view") return "ViewContent" as const;
+  if (event === "add_to_cart" || event === "buy_now") return "AddToCart" as const;
+  if (event === "checkout_view") return "InitiateCheckout" as const;
+  if (event === "checkout_submit") return "AddPaymentInfo" as const;
+  return null;
+}
 
 export function trackStorefrontEvent({
   event,
@@ -173,6 +232,9 @@ export function trackStorefrontEvent({
   schoolId,
   quantity,
   eventDetail,
+  value,
+  contentIds,
+  contentName,
   dedupe = false,
 }: TrackEventInput) {
   const sessionId = getAnalyticsSessionId();
@@ -192,6 +254,24 @@ export function trackStorefrontEvent({
   if (dedupe && now - (recentEvents.get(signature) ?? 0) < 2_000) return;
   if (dedupe) recentEvents.set(signature, now);
 
+  const metaEventName = getMetaEventName(event);
+  if (metaEventName) {
+    const metaParameters: MetaEventParameters = {
+      ...(productId || contentIds?.length
+        ? { content_ids: contentIds?.length ? contentIds : [productId!] }
+        : {}),
+      ...(productId || contentIds?.length ? { content_type: "product" as const } : {}),
+      ...(contentName ? { content_name: contentName } : {}),
+      ...(Number.isFinite(value) ? { value, currency: "ARS" as const } : {}),
+      ...(quantity ? { num_items: quantity } : {}),
+    };
+    trackMetaEvent({
+      eventName: metaEventName,
+      parameters: metaParameters,
+      analyticsSessionId: sessionId,
+    });
+  }
+
   void fetch("/api/analytics", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -204,6 +284,8 @@ export function trackStorefrontEvent({
       quantity,
       analyticsVersion: ANALYTICS_VERSION,
       campaign: getCampaign(),
+      medium: getStoredAttribution(MEDIUM_STORAGE_KEY, "utm_medium", 48),
+      content: getStoredAttribution(CONTENT_STORAGE_KEY, "utm_content", 80),
       eventDetail,
       source: getSource(),
       deviceType: getDeviceType(),

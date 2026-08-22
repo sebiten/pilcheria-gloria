@@ -397,6 +397,8 @@ export const storefrontAnalyticsEvents = pgTable("storefront_analytics_events", 
   }),
   analyticsVersion: smallint("analytics_version").notNull().default(1),
   campaign: text("campaign"),
+  medium: text("medium"),
+  content: text("content"),
   eventDetail: text("event_detail"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

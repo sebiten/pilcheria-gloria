@@ -23,6 +23,18 @@ const analyticsEventSchema = z.object({
     .max(64)
     .regex(/^[a-z0-9_-]+$/)
     .optional(),
+  medium: z
+    .string()
+    .trim()
+    .max(48)
+    .regex(/^[a-z0-9_-]+$/)
+    .optional(),
+  content: z
+    .string()
+    .trim()
+    .max(80)
+    .regex(/^[a-z0-9_-]+$/)
+    .optional(),
   eventDetail: z.enum(ANALYTICS_EVENT_DETAILS).optional(),
 }).superRefine((event, context) => {
   if (event.eventDetail && event.event !== "checkout_validation_error") {
@@ -104,6 +116,8 @@ export async function POST(request: Request) {
         quantity: event.quantity ?? null,
         analytics_version: event.analyticsVersion,
         campaign: event.campaign ?? null,
+        medium: event.medium ?? null,
+        content: event.content ?? null,
         event_detail: event.eventDetail ?? null,
       });
 

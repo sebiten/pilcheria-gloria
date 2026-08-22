@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   Smartphone,
   Users,
+  RadioTower,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { requireAdmin } from "@/actions/auth";
@@ -130,6 +131,8 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const requestedDays = Number(params.days || 30);
   const days = [7, 30, 90].includes(requestedDays) ? requestedDays : 30;
   const data = await getAnalyticsDashboard(days);
+  const metaPixelConfigured = Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID);
+  const metaCapiConfigured = Boolean(process.env.META_CONVERSIONS_API_TOKEN);
   const { metrics } = data;
   const funnel = [
     { label: "Entraron al catálogo", value: metrics.catalog_sessions, icon: Users },
@@ -184,6 +187,33 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       </header>
 
       <AnalyticsDeviceControl />
+
+      <section
+        className={`flex flex-col gap-3 rounded-xl border p-4 text-sm sm:flex-row sm:items-center sm:justify-between ${
+          metaPixelConfigured && metaCapiConfigured
+            ? "border-primary/25 bg-primary/5"
+            : "border-amber-300 bg-amber-50 text-amber-950"
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <RadioTower className="mt-0.5 size-5 shrink-0" />
+          <div>
+            <p className="font-extrabold">
+              {metaPixelConfigured && metaCapiConfigured
+                ? "Meta Pixel y Conversiones API activos"
+                : "Falta conectar la medición de Meta"}
+            </p>
+            <p className="mt-1 leading-5 opacity-75">
+              {metaPixelConfigured && metaCapiConfigured
+                ? "Meta recibe ficha, carrito, checkout y pagos aprobados con deduplicación."
+                : "La web ya está preparada. Agregá el Pixel ID y el token de Conversiones API en Vercel."}
+            </p>
+          </div>
+        </div>
+        <span className="w-fit rounded-full border border-current/20 px-3 py-1 text-xs font-black uppercase tracking-wide">
+          {metaPixelConfigured && metaCapiConfigured ? "Conectado" : "Pendiente"}
+        </span>
+      </section>
 
       {data.sample_warning ? (
         <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-950">
@@ -356,7 +386,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-[0.7fr_1.3fr]">
         <Distribution
           title="Errores del checkout"
           items={data.checkout_errors.map((item) => ({
@@ -366,15 +396,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           max={Math.max(1, ...data.checkout_errors.map((item) => item.sessions))}
           icon={CreditCard}
         />
-        <Distribution
-          title="Campañas"
-          items={data.campaigns.map((item) => ({
-            label: item.campaign,
-            value: item.sessions,
-          }))}
-          max={Math.max(1, ...data.campaigns.map((item) => item.sessions))}
-          icon={BarChart3}
-        />
+        <CampaignAttribution campaigns={data.campaigns} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -392,6 +414,72 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </Link>
       </section>
     </div>
+  );
+}
+
+function CampaignAttribution({
+  campaigns,
+}: {
+  campaigns: Awaited<ReturnType<typeof getAnalyticsDashboard>>["campaigns"];
+}) {
+  return (
+    <Card className="min-w-0">
+      <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
+        <CardTitle className="flex items-center gap-2">
+          <BarChart3 className="size-5 text-primary" /> Campañas y anuncios
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Usá un utm_content distinto en cada imagen o video.
+        </p>
+      </CardHeader>
+      <CardContent className="p-4 sm:p-6">
+        {campaigns.length ? (
+          <div className="space-y-3">
+            {campaigns.map((campaign) => (
+              <article
+                key={`${campaign.campaign}:${campaign.medium ?? ""}:${campaign.content ?? ""}`}
+                className="rounded-xl border border-border p-3 sm:p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-extrabold">{campaign.campaign}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {campaign.content || "Anuncio sin identificar"}
+                      {campaign.medium ? ` · ${campaign.medium}` : ""}
+                    </p>
+                  </div>
+                  <strong className="text-sm text-primary">
+                    {formatPrice(Number(campaign.revenue))}
+                  </strong>
+                </div>
+                <div className="mt-3 grid grid-cols-4 gap-2 text-center sm:grid-cols-7">
+                  {[
+                    ["Catálogo", campaign.catalog_sessions],
+                    ["Prenda", campaign.product_viewers],
+                    ["Talle", campaign.size_selections],
+                    ["Compra", campaign.purchase_intents],
+                    ["Checkout", campaign.checkout_sessions],
+                    ["M. Pago", campaign.payment_redirects],
+                    ["Pagos", campaign.payment_approved],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="rounded-lg bg-muted/60 px-1 py-2">
+                      <strong className="block text-base">{value}</strong>
+                      <span className="text-[0.62rem] font-semibold text-muted-foreground">
+                        {label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Todavía no hay visitas con utm_campaign.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

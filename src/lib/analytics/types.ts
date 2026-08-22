@@ -1,4 +1,4 @@
-export const ANALYTICS_VERSION = 4;
+export const ANALYTICS_VERSION = 5;
 
 export const CLIENT_ANALYTICS_EVENT_NAMES = [
   "page_view",
@@ -90,7 +90,16 @@ export type AnalyticsDashboardData = {
   }>;
   campaigns: Array<{
     campaign: string;
-    sessions: number;
+    medium: string | null;
+    content: string | null;
+    catalog_sessions: number;
+    product_viewers: number;
+    size_selections: number;
+    purchase_intents: number;
+    checkout_sessions: number;
+    payment_redirects: number;
+    payment_approved: number;
+    revenue: number;
   }>;
   daily: Array<{
     date: string;

@@ -389,6 +389,8 @@ export function CheckoutForm({
       trackStorefrontEvent({
         event: "checkout_submit",
         quantity: getCartItemCount(items),
+        value: total,
+        contentIds: Array.from(new Set(items.map((item) => item.product_id))),
       });
 
       if (

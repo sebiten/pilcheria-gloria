@@ -15,6 +15,7 @@
     "images:uniforms": "node scripts/prepare-uniform-images.mts",
     "images:uniforms:publish": "node --env-file=.env.local scripts/publish-uniform-images.mts",
     "images:social-og": "node scripts/generate-social-og.mjs",
+    "images:meta-ads": "node scripts/generate-meta-ad-creatives.mjs",
     "catalog:uniforms:sync": "node --env-file=.env.local scripts/sync-school-uniform-catalog.mts",
     "cron:configure": "node scripts/configure-cron-jobs.mts",
     "db:seed:demo": "node --env-file=.env.local scripts/seed-demo-catalog.mts",

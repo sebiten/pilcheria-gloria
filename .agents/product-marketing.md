@@ -65,3 +65,5 @@ Español argentino simple, cercano y respetuoso. Frases cortas. Verbos concretos
 La analítica comparable empieza en la versión 3 y toma el catálogo como inicio del embudo. Se miden por separado: ficha, talle, acción de compra, checkout, clic para pagar, redirección, aprobación de Mercado Pago y confirmación. El cuello observado está entre elegir talle, decidir comprar y completar el checkout.
 
 Reevaluar después de 100 personas que abran fichas o 30 días. Buscar mantener ficha → talle por encima del 50% y llevar ficha → intención de compra al menos al 20%, sin tratarlo como garantía.
+
+La versión 5 agrega atribución por `utm_campaign`, `utm_medium` y `utm_content`, además de Meta Pixel y Conversiones API cuando se configuran sus credenciales. `Purchase` se envía desde el servidor solamente después de la aprobación de Mercado Pago.

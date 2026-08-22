@@ -62,4 +62,15 @@ if (isProductionDeployment) {
       "Clerk development habilitado temporalmente para esta demo. No usar para ventas reales."
     );
   }
+
+  const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim();
+  const metaToken = process.env.META_CONVERSIONS_API_TOKEN?.trim();
+  if (Boolean(metaPixelId) !== Boolean(metaToken)) {
+    errors.push(
+      "NEXT_PUBLIC_META_PIXEL_ID y META_CONVERSIONS_API_TOKEN deben configurarse juntos"
+    );
+  }
+  if (metaPixelId && !/^\d{5,32}$/.test(metaPixelId)) {
+    errors.push("NEXT_PUBLIC_META_PIXEL_ID no tiene un formato válido");
+  }
 }
