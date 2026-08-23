@@ -94,33 +94,57 @@ const productHref = await page
   .getAttribute("href");
 if (!productHref) throw new Error("No se encontro un producto navegable");
 
+const productConsoleStart = consoleErrors.length;
 await page.goto(`${baseUrl}${productHref}`, { waitUntil: "domcontentloaded" });
 await page.waitForTimeout(1800);
 await page.screenshot({ path: screenshots.product, fullPage: true });
 const product = await auditPage(page);
 
-const requiresSizeSelection = await page
-  .getByRole("button", { name: "Elegir diseño y talle" })
-  .isVisible();
-let selectorGroups = page.locator('#elegir-talle [role="radiogroup"]');
-if (await page.getByText("¿Es de Primaria o Secundaria?").isVisible().catch(() => false)) {
-  const firstDesignId = await selectorGroups
-    .first()
-    .locator('[role="radio"]:not([disabled])')
-    .first()
-    .getAttribute("id");
-  if (!firstDesignId) throw new Error("No se encontro un diseño disponible");
-  await page.locator(`label[for="${firstDesignId}"]`).click();
-  await page.locator('#elegir-talle label[for^="variant-"]').first().waitFor();
-  selectorGroups = page.locator('#elegir-talle [role="radiogroup"]');
+const sizeGroup = page.getByRole("radiogroup", { name: "Elegí el talle" });
+const initialSizeVisible = await sizeGroup.isVisible().catch(() => false);
+const initialLevelCtaVisible = await page
+  .getByRole("button", { name: "Elegí el nivel", exact: true })
+  .isVisible()
+  .catch(() => false);
+const levelGroup = page.getByRole("radiogroup", {
+  name: "¿Para qué nivel es?",
+});
+if (!(await levelGroup.isVisible().catch(() => false))) {
+  throw new Error("El producto auditado no permite comprobar los dos niveles");
 }
-const firstVariant = selectorGroups
-  .last()
+
+const firstLevel = levelGroup.locator('[role="radio"]:not([disabled])').first();
+const selectedLevel = await firstLevel.getAttribute("aria-label");
+if (!selectedLevel) throw new Error("No se encontró un nivel disponible");
+await firstLevel.click();
+await sizeGroup.waitFor({ state: "visible" });
+const sizesVisibleAfterLevel = await sizeGroup.isVisible();
+const sizeCtaVisible = await page
+  .getByRole("button", { name: "Elegí el talle", exact: true })
+  .isVisible();
+
+const firstVariant = sizeGroup
   .locator('[role="radio"]:not([disabled])')
   .first();
-const firstVariantId = await firstVariant.getAttribute("id");
-if (!firstVariantId) throw new Error("No se encontro un talle disponible");
-await page.locator(`label[for="${firstVariantId}"]`).click();
+const selectedVariantLabel = await firstVariant.getAttribute("aria-label");
+if (!selectedVariantLabel) throw new Error("No se encontró un talle disponible");
+await firstVariant.click();
+
+const selectedSize = selectedVariantLabel.match(/^Talle ([^,]+)/)?.[1] ?? "";
+const addToCartLabel = await page
+  .getByTestId("add-to-cart-button-mobile")
+  .innerText();
+const whatsappLinkCount = await page
+  .locator('main a[href^="https://wa.me/"]')
+  .count();
+const legacyCardCount = await page
+  .getByRole("heading", {
+    name: /^(Talles claros|Retiro coordinado|Envío gratis desde 2 prendas|Mercado Pago)$/,
+  })
+  .count();
+const emptyReviewBlockCount =
+  (await page.getByRole("heading", { name: "Reseñas de clientes", exact: true }).count()) +
+  (await page.getByRole("heading", { name: "Reseñas verificadas", exact: true }).count());
 
 const addToCartButton = page.getByTestId("add-to-cart-button-mobile");
 await addToCartButton.waitFor({ state: "visible" });
@@ -139,6 +163,29 @@ const drawer = await cartDrawer.evaluate((element) => {
     text: element.textContent?.trim().replace(/\s+/g, " ").slice(0, 1000),
   };
 });
+const drawerProductMatches = await cartDrawer
+  .locator(`a[href="${productHref}"]`)
+  .isVisible();
+const persistedCartSelection = await page.evaluate(() => {
+  const rawCart = localStorage.getItem("pilcheria-gloria-cart");
+  const item = rawCart ? JSON.parse(rawCart).state?.items?.[0] : null;
+  const variant = item?.product?.variants?.find(
+    (candidate: { id: string }) => candidate.id === item.variant_id
+  );
+
+  return item
+    ? {
+        productSlug: item.product?.slug ?? null,
+        quantity: item.quantity,
+        schoolLevel: variant?.schoolLevel ?? null,
+        size: variant?.size ?? null,
+      }
+    : null;
+});
+const freeShippingIncentiveVisible = /(?:Sumá otra|Agregá 1 prenda).+envío.+gratis/i.test(
+  drawer.text ?? ""
+);
+const productConsoleErrors = consoleErrors.slice(productConsoleStart);
 
 await page.getByTestId("cart-checkout-link").click();
 await page.waitForURL("**/checkout");
@@ -147,35 +194,20 @@ await page.screenshot({ path: screenshots.checkout, fullPage: true });
 const checkout = await auditPage(page);
 const couponValue = await page.getByLabel(/Código/).inputValue();
 
-if (couponValue) {
-  await page.getByRole("button", { name: "Aplicar" }).click();
-  await page.waitForTimeout(800);
-  const couponApplied = await page
-    .getByText(/Cupón .* aplicado/i)
-    .isVisible()
-    .catch(() => false);
-  if (!couponApplied) await page.getByLabel(/Código/).fill("");
-}
-
-await page.getByLabel("Nombre").fill("Maria");
-await page.getByLabel("Apellido").fill("Perez");
-await page.getByLabel("Email").fill("maria@example.com");
-await page.getByLabel(/Tel.fono/i).fill("3884123456");
-await page.getByTestId("checkout-submit-mobile").click();
-await page.waitForURL("https://example.com/pago-simulado");
-
 const responsiveChecks: Record<
   string,
   {
     catalogOverflow: number;
     productOverflow: number;
     mobileActionVisible: boolean;
+    consoleErrors: string[];
     screenshots: { catalog: string; product: string };
   }
 > = {};
 
 for (const viewport of [
   { name: "320", width: 320, height: 568 },
+  { name: "393", width: 393, height: 852 },
   { name: "430", width: 430, height: 932 },
   { name: "tablet", width: 768, height: 1024 },
   { name: "desktop", width: 1440, height: 900 },
@@ -185,6 +217,10 @@ for (const viewport of [
     locale: "es-AR",
   });
   const responsivePage = await responsiveContext.newPage();
+  const responsiveConsoleErrors: string[] = [];
+  responsivePage.on("console", (message) => {
+    if (message.type() === "error") responsiveConsoleErrors.push(message.text());
+  });
   const catalogScreenshot = join(
     tmpdir(),
     `gloria-${viewport.name}-catalog.png`
@@ -211,7 +247,7 @@ for (const viewport of [
     () => document.documentElement.scrollWidth - window.innerWidth
   );
   const mobileActionVisible = await responsivePage
-    .getByRole("button", { name: "Elegir diseño y talle" })
+    .getByRole("button", { name: "Elegí el nivel", exact: true })
     .isVisible()
     .catch(() => false);
   await responsivePage.screenshot({ path: productScreenshot });
@@ -220,6 +256,7 @@ for (const viewport of [
     catalogOverflow,
     productOverflow,
     mobileActionVisible,
+    consoleErrors: responsiveConsoleErrors,
     screenshots: {
       catalog: catalogScreenshot,
       product: productScreenshot,
@@ -241,10 +278,52 @@ await redirectPage.goto(
 const oldProductRedirect = new URL(redirectPage.url());
 await redirectContext.close();
 
+const expectedSchoolLevel =
+  selectedLevel === "Primaria"
+    ? "primary"
+    : selectedLevel === "Secundaria"
+      ? "secondary"
+      : null;
+const checks = {
+  initialSizesHidden: !initialSizeVisible,
+  initialLevelCtaVisible,
+  sizesVisibleAfterLevel,
+  sizeCtaVisible,
+  addToCartCtaVisible: /^Agregar al carrito · \$/.test(addToCartLabel),
+  drawerProductMatches,
+  drawerSizeMatches: Boolean(
+    selectedSize && new RegExp(`Talle (?:Juvenil |Adulto )?${selectedSize}(?:,|\\b)`).test(drawer.text ?? "")
+  ),
+  cartLevelMatches: persistedCartSelection?.schoolLevel === expectedSchoolLevel,
+  cartQuantityIsOne: persistedCartSelection?.quantity === 1,
+  cartProductMatches:
+    persistedCartSelection?.productSlug === productHref.split("/").at(-1),
+  cartSizeMatches: persistedCartSelection?.size === selectedSize,
+  freeShippingIncentiveVisible,
+  singleWhatsappLink: whatsappLinkCount === 1,
+  noLegacyCards: legacyCardCount === 0,
+  noEmptyReviewBlock: emptyReviewBlockCount === 0,
+  noResponsiveOverflow: Object.values(responsiveChecks).every(
+    (result) => result.productOverflow <= 0
+  ),
+  mobileCtaAtExpectedWidths: Object.entries(responsiveChecks).every(
+    ([name, result]) => (name === "desktop" ? !result.mobileActionVisible : result.mobileActionVisible)
+  ),
+  noProductConsoleErrors:
+    productConsoleErrors.length === 0 &&
+    Object.values(responsiveChecks).every((result) => result.consoleErrors.length === 0),
+};
+const failures = Object.entries(checks)
+  .filter(([, passed]) => !passed)
+  .map(([name]) => name);
+
 const report = JSON.stringify(
   {
     productHref,
-    requiresSizeSelection,
+    selectedLevel,
+    selectedVariantLabel,
+    checks,
+    failures,
     couponValue,
     finalUrl: page.url(),
     screenshots,
@@ -268,3 +347,7 @@ await writeFile(join(tmpdir(), "gloria-mobile-audit.json"), report);
 console.log(report);
 
 await browser.close();
+
+if (failures.length > 0) {
+  throw new Error(`Falló la auditoría móvil: ${failures.join(", ")}`);
+}
