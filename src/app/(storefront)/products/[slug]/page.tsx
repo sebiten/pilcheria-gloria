@@ -4,11 +4,6 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
-  CreditCard,
-  MapPin,
-  PackageCheck,
-  Shirt,
-  Store,
 } from "lucide-react";
 import { getProductBySlug } from "@/actions/products";
 import { getStoreSettings } from "@/actions/store-settings";
@@ -19,8 +14,6 @@ import {
   absoluteUrl,
   SITE_LOCALITY,
   SITE_NAME,
-  STORE_LOCATION_ADDRESS,
-  STORE_LOCATION_REFERENCE,
 } from "@/lib/site";
 import { sanitizeStorefrontProduct } from "@/lib/inventory";
 import {
@@ -112,41 +105,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const isOffer = compareAtPrice > price;
   const productUrl = absoluteUrl(`/uniformes/${product.slug}`);
   const images = product.images.map((image) => image.url);
-  const freeLocalDelivery =
-    settings.local_delivery_enabled &&
-    Number(settings.local_delivery_cost) === 0;
-  const fulfillmentBenefits = [
-    {
-      icon: Shirt,
-      title: "Talles claros",
-      text: "Elegí el diseño y el talle antes de comprar.",
-    },
-    ...(settings.pickup_enabled
-      ? [
-          {
-            icon: MapPin,
-            title: "Retiro coordinado",
-            text: settings.pickup_instructions,
-          },
-        ]
-      : []),
-    ...(settings.local_delivery_enabled
-      ? [
-          {
-            icon: PackageCheck,
-            title: freeLocalDelivery
-              ? "Envío gratis desde 2 prendas"
-              : "Entrega local desde 2 prendas",
-            text: "Disponible en Ledesma y localidades cercanas.",
-          },
-        ]
-      : []),
-    {
-      icon: CreditCard,
-      title: "Mercado Pago",
-      text: "Pago online procesado de forma segura.",
-    },
-  ];
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -271,58 +229,69 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   whatsappPhone={settings.whatsapp_phone}
                   productUrl={productUrl}
                 />
-                <div className="mt-5 space-y-3 border-t border-dashed border-gloria-200 pt-4 text-sm leading-5 text-gloria-900">
-                  <p className="flex items-start gap-2">
-                    <Store className="mt-0.5 size-4 shrink-0 text-gloria-700" />
-                    <span>
-                      <strong>Pilchería Gloria</strong> · {STORE_LOCATION_ADDRESS}. {STORE_LOCATION_REFERENCE}.
-                    </span>
-                  </p>
-                  {settings.pickup_enabled ? (
-                    <p className="flex items-start gap-2">
-                      <MapPin className="mt-0.5 size-4 shrink-0 text-gloria-700" />
-                      <span>
-                        Retiro de compras online coordinado en {settings.address_line}.
-                      </span>
-                    </p>
-                  ) : null}
-                </div>
               </div>
             </div>
           </div>
 
           <section className="mt-8 grid gap-6 border-t border-border pt-7 lg:grid-cols-[1fr_auto] lg:items-start">
-            <div className="max-w-2xl">
-              <h2 className="text-lg font-extrabold text-gloria-950">Sobre esta prenda</h2>
-              <p className="mt-2 leading-7 text-muted-foreground">
-                {product.description || "Consultá los talles y elegí la opción que necesitás."}
-              </p>
+            <div className="max-w-2xl space-y-2">
+              <details className="rounded-xl border border-border bg-white px-4 py-3">
+                <summary className="min-h-8 cursor-pointer font-bold text-gloria-950">
+                  Detalles de la prenda
+                </summary>
+                <p className="pt-2 leading-7 text-muted-foreground">
+                  {product.description || "Consultá los talles y elegí la opción que necesitás."}
+                </p>
+              </details>
+
+              <details className="rounded-xl border border-border bg-white px-4 py-3">
+                <summary className="min-h-8 cursor-pointer font-bold text-gloria-950">
+                  Envío y retiro
+                </summary>
+                <div className="space-y-3 pt-2 text-sm leading-6 text-muted-foreground">
+                  {settings.pickup_enabled ? (
+                    <div>
+                      <p className="font-semibold text-foreground">Retiro coordinado</p>
+                      <p>Retiro de compras online en {settings.address_line}.</p>
+                      <p>{settings.pickup_instructions}</p>
+                    </div>
+                  ) : null}
+                  {settings.local_delivery_enabled ? (
+                    <div>
+                      <p className="font-semibold text-foreground">Entrega local</p>
+                      <p>
+                        Disponible en Ledesma y localidades cercanas.
+                        {Number(settings.local_delivery_cost) === 0
+                          ? " Sin costo desde 2 prendas."
+                          : ` Costo: ${formatPrice(settings.local_delivery_cost)}.`}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </details>
+
+              <details className="rounded-xl border border-border bg-white px-4 py-3">
+                <summary className="min-h-8 cursor-pointer font-bold text-gloria-950">
+                  Cambios
+                </summary>
+                <p className="pt-2 text-sm leading-6 text-muted-foreground">
+                  Consultá las condiciones y los pasos en nuestra{" "}
+                  <Link
+                    href="/cambios-y-devoluciones"
+                    className="font-semibold text-foreground underline underline-offset-4"
+                  >
+                    política de cambios y devoluciones
+                  </Link>
+                  .
+                </p>
+              </details>
+
               <div className="mt-4">
                 <ProductReviewSummary productId={product.id} />
               </div>
             </div>
             <ProductShareActions title={product.name} url={productUrl} />
           </section>
-        </div>
-      </section>
-
-      <section className="border-b border-border bg-gloria-50 py-10">
-        <div className="container mx-auto grid grid-cols-2 gap-3 px-4 lg:grid-cols-4">
-          {fulfillmentBenefits.map((benefit) => {
-            const Icon = benefit.icon;
-            return (
-              <article
-                key={benefit.title}
-                className="rounded-2xl border border-gloria-200 bg-white p-4 sm:p-5"
-              >
-                <Icon className="size-5 text-gloria-700" />
-                <h2 className="mt-4 font-bold text-gloria-950">{benefit.title}</h2>
-                <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground sm:text-sm">
-                  {benefit.text}
-                </p>
-              </article>
-            );
-          })}
         </div>
       </section>
 
