@@ -47,9 +47,7 @@ export async function ProductReviews({
 }) {
   const reviews = await getProductReviews(productId);
 
-  if (reviews.length === 0) {
-    return <ReviewPanel productId={productId} productSlug={productSlug} />;
-  }
+  if (reviews.length === 0) return null;
 
   return (
     <section className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">

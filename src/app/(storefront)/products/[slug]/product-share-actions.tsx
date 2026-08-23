@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Share2 } from "lucide-react";
+import { Check, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function ProductShareActions({
@@ -33,29 +33,18 @@ export function ProductShareActions({
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        className="min-h-11 rounded-full"
-        onClick={shareProduct}
-      >
+    <Button
+      type="button"
+      variant="ghost"
+      className="min-h-11 rounded-full text-muted-foreground"
+      onClick={shareProduct}
+    >
+      {copied ? (
+        <Check className="mr-2 size-4 text-green-700" />
+      ) : (
         <Share2 className="mr-2 size-4" />
-        Compartir
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        className="min-h-11 rounded-full"
-        onClick={copyLink}
-      >
-        {copied ? (
-          <Check className="mr-2 size-4 text-green-700" />
-        ) : (
-          <Copy className="mr-2 size-4" />
-        )}
-        {copied ? "Enlace copiado" : "Copiar enlace"}
-      </Button>
-    </div>
+      )}
+      {copied ? "Enlace copiado" : "Compartir"}
+    </Button>
   );
 }

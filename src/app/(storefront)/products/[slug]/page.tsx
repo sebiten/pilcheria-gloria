@@ -233,7 +233,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </div>
           </div>
 
-          <section className="mt-8 grid gap-6 border-t border-border pt-7 lg:grid-cols-[1fr_auto] lg:items-start">
+          <section className="mt-8 border-t border-border pt-7">
             <div className="max-w-2xl space-y-2">
               <details className="rounded-xl border border-border bg-white px-4 py-3">
                 <summary className="min-h-8 cursor-pointer font-bold text-gloria-950">
@@ -289,8 +289,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
               <div className="mt-4">
                 <ProductReviewSummary productId={product.id} />
               </div>
+              <div className="pt-2">
+                <ProductShareActions title={product.name} url={productUrl} />
+              </div>
             </div>
-            <ProductShareActions title={product.name} url={productUrl} />
           </section>
         </div>
       </section>
