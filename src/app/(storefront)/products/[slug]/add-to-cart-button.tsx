@@ -121,6 +121,9 @@ export function AddToCartButton({
   const currentPrice = selectedVariant
     ? getVariantQuantityTotal(selectedVariant, quantity)
     : Number(product.basePrice) * quantity;
+  const mobilePrice = selectedVariant
+    ? getVariantQuantityTotal(selectedVariant, 1)
+    : Number(product.basePrice);
   const priceSegments = selectedVariant
     ? getVariantPricingSegments(selectedVariant, quantity).segments
     : [];
@@ -187,6 +190,18 @@ export function AddToCartButton({
       productId: product.id,
       quantity,
       value: currentPrice,
+      contentName: product.name,
+    });
+  };
+
+  const handleMobileAddToCart = () => {
+    if (!selectedVariant) return;
+    addItem(product, selectedVariant.id, 1);
+    trackStorefrontEvent({
+      event: "add_to_cart",
+      productId: product.id,
+      quantity: 1,
+      value: mobilePrice,
       contentName: product.name,
     });
   };
@@ -380,7 +395,7 @@ export function AddToCartButton({
       ) : null}
 
       {canPurchase ? (
-        <div className="flex items-center gap-4">
+        <div className="hidden items-center gap-4 lg:flex">
           <Label className="text-base font-semibold">Cantidad</Label>
           <div className="flex items-center gap-2">
             <Button
@@ -504,39 +519,20 @@ export function AddToCartButton({
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gloria-200 bg-background/98 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-18px_45px_-28px_oklch(0.2_0.045_136/0.55)] backdrop-blur lg:hidden">
           <div className="mx-auto max-w-md">
             {selectedVariant ? (
-              <>
-                <div className="mb-2 flex items-center justify-between gap-3 px-1 text-sm">
-                  <span className="truncate font-bold">
-                    {formatStorefrontVariantSize(selectedVariant)} · {quantity} prenda{quantity === 1 ? "" : "s"}
-                  </span>
-                  <span className="shrink-0 font-black">{formatPrice(currentPrice)}</span>
-                </div>
-                 <div className="space-y-2">
-                  <Button
-                    className="min-h-12 w-full px-3 text-sm font-extrabold"
-                    onClick={handleBuyNow}
-                    disabled={isBuyingNow}
-                  >
-                    {isBuyingNow ? "Abriendo…" : "Comprar ahora"}
-                    <ArrowRight className="ml-1 size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="min-h-11 w-full px-3 text-sm font-bold text-gloria-800"
-                    data-testid="add-to-cart-button-mobile"
-                    onClick={handleAddToCart}
-                  >
-                    <ShoppingBag className="mr-1 size-4" />
-                    Agregar al carrito para seguir eligiendo
-                  </Button>
-                </div>
-              </>
+              <Button
+                className="min-h-12 w-full px-3 text-base font-extrabold"
+                data-testid="add-to-cart-button-mobile"
+                onClick={handleMobileAddToCart}
+              >
+                <ShoppingBag className="mr-1 size-4" />
+                Agregar al carrito · {formatPrice(mobilePrice)}
+              </Button>
             ) : (
               <Button
                 className="min-h-12 w-full justify-between px-5 text-base font-extrabold"
                 onClick={scrollToSelector}
               >
-                Elegir diseño y talle
+                {designSelected ? "Elegí el talle" : "Elegí el nivel"}
                 <ArrowRight className="size-4" />
               </Button>
             )}
