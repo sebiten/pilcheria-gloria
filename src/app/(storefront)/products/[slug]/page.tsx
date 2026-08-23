@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   CreditCard,
   MapPin,
-  MessageCircle,
   PackageCheck,
   Shirt,
   Store,
@@ -331,28 +330,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <ProductReviews productId={product.id} productSlug={product.slug} />
       </section>
 
-      {settings.whatsapp_phone ? (
-        <section className="bg-gloria-950 py-12 text-white">
-          <div className="container mx-auto flex flex-col gap-5 px-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="font-display text-3xl">¿Tenés dudas con el talle?</p>
-              <p className="mt-2 text-white/65">
-                Consultanos antes de comprar y te ayudamos.
-              </p>
-            </div>
-            <Link
-              href={`https://wa.me/${settings.whatsapp_phone.replace(/\D/g, "")}?text=${encodeURIComponent(
-                `Hola, quiero consultar por ${product.name}. ${productUrl}`
-              )}`}
-              target="_blank"
-              className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 font-bold text-gloria-950"
-            >
-              <MessageCircle className="mr-2 size-5" />
-              Consultar por WhatsApp
-            </Link>
-          </div>
-        </section>
-      ) : null}
     </main>
   );
 }

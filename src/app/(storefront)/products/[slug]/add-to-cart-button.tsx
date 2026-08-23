@@ -295,6 +295,27 @@ export function AddToCartButton({
                   </p>
                 </div>
               </details>
+              {whatsappUrl ? (
+                <Button
+                  variant="link"
+                  className="mb-3 h-auto min-h-11 w-full justify-start whitespace-normal px-0 text-left text-sm font-bold"
+                  asChild
+                >
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() =>
+                      trackStorefrontEvent({
+                        event: "whatsapp_click",
+                        productId: product.id,
+                      })
+                    }
+                  >
+                    ¿No sabés qué talle elegir? Te ayudamos por WhatsApp
+                  </a>
+                </Button>
+              ) : null}
               <RadioGroup
                 aria-labelledby={sizeGroupLabelId}
                 value={selectedVariant?.id ?? ""}
@@ -486,14 +507,14 @@ export function AddToCartButton({
           </li>
           <li className="flex items-center gap-2">
             <Truck className="size-4 shrink-0 text-gloria-700" />
-            Retiro coordinado o envío gratis desde 2 prendas
+            Envío gratis desde 2 prendas
           </li>
         </ul>
       ) : null}
 
-      {whatsappUrl ? (
+      {whatsappUrl && !hasPurchasableVariants ? (
         <Button
-          variant={hasPurchasableVariants ? "outline" : "default"}
+          variant="default"
           className="min-h-12 w-full text-base"
           asChild
         >
@@ -508,9 +529,7 @@ export function AddToCartButton({
               })
             }
           >
-            {hasPurchasableVariants
-              ? "¿No encontrás tu talle? Consultanos"
-              : "Consultar disponibilidad por WhatsApp"}
+            Consultar disponibilidad por WhatsApp
           </a>
         </Button>
       ) : null}
