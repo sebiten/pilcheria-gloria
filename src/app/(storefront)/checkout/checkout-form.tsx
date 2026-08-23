@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -77,6 +78,36 @@ type CheckoutFieldName =
   | "couponCode";
 
 type CheckoutFieldErrors = Partial<Record<CheckoutFieldName, string>>;
+
+function MercadoPagoButtonContent({
+  isProcessing,
+  compact = false,
+}: {
+  isProcessing: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+        <Image
+          src="/payment-methods/mercadopago.svg"
+          alt=""
+          width={24}
+          height={17}
+          className="h-auto w-6"
+          aria-hidden="true"
+        />
+      </span>
+      <span>
+        {isProcessing
+          ? "Abriendo Mercado Pago…"
+          : compact
+            ? "Pagar con Mercado Pago"
+            : "Ir a pagar con Mercado Pago"}
+      </span>
+    </>
+  );
+}
 
 function getDefaultAddress(addresses: Address[]) {
   return addresses.find((address) => address.is_default) || addresses[0] || null;
@@ -1000,8 +1031,8 @@ export function CheckoutForm({
                 Te confirmamos el pedido por WhatsApp
               </li>
             </ul>
-            <Button className="hidden min-h-14 w-full text-base font-bold lg:flex" size="lg" type="submit" form={formId} data-testid="checkout-submit" onClick={handleCheckoutCtaClick} disabled={isProcessing || !hasAvailableShippingMethod}>
-              {isProcessing ? "Abriendo Mercado Pago..." : "Ir a pagar con Mercado Pago"}
+            <Button className="hidden min-h-14 w-full rounded-xl border border-[#0089c7] bg-[#009ee3] px-5 text-base font-extrabold text-white shadow-[0_8px_20px_-10px_rgba(0,158,227,0.9)] hover:bg-[#008fce] focus-visible:ring-2 focus-visible:ring-[#009ee3] focus-visible:ring-offset-2 lg:flex" size="lg" type="submit" form={formId} data-testid="checkout-submit" onClick={handleCheckoutCtaClick} disabled={isProcessing || !hasAvailableShippingMethod}>
+              <MercadoPagoButtonContent isProcessing={isProcessing} />
             </Button>
             <PaymentConfidence amount={total} compact />
             <p className="text-xs leading-5 text-muted-foreground">
@@ -1021,19 +1052,19 @@ export function CheckoutForm({
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gloria-200 bg-background/98 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-18px_45px_-28px_oklch(0.2_0.045_136/0.55)] backdrop-blur lg:hidden">
         <div className="mx-auto flex max-w-md items-center gap-3">
-          <div className="min-w-0 flex-1">
+          <div className="shrink-0">
             <p className="text-xs font-semibold text-muted-foreground">Total</p>
             <p className="truncate text-lg font-black">{formatPrice(total)}</p>
           </div>
           <Button
-            className="min-h-12 flex-1 px-3 text-sm font-extrabold"
+            className="min-h-12 min-w-0 flex-1 rounded-xl border border-[#0089c7] bg-[#009ee3] px-3 text-sm font-extrabold text-white shadow-[0_8px_20px_-10px_rgba(0,158,227,0.9)] hover:bg-[#008fce] focus-visible:ring-2 focus-visible:ring-[#009ee3] focus-visible:ring-offset-2"
             type="submit"
             form={formId}
             data-testid="checkout-submit-mobile"
             onClick={handleCheckoutCtaClick}
             disabled={isProcessing || !hasAvailableShippingMethod}
           >
-            {isProcessing ? "Abriendo…" : "Ir a pagar con Mercado Pago"}
+            <MercadoPagoButtonContent isProcessing={isProcessing} compact />
           </Button>
         </div>
         <p className="mx-auto mt-1 max-w-md text-center text-[0.68rem] font-semibold text-muted-foreground">

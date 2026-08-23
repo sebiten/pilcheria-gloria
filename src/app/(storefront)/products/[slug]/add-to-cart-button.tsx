@@ -282,40 +282,35 @@ export function AddToCartButton({
                   Mismo precio en todos los talles: {formatPrice(product.basePrice)}
                 </p>
               ) : null}
-              <details className="mb-3 mt-1 rounded-xl border border-gloria-200 bg-gloria-50 px-3 py-2">
-                <summary className="flex min-h-9 cursor-pointer list-none items-center text-sm font-bold text-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                  ¿No sabés qué talle elegir?
+              <details className="mb-3 mt-2 border-b border-gloria-200 pb-2 text-sm">
+                <summary className="inline-flex min-h-8 cursor-pointer list-none items-center font-semibold text-muted-foreground underline decoration-gloria-300 underline-offset-4 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  ¿Dudas con el talle?
                 </summary>
-                <div className="pb-2 pt-1 text-sm leading-6 text-muted-foreground">
+                <div className="pb-1 pt-2 leading-6 text-muted-foreground">
                   <p>Juvenil: 8, 10, 12, 14 y 16.</p>
                   <p>Adulto: 1, 2, 3, 4 y 5.</p>
                   <p className="mt-2">
                     El nivel no define el talle. Si dudás, medí una prenda que le
                     quede bien y consultanos.
                   </p>
+                  {whatsappUrl ? (
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex min-h-10 items-center font-bold text-primary underline-offset-4 hover:underline"
+                      onClick={() =>
+                        trackStorefrontEvent({
+                          event: "whatsapp_click",
+                          productId: product.id,
+                        })
+                      }
+                    >
+                      Consultanos por WhatsApp
+                    </a>
+                  ) : null}
                 </div>
               </details>
-              {whatsappUrl ? (
-                <Button
-                  variant="link"
-                  className="mb-3 h-auto min-h-11 w-full justify-start whitespace-normal px-0 text-left text-sm font-bold"
-                  asChild
-                >
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() =>
-                      trackStorefrontEvent({
-                        event: "whatsapp_click",
-                        productId: product.id,
-                      })
-                    }
-                  >
-                    ¿No sabés qué talle elegir? Te ayudamos por WhatsApp
-                  </a>
-                </Button>
-              ) : null}
               <RadioGroup
                 aria-labelledby={sizeGroupLabelId}
                 value={selectedVariant?.id ?? ""}
@@ -351,7 +346,7 @@ export function AddToCartButton({
                           );
 
                           return (
-                            <div key={variant.id} className="relative min-h-20 sm:min-h-24">
+                            <div key={variant.id} className="relative min-h-16">
                               <RadioGroupItem
                                 value={variant.id}
                                 id={`variant-${variant.id}`}
@@ -360,13 +355,8 @@ export function AddToCartButton({
                                 }, ${formatPrice(unitPrice)}`}
                                 className="absolute inset-0 size-full aspect-auto rounded-xl border border-gloria-200 bg-card text-foreground shadow-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=checked]:border-primary data-[state=checked]:bg-primary/10 data-[state=checked]:ring-2 data-[state=checked]:ring-primary/20 [&>span]:hidden"
                               />
-                              <span className="pointer-events-none relative flex min-h-20 flex-col justify-center px-3 py-3 text-center text-base sm:min-h-24">
+                              <span className="pointer-events-none relative flex min-h-16 flex-col justify-center px-3 py-3 text-center text-base">
                                 <span className="font-bold">Talle {variant.size}</span>
-                                {variant.color ? (
-                                  <span className="text-sm text-muted-foreground">
-                                    {variant.color}
-                                  </span>
-                                ) : null}
                                 {!product.uniformPriceGroup ? (
                                   <span className="mt-1 font-bold text-foreground">
                                     {formatPrice(unitPrice)}
