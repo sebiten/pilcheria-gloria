@@ -147,7 +147,7 @@ export function AddToCartButton({
   const selectedLabel = selectedVariant
     ? [
         getSchoolLevelLabel(selectedVariant.schoolLevel)
-          ? `diseño ${getSchoolLevelLabel(selectedVariant.schoolLevel)}`
+          ? `nivel ${getSchoolLevelLabel(selectedVariant.schoolLevel)}`
           : null,
         `talle ${formatStorefrontVariantSize(selectedVariant)}`,
         selectedVariant.color ? `color ${selectedVariant.color}` : null,
@@ -221,7 +221,7 @@ export function AddToCartButton({
                 id={designGroupLabelId}
                 className="mb-3 block text-lg font-extrabold text-gloria-950"
               >
-                ¿Es de Primaria o Secundaria?
+                ¿Para qué nivel es?
               </Label>
               <RadioGroup
                 aria-labelledby={designGroupLabelId}
@@ -254,36 +254,32 @@ export function AddToCartButton({
             </div>
           ) : null}
 
-          <div>
-            <Label
-              id={sizeGroupLabelId}
-              className="block text-lg font-extrabold text-gloria-950"
-            >
-              Elegí el talle
-            </Label>
-            {product.uniformPriceGroup ? (
-              <p className="mt-1 text-sm font-bold text-gloria-700">
-                Mismo precio en todos los talles: {formatPrice(product.basePrice)}
-              </p>
-            ) : null}
-            <details className="mb-3 mt-1 rounded-xl border border-gloria-200 bg-gloria-50 px-3 py-2">
-              <summary className="flex min-h-9 cursor-pointer list-none items-center text-sm font-bold text-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                ¿No sabés qué talle elegir?
-              </summary>
-              <div className="pb-2 pt-1 text-sm leading-6 text-muted-foreground">
-                <p>Juvenil: 8, 10, 12, 14 y 16.</p>
-                <p>Adulto: 1, 2, 3, 4 y 5.</p>
-                <p className="mt-2">
-                  Primaria o Secundaria cambia el diseño, no define el talle. Si
-                  dudás, medí una prenda que le quede bien y consultanos.
+          {designSelected ? (
+            <div>
+              <Label
+                id={sizeGroupLabelId}
+                className="block text-lg font-extrabold text-gloria-950"
+              >
+                Elegí el talle
+              </Label>
+              {product.uniformPriceGroup ? (
+                <p className="mt-1 text-sm font-bold text-gloria-700">
+                  Mismo precio en todos los talles: {formatPrice(product.basePrice)}
                 </p>
-              </div>
-            </details>
-            {!designSelected ? (
-              <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950">
-                Primero elegí Primaria o Secundaria.
-              </p>
-            ) : (
+              ) : null}
+              <details className="mb-3 mt-1 rounded-xl border border-gloria-200 bg-gloria-50 px-3 py-2">
+                <summary className="flex min-h-9 cursor-pointer list-none items-center text-sm font-bold text-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  ¿No sabés qué talle elegir?
+                </summary>
+                <div className="pb-2 pt-1 text-sm leading-6 text-muted-foreground">
+                  <p>Juvenil: 8, 10, 12, 14 y 16.</p>
+                  <p>Adulto: 1, 2, 3, 4 y 5.</p>
+                  <p className="mt-2">
+                    El nivel no define el talle. Si dudás, medí una prenda que le
+                    quede bien y consultanos.
+                  </p>
+                </div>
+              </details>
               <RadioGroup
                 aria-labelledby={sizeGroupLabelId}
                 value={selectedVariant?.id ?? ""}
@@ -348,19 +344,15 @@ export function AddToCartButton({
                   </div>
                 ))}
               </RadioGroup>
-            )}
-          </div>
+            </div>
+          ) : null}
 
-          <div
-            className={`rounded-xl border p-3 text-base leading-6 ${
-              selectedVariant
-                ? "border-primary/25 bg-primary/5 text-foreground"
-                : "border-amber-300 bg-amber-50 text-amber-950"
-            }`}
-            role="status"
-            aria-live="polite"
-          >
-            {selectedVariant ? (
+          {selectedVariant ? (
+            <div
+              className="rounded-xl border border-primary/25 bg-primary/5 p-3 text-base leading-6 text-foreground"
+              role="status"
+              aria-live="polite"
+            >
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-muted-foreground">
                   {schoolName}
@@ -382,14 +374,8 @@ export function AddToCartButton({
                   {fulfillmentLabel}
                 </p>
               </div>
-            ) : (
-              <span className="font-bold">
-                {designSelected
-                  ? "Tocá un talle para continuar."
-                  : "Elegí el diseño y después el talle."}
-              </span>
-            )}
-          </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
