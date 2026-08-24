@@ -3,6 +3,7 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { Header } from "@/components/storefront/header";
+import { CheckoutHeader } from "@/components/storefront/checkout-header";
 import { CartDrawer } from "@/components/storefront/cart-drawer";
 import { CartContent } from "@/components/storefront/cart-content";
 import { CartSync } from "@/components/storefront/cart-sync";
@@ -12,6 +13,7 @@ import { hydrateCartStore, subscribeCartStorePersistence, useCartStore } from "@
 
 export function StorefrontClientShell() {
   const pathname = usePathname();
+  const isCheckout = pathname === "/checkout";
   const isOpen = useCartStore((state) => state.isOpen);
   const setIsOpen = useCartStore((state) => state.setIsOpen);
 
@@ -28,11 +30,15 @@ export function StorefrontClientShell() {
     <>
       <AnalyticsTracker />
       <CartSync />
-      <Header />
-      <CartDrawer isOpen={isOpen} onClose={() => setIsOpen(false)}>
-        <CartContent />
-      </CartDrawer>
-      <MobileCartBar />
+      {isCheckout ? <CheckoutHeader /> : <Header />}
+      {!isCheckout ? (
+        <>
+          <CartDrawer isOpen={isOpen} onClose={() => setIsOpen(false)}>
+            <CartContent />
+          </CartDrawer>
+          <MobileCartBar />
+        </>
+      ) : null}
     </>
   );
 }

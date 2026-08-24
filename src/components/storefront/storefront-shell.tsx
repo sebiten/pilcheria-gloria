@@ -1,5 +1,6 @@
 import { Footer } from "@/components/storefront/footer";
 import { StorefrontClientShell } from "@/components/storefront/storefront-client-shell";
+import { RouteAwareFooter } from "@/components/storefront/route-aware-footer";
 import { WhatsAppFloatingButton } from "@/components/storefront/whatsapp-floating-button";
 import type { StoreSettings } from "@/types";
 
@@ -19,7 +20,9 @@ export function StorefrontShell({ children, settings }: StorefrontShellProps) {
         phone={settings.whatsapp_phone}
         storeName={settings.store_name}
       />
-      <Footer settings={settings} />
+      <RouteAwareFooter>
+        <Footer settings={settings} />
+      </RouteAwareFooter>
     </>
   );
 }

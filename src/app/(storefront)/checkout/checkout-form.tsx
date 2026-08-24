@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   ExternalLink,
+  LoaderCircle,
   MapPin,
   MessageCircle,
+  RefreshCw,
   ShieldCheck,
   Store,
   Truck,
@@ -17,7 +19,7 @@ import {
 import { addAddress, updateProfileContact } from "@/actions/auth";
 import { useCartStore } from "@/hooks/use-cart";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -78,13 +80,12 @@ type CheckoutFieldName =
   | "couponCode";
 
 type CheckoutFieldErrors = Partial<Record<CheckoutFieldName, string>>;
+type CartRefreshStatus = "updating" | "ready" | "error";
 
 function MercadoPagoButtonContent({
   isProcessing,
-  compact = false,
 }: {
   isProcessing: boolean;
-  compact?: boolean;
 }) {
   return (
     <>
@@ -100,10 +101,8 @@ function MercadoPagoButtonContent({
       </span>
       <span>
         {isProcessing
-          ? "Abriendo Mercado Pago…"
-          : compact
-            ? "Pagar con Mercado Pago"
-            : "Ir a pagar con Mercado Pago"}
+          ? "Preparando el pago…"
+          : "Continuar a Mercado Pago"}
       </span>
     </>
   );
@@ -122,12 +121,15 @@ export function CheckoutForm({
   const router = useRouter();
   const { items, getTotal, setItems } = useCartStore();
   const checkoutRequestId = useRef<string | null>(null);
-  const cartRefreshStarted = useRef(false);
-  const invalidFocusScheduled = useRef(false);
+  const submitLock = useRef(false);
+  const lastRefreshedCartSignature = useRef("");
   const [isMounted, setIsMounted] = useState(false);
   const defaultAddress = getDefaultAddress(addresses);
   const defaultFullName = (defaultAddress?.name || profile?.full_name || "").trim();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [cartRefreshStatus, setCartRefreshStatus] =
+    useState<CartRefreshStatus>("updating");
+  const [cartRefreshError, setCartRefreshError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<CheckoutFieldErrors>({});
   const [isCouponOpen, setIsCouponOpen] = useState(false);
@@ -171,23 +173,56 @@ export function CheckoutForm({
       dedupe: true,
     });
   }, [cartSignature, isMounted, items]);
-  useEffect(() => {
-    if (!items.length || cartRefreshStarted.current) return;
-    cartRefreshStarted.current = true;
+  const refreshCart = useCallback(async () => {
+    const currentItems = useCartStore.getState().items;
+    if (!currentItems.length) return;
 
-    void refreshCheckoutCart(
-      items.map((item) => ({
-        product_id: item.product_id,
-        variant_id: item.variant_id,
-        quantity: item.quantity,
-      }))
-    )
-      .then(setItems)
-      .catch((refreshError) => {
-        cartRefreshStarted.current = false;
-        console.error("No se pudo actualizar el carrito:", refreshError);
+    setCartRefreshStatus("updating");
+    setCartRefreshError(null);
+    setError(null);
+
+    try {
+      const refreshedItems = await refreshCheckoutCart(
+        currentItems.map((item) => ({
+          product_id: item.product_id,
+          variant_id: item.variant_id,
+          quantity: item.quantity,
+        }))
+      );
+      setItems(refreshedItems);
+      const hasUnavailableItem = refreshedItems.some((item) => {
+        const variant = item.variant_id
+          ? item.product?.variants?.find(
+              (current) => current.id === item.variant_id
+            )
+          : null;
+
+        return !item.product || !variant || !variant.active || !variant.available;
       });
-  }, [items, setItems]);
+      if (hasUnavailableItem) {
+        setCartRefreshError(
+          "Hay una prenda o un talle que ya no está disponible. Editá el carrito para continuar."
+        );
+        setCartRefreshStatus("error");
+        return;
+      }
+      setCartRefreshStatus("ready");
+    } catch (refreshError) {
+      console.error("No se pudo actualizar el carrito:", refreshError);
+      setCartRefreshError(
+        "Revisá tu conexión y reintentá. No podés continuar con precios desactualizados."
+      );
+      setCartRefreshStatus("error");
+    }
+  }, [setItems]);
+
+  useEffect(() => {
+    if (!items.length || lastRefreshedCartSignature.current === cartSignature) {
+      return;
+    }
+    lastRefreshedCartSignature.current = cartSignature;
+    void refreshCart();
+  }, [cartSignature, items.length, refreshCart]);
   useEffect(() => {
     const promotionCode = window.sessionStorage.getItem(
       FACEBOOK_PROMOTION.storageKey
@@ -318,7 +353,16 @@ export function CheckoutForm({
     setError(null);
 
     const address = addresses.find((item) => item.id === value);
-    if (!address) return;
+    if (!address) {
+      setFormData((current) => ({
+        ...current,
+        street: "",
+        city: settings.city,
+        state: settings.state,
+        zip: "",
+      }));
+      return;
+    }
 
     setFormData((current) => ({
       ...current,
@@ -332,6 +376,7 @@ export function CheckoutForm({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitLock.current) return;
     setError(null);
     setFieldErrors({});
 
@@ -349,6 +394,7 @@ export function CheckoutForm({
       eventDetail:
         | "missing_name"
         | "invalid_phone"
+        | "invalid_email"
         | "shipping_unavailable"
         | "missing_address"
         | "coupon_pending"
@@ -382,11 +428,32 @@ export function CheckoutForm({
       return;
     }
 
+    if (cartRefreshStatus !== "ready") {
+      setError(
+        cartRefreshStatus === "error"
+          ? "No pudimos actualizar precios y disponibilidad. Reintentá antes de continuar."
+          : "Estamos actualizando precios y disponibilidad. Esperá un momento."
+      );
+      focusField("cart-refresh-status");
+      return;
+    }
+
     if (!isValidArgentinaContactPhone(formData.phone)) {
       showFieldError(
         "phone",
         "Ingresá un WhatsApp válido con código de área.",
         "invalid_phone"
+      );
+      return;
+    }
+
+    const email = formData.email.trim();
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+      setIsEmailOpen(true);
+      showFieldError(
+        "email",
+        "Ingresá un email válido, por ejemplo nombre@correo.com.",
+        "invalid_email"
       );
       return;
     }
@@ -403,6 +470,24 @@ export function CheckoutForm({
       return;
     }
 
+    if (needsAddress && formData.street.trim().length < 3) {
+      showFieldError(
+        "street",
+        "Ingresá la calle y el número para coordinar la entrega.",
+        "missing_address"
+      );
+      return;
+    }
+
+    if (needsAddress && formData.city.trim().length < 2) {
+      showFieldError(
+        "city",
+        "Ingresá la localidad donde entregaremos el pedido.",
+        "missing_address"
+      );
+      return;
+    }
+
     if (formData.couponCode.trim() && !appliedCoupon) {
       setIsCouponOpen(true);
       showFieldError(
@@ -413,6 +498,7 @@ export function CheckoutForm({
       return;
     }
 
+    submitLock.current = true;
     setIsProcessing(true);
 
     try {
@@ -460,11 +546,11 @@ export function CheckoutForm({
           couponCode: appliedCoupon?.code,
           shippingAddress: {
             name: fullName,
-            email: formData.email.trim() || null,
+            email: email || null,
             phone: formData.phone.trim(),
             street: needsAddress ? formData.street.trim() : null,
             city: needsAddress ? formData.city.trim() : null,
-            state: needsAddress ? formData.state.trim() : null,
+            state: needsAddress ? formData.state.trim() || settings.state : null,
             zip: needsAddress ? formData.zip.trim() || null : null,
             references: needsAddress
               ? formData.references.trim() || null
@@ -509,8 +595,26 @@ export function CheckoutForm({
           : "No se pudo procesar el checkout"
       );
       setIsProcessing(false);
+      submitLock.current = false;
       focusField("checkout-error");
     }
+  };
+
+  const validateContactField = (field: "phone" | "email") => {
+    if (field === "phone") {
+      const message = isValidArgentinaContactPhone(formData.phone)
+        ? undefined
+        : "Usá 10 dígitos con código de área. Aceptamos +54 9 y formatos antiguos con 0 y 15.";
+      setFieldErrors((current) => ({ ...current, phone: message }));
+      return;
+    }
+
+    const email = formData.email.trim();
+    const message =
+      email && !/^\S+@\S+\.\S+$/.test(email)
+        ? "Ingresá un email válido, por ejemplo nombre@correo.com."
+        : undefined;
+    setFieldErrors((current) => ({ ...current, email: message }));
   };
 
   const handleCheckoutCtaClick = () => {
@@ -546,530 +650,449 @@ export function CheckoutForm({
     );
   }
 
+  const summaryContent = (
+    <>
+      <div className="space-y-4">
+        {items.map((item) => {
+          const variant = item.variant_id
+            ? item.product?.variants?.find(
+                (current) => current.id === item.variant_id
+              )
+            : null;
+          const pricing = getCartItemPricingSegments(item);
+
+          return (
+            <div key={`${item.product_id}-${item.variant_id}`} className="text-sm">
+              <div className="flex justify-between gap-4">
+                <span className="min-w-0 font-semibold">
+                  {item.product?.name}
+                  {variant ? ` · Talle ${formatStorefrontVariantSize(variant)}` : ""}
+                  <span className="block font-normal text-muted-foreground">
+                    Cantidad: {item.quantity}
+                  </span>
+                </span>
+                <span className="shrink-0 font-bold">
+                  {formatPrice(getCartItemLineTotal(item))}
+                </span>
+              </div>
+              {pricing.segments.map((segment, index) => (
+                <p
+                  key={`${segment.fulfillment}-${segment.unitPrice}-${index}`}
+                  className="mt-1 text-xs leading-5 text-muted-foreground"
+                >
+                  {item.product?.uniformPriceGroup
+                    ? `${segment.quantity} prenda${segment.quantity === 1 ? "" : "s"}`
+                    : `${segment.quantity} × ${formatPrice(segment.unitPrice)}`}
+                  {segment.fulfillment === "immediate"
+                    ? ", entrega inmediata"
+                    : ", preparación en 24-48 h"}
+                </p>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <div className="space-y-2 border-t pt-4 text-sm">
+        <div className="flex justify-between gap-4">
+          <span>Subtotal</span>
+          <span>{formatPrice(subtotal)}</span>
+        </div>
+        {appliedCoupon ? (
+          <div className="flex justify-between gap-4 font-semibold text-primary">
+            <span>Descuento ({appliedCoupon.code})</span>
+            <span>-{formatPrice(discount)}</span>
+          </div>
+        ) : null}
+        <div className="flex justify-between gap-4">
+          <span>{needsAddress ? "Entrega local" : "Retiro"}</span>
+          <span>{shippingCost === 0 ? "Sin costo" : formatPrice(shippingCost)}</span>
+        </div>
+        <div className="flex justify-between gap-4 border-t pt-3 text-lg font-black">
+          <span>Total</span>
+          <span>{formatPrice(total)}</span>
+        </div>
+      </div>
+      <Link
+        href="/cart"
+        className="inline-flex min-h-11 items-center text-sm font-bold text-primary underline underline-offset-4"
+      >
+        Editar carrito
+      </Link>
+    </>
+  );
+
+  const trustContent = (
+    <div className="space-y-3">
+      <PaymentConfidence amount={total} compact />
+      <ul className="space-y-2 text-sm font-semibold text-gloria-950">
+        <li className="flex items-center gap-2">
+          <ShieldCheck className="size-4 shrink-0 text-gloria-700" aria-hidden="true" />
+          Pago protegido por Mercado Pago
+        </li>
+        <li className="flex items-center gap-2">
+          <UserRoundCheck className="size-4 shrink-0 text-gloria-700" aria-hidden="true" />
+          No necesitás una cuenta de Mercado Pago
+        </li>
+        <li className="flex items-center gap-2">
+          <MessageCircle className="size-4 shrink-0 text-gloria-700" aria-hidden="true" />
+          Confirmamos tu pedido por WhatsApp
+        </li>
+      </ul>
+    </div>
+  );
+
+  const checkoutDisabled =
+    isProcessing ||
+    cartRefreshStatus !== "ready" ||
+    !hasAvailableShippingMethod;
+
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-36 pt-6 sm:py-12">
-      <div className="mb-6 sm:mb-8">
-        <p className="text-sm font-semibold text-primary">Último paso en la tienda</p>
-        <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
-          Ya casi está
+    <main className="mx-auto w-full max-w-6xl px-4 pb-44 pt-7 sm:px-6 sm:pt-10 lg:pb-16">
+      <div className="mb-7">
+        <h1 className="text-3xl font-black tracking-tight text-gloria-950 sm:text-4xl">
+          Finalizar compra
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Completá tu nombre y WhatsApp. Después pagás de forma segura en Mercado Pago.
+        <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
+          Completá la entrega y tus datos. El pago se realiza en Mercado Pago.
         </p>
-        <p className="mt-3 text-xs font-bold text-gloria-700 sm:text-sm">
-          Tus datos → Mercado Pago → Confirmación
-        </p>
+        <ol className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-gloria-800" aria-label="Pasos para finalizar la compra">
+          <li>Datos y entrega</li>
+          <li aria-hidden="true">→</li>
+          <li>Mercado Pago</li>
+          <li aria-hidden="true">→</li>
+          <li>Confirmación</li>
+        </ol>
       </div>
 
-      <section className="mb-4 rounded-2xl border border-gloria-200 bg-gloria-50 p-4 lg:hidden" aria-label="Resumen de la compra">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-extrabold text-gloria-950">Tu compra</h2>
-          <strong className="text-lg text-gloria-950">{formatPrice(total)}</strong>
-        </div>
-        <div className="mt-3 space-y-2 border-t border-dashed border-gloria-300 pt-3">
-          {items.slice(0, 2).map((item) => {
-            const variant = item.variant_id
-              ? item.product?.variants?.find((current) => current.id === item.variant_id)
-              : null;
-            return (
-              <p key={`${item.product_id}-${item.variant_id}`} className="flex justify-between gap-3 text-sm leading-5">
-                <span className="min-w-0 truncate">
-                  {item.product?.name}
-                  {variant ? ` · ${formatStorefrontVariantSize(variant)}` : ""}
-                </span>
-                <span className="shrink-0 font-bold">× {item.quantity}</span>
-              </p>
-            );
-          })}
-          {items.length > 2 ? (
-            <p className="text-xs font-semibold text-muted-foreground">
-              Y {items.length - 2} prenda{items.length - 2 === 1 ? "" : "s"} más
-            </p>
+      <div
+        id="cart-refresh-status"
+        tabIndex={-1}
+        data-testid="cart-refresh-status"
+        className={`mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm leading-6 ${
+          cartRefreshStatus === "error"
+            ? "border-amber-300 bg-amber-50 text-amber-950"
+            : "border-gloria-200 bg-gloria-50 text-gloria-950"
+        }`}
+        role={cartRefreshStatus === "error" ? "alert" : "status"}
+      >
+        {cartRefreshStatus === "updating" ? (
+          <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        ) : cartRefreshStatus === "error" ? (
+          <RefreshCw className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        ) : (
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-gloria-700" aria-hidden="true" />
+        )}
+        <div className="flex-1">
+          <p className="font-bold">
+            {cartRefreshStatus === "updating"
+              ? "Actualizando precios y disponibilidad..."
+              : cartRefreshStatus === "error"
+                ? "No pudimos actualizar el carrito"
+                : "Precios y disponibilidad actualizados"}
+          </p>
+          {cartRefreshStatus === "error" ? (
+            <>
+              <p>{cartRefreshError}</p>
+              <div className="mt-1 flex flex-wrap gap-x-4">
+                <button
+                  type="button"
+                  onClick={() => void refreshCart()}
+                  className="min-h-11 font-black underline underline-offset-4"
+                >
+                  Reintentar actualización
+                </button>
+                <Link href="/cart" className="inline-flex min-h-11 items-center font-black underline underline-offset-4">
+                  Editar carrito
+                </Link>
+              </div>
+            </>
           ) : null}
         </div>
-      </section>
+      </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_22rem]">
+      <details className="group mb-5 rounded-xl border border-gloria-200 bg-background lg:hidden">
+        <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4 marker:hidden">
+          <span className="font-black text-gloria-950">Resumen de tu compra</span>
+          <span className="flex items-center gap-2">
+            <strong className="text-lg text-gloria-950">{formatPrice(total)}</strong>
+            <ChevronDown className="size-5 transition-transform group-open:rotate-180" aria-hidden="true" />
+          </span>
+        </summary>
+        <div className="space-y-4 border-t px-4 py-5">{summaryContent}</div>
+      </details>
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_23rem]">
         <form
           id={formId}
           data-testid="checkout-form"
+          noValidate
           onSubmit={handleSubmit}
-          onInvalid={(event) => {
-            event.preventDefault();
-            const field = event.target as HTMLInputElement;
-            if (!field.name) return;
-            const message = field.validity.valueMissing
-              ? "Completá este dato para continuar."
-              : field.validity.typeMismatch
-                ? "Ingresá un dato válido."
-                : field.validationMessage;
-            setFieldErrors((current) => ({
-              ...current,
-              [field.name as CheckoutFieldName]: message,
-            }));
-            const eventDetail =
-              field.name === "fullName"
-                ? "missing_name"
-                : field.name === "phone"
-                  ? "invalid_phone"
-                  : field.name === "email"
-                    ? "invalid_email"
-                    : "missing_address";
-            trackStorefrontEvent({
-              event: "checkout_validation_error",
-              eventDetail,
-              quantity: getCartItemCount(items),
-            });
-            if (!invalidFocusScheduled.current) {
-              invalidFocusScheduled.current = true;
-              window.requestAnimationFrame(() => {
-                field.focus();
-                field.scrollIntoView({ behavior: "smooth", block: "center" });
-                window.setTimeout(() => {
-                  invalidFocusScheduled.current = false;
-                }, 300);
-              });
-            }
-          }}
           className="space-y-6"
         >
-          <div
-            id="shippingMethod"
-            tabIndex={-1}
-            aria-invalid={Boolean(fieldErrors.shippingMethod)}
+          <section
+            aria-labelledby="checkout-delivery-title"
+            className="rounded-xl border bg-card text-card-foreground shadow"
           >
-            {canChooseShipping ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>¿Cómo querés recibir tu compra?</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <RadioGroup
-                    aria-label="Método de entrega"
-                    value={formData.shippingMethod}
-                    onValueChange={(value) => {
-                      checkoutRequestId.current = null;
-                      setFieldErrors((current) => ({
-                        ...current,
-                        shippingMethod: undefined,
-                      }));
-                      setFormData((current) => ({
-                        ...current,
-                        shippingMethod: value as DeliveryMethod,
-                      }));
-                    }}
-                    className="grid gap-3 sm:grid-cols-2"
-                  >
-                    <DeliveryOption
-                      id="pickup"
-                      icon={Store}
-                      title="Retiro coordinado"
-                      description={pickupLocation}
-                      price="Sin costo"
-                    />
-                    <DeliveryOption
-                      id="local_delivery"
-                      icon={Truck}
-                      title={freeLocalDelivery ? "Envío local gratis" : "Entrega local"}
-                      description="Ledesma y localidades cercanas, desde 2 prendas"
-                      price={
-                        localDeliveryCost > 0
-                          ? formatPrice(localDeliveryCost)
-                          : "Sin costo"
-                      }
-                    />
-                  </RadioGroup>
-                </CardContent>
-              </Card>
-            ) : hasAvailableShippingMethod ? (
-              <section className="flex items-start gap-3 rounded-2xl border border-gloria-200 bg-gloria-50 p-4">
-                {formData.shippingMethod === "pickup" ? (
-                  <Store className="mt-0.5 size-5 shrink-0 text-gloria-700" />
-                ) : (
-                  <Truck className="mt-0.5 size-5 shrink-0 text-gloria-700" />
-                )}
-                <div>
-                  <p className="font-extrabold text-gloria-950">
-                    {formData.shippingMethod === "pickup"
-                      ? "Retiro coordinado, sin costo"
-                      : freeLocalDelivery
-                        ? "Envío local gratis"
-                        : `Entrega local · ${formatPrice(localDeliveryCost)}`}
-                  </p>
-                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                    {formData.shippingMethod === "pickup"
-                      ? pickupLocation
-                      : "Ledesma y localidades cercanas"}
-                  </p>
-                </div>
-              </section>
-            ) : null}
-              {fieldErrors.shippingMethod ? (
-                <p className="mt-3 text-sm font-semibold text-destructive" role="alert">
-                  {fieldErrors.shippingMethod}
+              <CardHeader>
+                <h2 id="checkout-delivery-title" className="font-semibold leading-none tracking-tight">
+                  1. Entrega
+                </h2>
+                <p className="text-sm leading-5 text-muted-foreground">
+                  Elegí cómo querés recibir la compra.
                 </p>
-              ) : null}
-              {!hasAvailableShippingMethod ? (
-                <div
-                  className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950"
-                  role="alert"
-                >
-                  No hay un método disponible para este carrito. Volvé al{" "}
-                  <Link href="/cart" className="underline underline-offset-4">
-                    carrito
-                  </Link>{" "}
-                  y sumá otra prenda para habilitar entrega local, o consultanos
-                  antes de pagar.
-                </div>
-              ) : null}
-              {settings.local_delivery_enabled && !canChooseShipping ? (
-                <p
-                  data-testid="local-delivery-condition"
-                  className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm font-semibold leading-6"
-                >
-                  {localDeliveryAvailable
-                    ? freeLocalDelivery
-                      ? `Tu compra de ${itemCount} prendas tiene envío local gratis en Ledesma. También podés retirar sin costo.`
-                      : `Tu compra de ${itemCount} prendas habilita entrega local en Ledesma. También podés retirar sin costo.`
-                    : freeLocalDelivery
-                      ? `El envío local gratis en Ledesma se habilita desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas. Con una sola prenda, el pedido se retira de forma coordinada.`
-                      : `La entrega local en Ledesma se habilita desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas. Con una sola prenda, el pedido se retira de forma coordinada.`}
-                </p>
-              ) : null}
-          </div>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>¿A nombre de quién queda el pedido?</CardTitle>
-              <p className="text-sm leading-5 text-muted-foreground">
-                Usamos tu WhatsApp para confirmar la compra y coordinar la entrega.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                label="Nombre y apellido"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleInputChange}
-                autoComplete="name"
-                error={fieldErrors.fullName}
-                placeholder="Ej. María López"
-                required
-              />
-              <FormField
-                label="WhatsApp"
-                name="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={handleInputChange}
-                autoComplete="tel"
-                inputMode="tel"
-                placeholder="Ej. 388 4123456"
-                hint="Podés escribirlo con 0, 15, +54 9, espacios o guiones."
-                error={fieldErrors.phone}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setIsEmailOpen((open) => !open)}
-                aria-expanded={isEmailOpen}
-                aria-controls="checkout-email-field"
-                className="flex min-h-11 items-center gap-2 rounded-lg text-sm font-bold text-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <ChevronDown className={`size-4 transition-transform ${isEmailOpen ? "rotate-180" : ""}`} />
-                {isEmailOpen ? "Ocultar email" : "Agregar email (opcional)"}
-              </button>
-              {isEmailOpen ? (
-                <div id="checkout-email-field">
-                  <FormField
-                    label="Email (opcional)"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    autoComplete="email"
-                    error={fieldErrors.email}
-                    hint="Si lo agregás, también recibirás las novedades por email."
-                  />
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          {needsAddress ? (
-            <>
-              {addresses.length > 0 ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Dirección guardada</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div id="shippingMethod" tabIndex={-1} aria-invalid={Boolean(fieldErrors.shippingMethod)}>
+                  {canChooseShipping ? (
                     <RadioGroup
-                      value={selectedAddressId}
-                      onValueChange={handleAddressSelect}
+                      aria-label="Método de entrega"
+                      value={formData.shippingMethod}
+                      onValueChange={(value) => {
+                        checkoutRequestId.current = null;
+                        setFieldErrors((current) => ({ ...current, shippingMethod: undefined }));
+                        setFormData((current) => ({ ...current, shippingMethod: value as DeliveryMethod }));
+                      }}
                       className="grid gap-3 sm:grid-cols-2"
                     >
-                      {addresses.map((address) => (
-                        <div key={address.id}>
-                          <RadioGroupItem value={address.id} id={`address-${address.id}`} className="peer sr-only" />
-                          <Label htmlFor={`address-${address.id}`} className="flex min-h-24 cursor-pointer flex-col rounded-xl border p-4 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5">
-                            <span className="font-semibold">{address.name}</span>
-                            <span className="mt-1 text-sm text-muted-foreground">{address.street}</span>
-                            <span className="text-sm text-muted-foreground">{address.city}</span>
-                          </Label>
-                        </div>
-                      ))}
-                      <div>
-                        <RadioGroupItem value="manual" id="address-manual" className="peer sr-only" />
-                        <Label htmlFor="address-manual" className="flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border border-dashed p-4 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5">
-                          <MapPin className="h-5 w-5" />
-                          Cargar otra dirección
-                        </Label>
-                      </div>
+                      <DeliveryOption id="pickup" icon={Store} title="Retiro coordinado" description={pickupLocation} price="Sin costo" />
+                      <DeliveryOption
+                        id="local_delivery"
+                        icon={Truck}
+                        title={freeLocalDelivery ? "Envío local gratis" : "Entrega local"}
+                        description={`Ledesma y localidades cercanas, desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas`}
+                        price={localDeliveryCost > 0 ? formatPrice(localDeliveryCost) : "Sin costo"}
+                      />
                     </RadioGroup>
-                  </CardContent>
-                </Card>
-              ) : null}
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Dirección de entrega</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <FormField label="Calle y número" name="street" value={formData.street} onChange={handleInputChange} error={fieldErrors.street} required />
-                  </div>
-                  <FormField label="Localidad" name="city" value={formData.city} onChange={handleInputChange} error={fieldErrors.city} required />
-                  <FormField label="Provincia" name="state" value={formData.state} onChange={handleInputChange} error={fieldErrors.state} required />
-                  <FormField label="Código postal" name="zip" value={formData.zip} onChange={handleInputChange} error={fieldErrors.zip} />
-                  <FormField label="Referencias" name="references" value={formData.references} onChange={handleInputChange} error={fieldErrors.references} placeholder="Barrio, entre calles..." />
-                  {shouldOfferSaveAddress ? (
-                    <label className="flex min-h-11 items-center gap-3 text-sm sm:col-span-2">
-                      <input type="checkbox" checked={saveAddress} onChange={(event) => setSaveAddress(event.target.checked)} />
-                      Guardar esta dirección para futuras compras
-                    </label>
+                  ) : hasAvailableShippingMethod ? (
+                    <div className="flex items-start gap-3 rounded-xl border border-gloria-200 bg-gloria-50 p-4">
+                      {formData.shippingMethod === "pickup" ? (
+                        <Store className="mt-0.5 size-5 shrink-0 text-gloria-700" aria-hidden="true" />
+                      ) : (
+                        <Truck className="mt-0.5 size-5 shrink-0 text-gloria-700" aria-hidden="true" />
+                      )}
+                      <div>
+                        <p className="font-black text-gloria-950">
+                          {formData.shippingMethod === "pickup"
+                            ? "Retiro coordinado, sin costo"
+                            : freeLocalDelivery
+                              ? "Envío local gratis"
+                              : `Entrega local: ${formatPrice(localDeliveryCost)}`}
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {formData.shippingMethod === "pickup" ? pickupLocation : "Ledesma y localidades cercanas"}
+                        </p>
+                      </div>
+                    </div>
                   ) : null}
-                </CardContent>
-              </Card>
-            </>
-          ) : (
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
-              <p className="font-bold">Retiro de la compra online</p>
-              <p className="mt-1 text-sm font-semibold">{pickupLocation}</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {settings.pickup_instructions}
-              </p>
-              {pickupConfigured ? (
-                <a
-                  href={pickupMapsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/25 bg-background px-4 text-sm font-bold text-primary hover:bg-primary/5"
-                >
-                  <MapPin className="size-4" />
-                  Cómo llegar con Google Maps
-                  <ExternalLink className="size-3.5" />
-                </a>
-              ) : null}
-            </div>
-          )}
+                  {fieldErrors.shippingMethod ? (
+                    <p className="mt-3 text-sm font-semibold text-destructive" role="alert">{fieldErrors.shippingMethod}</p>
+                  ) : null}
+                  {!hasAvailableShippingMethod ? (
+                    <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950" role="alert">
+                      No hay un método disponible para este carrito. Volvé al <Link href="/cart" className="underline underline-offset-4">carrito</Link> y sumá otra prenda o consultanos antes de pagar.
+                    </p>
+                  ) : null}
+                  {settings.local_delivery_enabled && !canChooseShipping ? (
+                    <p data-testid="local-delivery-condition" className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm font-semibold leading-6">
+                      {localDeliveryAvailable
+                        ? freeLocalDelivery
+                          ? `Tu compra de ${itemCount} prendas tiene envío local gratis en Ledesma. También podés retirar sin costo.`
+                          : `Tu compra de ${itemCount} prendas habilita entrega local en Ledesma. También podés retirar sin costo.`
+                        : `La entrega local en Ledesma se habilita desde ${LOCAL_DELIVERY_MIN_ITEMS} prendas. Con una sola prenda, el pedido se retira de forma coordinada.`}
+                    </p>
+                  ) : null}
+                </div>
 
-          <ul className="space-y-2 rounded-2xl bg-gloria-50 p-4 text-sm font-semibold text-gloria-950 lg:hidden">
-            <li className="flex items-center gap-2">
-              <ShieldCheck className="size-4 shrink-0 text-gloria-700" />
-              Pago protegido por Mercado Pago
-            </li>
-            <li className="flex items-center gap-2">
-              <UserRoundCheck className="size-4 shrink-0 text-gloria-700" />
-              Podés pagar con tarjeta aunque no tengas cuenta
-            </li>
-            <li className="flex items-center gap-2">
-              <MessageCircle className="size-4 shrink-0 text-gloria-700" />
-              Te confirmamos el pedido por WhatsApp
-            </li>
-          </ul>
+                {needsAddress ? (
+                  <div className="space-y-5 border-t pt-5">
+                    {addresses.length > 0 ? (
+                      <div>
+                        <p className="mb-3 font-bold">Dirección de entrega</p>
+                        <RadioGroup value={selectedAddressId} onValueChange={handleAddressSelect} className="grid gap-3 sm:grid-cols-2">
+                          {addresses.map((address) => (
+                            <div key={address.id}>
+                              <RadioGroupItem value={address.id} id={`address-${address.id}`} className="peer sr-only" />
+                              <Label htmlFor={`address-${address.id}`} className="flex min-h-24 cursor-pointer flex-col rounded-xl border p-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5">
+                                <span className="font-bold">{address.name}</span>
+                                <span className="mt-1 text-sm text-muted-foreground">{address.street}, {address.city}</span>
+                                {selectedAddressId === address.id ? (
+                                  <span className="mt-2 text-xs font-black text-primary">Dirección confirmada</span>
+                                ) : null}
+                              </Label>
+                            </div>
+                          ))}
+                          <div>
+                            <RadioGroupItem value="manual" id="address-manual" className="peer sr-only" />
+                            <Label htmlFor="address-manual" className="flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border border-dashed p-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5">
+                              <MapPin className="size-5" aria-hidden="true" />
+                              Cargar otra dirección
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    ) : null}
 
-          <Card>
-            <button
-              type="button"
-              onClick={() => setIsCouponOpen((open) => !open)}
-              aria-expanded={isCouponOpen}
-              aria-controls="checkout-coupon-content"
-              className="flex min-h-14 w-full items-center justify-between gap-3 px-6 text-left font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
-            >
-              <span>
-                ¿Tenés un cupón? <span className="font-medium text-muted-foreground">Es opcional</span>
-              </span>
-              <ChevronDown
-                className={`size-5 transition-transform ${isCouponOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-            {isCouponOpen ? (
-            <CardContent id="checkout-coupon-content" className="space-y-4 border-t pt-5">
-              <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                    {selectedAddressId === "manual" ? (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                          <FormField label="Calle y número" name="street" value={formData.street} onChange={handleInputChange} error={fieldErrors.street} autoComplete="street-address" />
+                        </div>
+                        <FormField label="Localidad" name="city" value={formData.city} onChange={handleInputChange} error={fieldErrors.city} autoComplete="address-level2" />
+                        <FormField label="Referencia (opcional)" name="references" value={formData.references} onChange={handleInputChange} error={fieldErrors.references} placeholder="Barrio, entre calles..." />
+                        {shouldOfferSaveAddress ? (
+                          <label className="flex min-h-11 items-center gap-3 text-sm sm:col-span-2">
+                            <input type="checkbox" checked={saveAddress} onChange={(event) => setSaveAddress(event.target.checked)} />
+                            Guardar esta dirección para futuras compras
+                          </label>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="border-t pt-5">
+                    <p className="font-bold">Retiro de la compra online</p>
+                    <p className="mt-1 text-sm font-semibold">{pickupLocation}</p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{settings.pickup_instructions}</p>
+                    {pickupConfigured ? (
+                      <a href={pickupMapsUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/25 bg-background px-4 text-sm font-bold text-primary hover:bg-primary/5">
+                        <MapPin className="size-4" aria-hidden="true" />
+                        Cómo llegar
+                        <ExternalLink className="size-3.5" aria-hidden="true" />
+                      </a>
+                    ) : null}
+                  </div>
+                )}
+              </CardContent>
+          </section>
+
+          <section
+            aria-labelledby="checkout-contact-title"
+            className="rounded-xl border bg-card text-card-foreground shadow"
+          >
+              <CardHeader>
+                <h2 id="checkout-contact-title" className="font-semibold leading-none tracking-tight">
+                  2. Tus datos
+                </h2>
+                <p className="text-sm leading-5 text-muted-foreground">Usamos tu WhatsApp para confirmar y coordinar el pedido.</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField label="Nombre y apellido" name="fullName" value={formData.fullName} onChange={handleInputChange} autoComplete="name" error={fieldErrors.fullName} placeholder="Ej. María López" />
                 <FormField
-                  label="Código (opcional)"
-                  name="couponCode"
-                  value={formData.couponCode}
+                  label="WhatsApp"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
                   onChange={handleInputChange}
-                  placeholder="Ingresá tu código"
-                  error={fieldErrors.couponCode}
+                  onBlur={() => validateContactField("phone")}
+                  autoComplete="tel"
+                  inputMode="tel"
+                  placeholder="Ej. 388 4123456"
+                  hint="Incluí el código de área. Aceptamos +54 9 y formatos antiguos con 0 y 15."
+                  error={fieldErrors.phone}
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-h-12 px-6 text-base font-bold"
-                  onClick={handleApplyCoupon}
-                  disabled={isApplyingCoupon || !formData.couponCode.trim()}
-                >
-                  {isApplyingCoupon ? "Validando..." : "Aplicar"}
-                </Button>
-              </div>
-              {couponFeedback?.type === "success" ? (
-                <p
-                  role="status"
-                  className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-semibold leading-6 text-primary"
-                >
-                  {couponFeedback.message}
-                </p>
-              ) : null}
-            </CardContent>
-            ) : null}
-          </Card>
+                <button type="button" onClick={() => setIsEmailOpen((open) => !open)} aria-expanded={isEmailOpen} aria-controls="checkout-email-field" className="flex min-h-11 items-center gap-2 rounded-lg text-sm font-bold text-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <ChevronDown className={`size-4 transition-transform ${isEmailOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                  {isEmailOpen ? "Ocultar email" : "Agregar email (opcional)"}
+                </button>
+                {isEmailOpen ? (
+                  <div id="checkout-email-field">
+                    <FormField label="Email (opcional)" name="email" type="email" value={formData.email} onChange={handleInputChange} onBlur={() => validateContactField("email")} autoComplete="email" error={fieldErrors.email} hint="Si lo agregás, también recibirás las novedades por email." />
+                  </div>
+                ) : null}
+              </CardContent>
+          </section>
 
-          {error ? (
-            <p
-              id="checkout-error"
-              role="alert"
-              tabIndex={-1}
-              className="rounded-xl bg-destructive/10 p-4 text-sm font-semibold text-destructive"
-            >
-              {error}
-            </p>
-          ) : null}
+          <section
+            aria-labelledby="checkout-review-title"
+            className="rounded-xl border bg-card text-card-foreground shadow"
+          >
+              <CardHeader>
+                <h2 id="checkout-review-title" className="font-semibold leading-none tracking-tight">
+                  3. Revisá y continuá al pago
+                </h2>
+                <p className="text-sm leading-5 text-muted-foreground">Mercado Pago se abrirá para que elijas cómo pagar.</p>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="rounded-xl border">
+                  <button type="button" onClick={() => setIsCouponOpen((open) => !open)} aria-expanded={isCouponOpen} aria-controls="checkout-coupon-content" className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
+                    <span>Agregar cupón <span className="font-normal text-muted-foreground">(opcional)</span></span>
+                    <ChevronDown className={`size-5 transition-transform ${isCouponOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                  </button>
+                  {isCouponOpen ? (
+                    <div id="checkout-coupon-content" className="space-y-4 border-t p-4">
+                      <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                        <FormField label="Código" name="couponCode" value={formData.couponCode} onChange={handleInputChange} placeholder="Ingresá tu código" error={fieldErrors.couponCode} />
+                        <Button type="button" variant="outline" className="min-h-12 px-6 text-base font-bold" onClick={handleApplyCoupon} disabled={isApplyingCoupon || !formData.couponCode.trim()}>
+                          {isApplyingCoupon ? "Validando..." : "Aplicar"}
+                        </Button>
+                      </div>
+                      {couponFeedback?.type === "success" ? (
+                        <p role="status" className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-semibold leading-6 text-primary">{couponFeedback.message}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="lg:hidden">{trustContent}</div>
+                <p className="text-xs leading-5 text-muted-foreground lg:hidden">
+                  El stock se reserva durante 30 minutos. Al continuar aceptás los <Link href="/terminos" className="font-semibold underline">términos de compra</Link> y la <Link href="/privacidad" className="font-semibold underline">política de privacidad</Link>.
+                </p>
+
+                {error ? (
+                  <div id="checkout-error" role="alert" tabIndex={-1} className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm leading-6 text-destructive">
+                    <p className="font-bold">No pudimos continuar</p>
+                    <p>{error}</p>
+                    <p className="mt-1">Revisá tu conexión y volvé a intentarlo. Tus datos siguen cargados.</p>
+                  </div>
+                ) : null}
+              </CardContent>
+          </section>
         </form>
 
-        <Card className="h-fit lg:sticky lg:top-24">
-          <CardHeader>
-            <CardTitle>Resumen</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              {items.map((item) => {
-                const variant = item.variant_id
-                  ? item.product?.variants?.find(
-                      (current) => current.id === item.variant_id
-                    )
-                  : null;
-                const pricing = getCartItemPricingSegments(item);
-
-                return (
-                  <div
-                    key={`${item.product_id}-${item.variant_id}`}
-                    className="text-sm"
-                  >
-                    <div className="flex justify-between gap-4">
-                      <span>
-                        {item.product?.name}
-                        {variant
-                          ? ` · ${formatStorefrontVariantSize(variant)}`
-                          : ""}{" "}
-                        × {item.quantity}
-                      </span>
-                      <span className="font-semibold">
-                        {formatPrice(getCartItemLineTotal(item))}
-                      </span>
-                    </div>
-                    {pricing.segments.map((segment, index) => (
-                      <p
-                        key={`${segment.fulfillment}-${segment.unitPrice}-${index}`}
-                        className="mt-1 text-xs text-muted-foreground"
-                      >
-                        {item.product?.uniformPriceGroup
-                          ? `${segment.quantity} prenda${segment.quantity === 1 ? "" : "s"} · `
-                          : `${segment.quantity} × ${formatPrice(segment.unitPrice)} · `}
-                        {segment.fulfillment === "immediate"
-                          ? "entrega inmediata"
-                          : "preparación en 24–48 h"}
-                      </p>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="space-y-2 border-t pt-4 text-sm">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>{formatPrice(subtotal)}</span>
-              </div>
-              {appliedCoupon ? (
-                <div className="flex justify-between font-semibold text-primary">
-                  <span>Descuento ({appliedCoupon.code})</span>
-                  <span>-{formatPrice(discount)}</span>
-                </div>
-              ) : null}
-              <div className="flex justify-between">
-                <span>{needsAddress ? "Entrega local" : "Retiro"}</span>
-                <span>{shippingCost === 0 ? "Sin costo" : formatPrice(shippingCost)}</span>
-              </div>
-              <div className="flex justify-between border-t pt-3 text-lg font-extrabold">
-                <span>Total</span>
-                <span>{formatPrice(total)}</span>
-              </div>
-            </div>
-            <ul className="space-y-2 rounded-xl bg-gloria-50 p-3 text-sm font-semibold text-gloria-900">
-              <li className="flex items-center gap-2">
-                <ShieldCheck className="size-4 text-gloria-700" />
-                Pago protegido por Mercado Pago
-              </li>
-              <li className="flex items-center gap-2">
-                <UserRoundCheck className="size-4 text-gloria-700" />
-                No necesitás crear una cuenta
-              </li>
-              <li className="flex items-center gap-2">
-                <MessageCircle className="size-4 text-gloria-700" />
-                Te confirmamos el pedido por WhatsApp
-              </li>
-            </ul>
-            <Button className="hidden min-h-14 w-full rounded-xl border border-[#0089c7] bg-[#009ee3] px-5 text-base font-extrabold text-white shadow-[0_8px_20px_-10px_rgba(0,158,227,0.9)] hover:bg-[#008fce] focus-visible:ring-2 focus-visible:ring-[#009ee3] focus-visible:ring-offset-2 lg:flex" size="lg" type="submit" form={formId} data-testid="checkout-submit" onClick={handleCheckoutCtaClick} disabled={isProcessing || !hasAvailableShippingMethod}>
-              <MercadoPagoButtonContent isProcessing={isProcessing} />
-            </Button>
-            <PaymentConfidence amount={total} compact />
-            <p className="text-xs leading-5 text-muted-foreground">
-              El stock se reserva durante 30 minutos. Al continuar aceptás los{" "}
-              <Link href="/terminos" className="font-semibold underline">
-                términos de compra
-              </Link>{" "}
-              y la{" "}
-              <Link href="/privacidad" className="font-semibold underline">
-                política de privacidad
-              </Link>
-              .
-            </p>
-          </CardContent>
-        </Card>
+        <aside className="hidden h-fit lg:sticky lg:top-20 lg:block" aria-label="Resumen y pago">
+          <Card>
+            <CardHeader className="pb-4">
+              <h2 className="font-semibold leading-none tracking-tight">Resumen de tu compra</h2>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {summaryContent}
+              {trustContent}
+              <Button
+                className="min-h-14 w-full rounded-xl border border-[#0089c7] bg-[#009ee3] px-4 text-base font-extrabold text-white shadow-[0_8px_20px_-10px_rgba(0,158,227,0.9)] hover:bg-[#008fce] focus-visible:ring-2 focus-visible:ring-[#009ee3] focus-visible:ring-offset-2"
+                size="lg"
+                type="submit"
+                form={formId}
+                data-testid="checkout-submit"
+                onClick={handleCheckoutCtaClick}
+                disabled={checkoutDisabled}
+              >
+                <MercadoPagoButtonContent isProcessing={isProcessing} />
+              </Button>
+              <p className="text-xs leading-5 text-muted-foreground">
+                El stock se reserva durante 30 minutos. Al continuar aceptás los <Link href="/terminos" className="font-semibold underline">términos de compra</Link> y la <Link href="/privacidad" className="font-semibold underline">política de privacidad</Link>.
+              </p>
+            </CardContent>
+          </Card>
+        </aside>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gloria-200 bg-background/98 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-18px_45px_-28px_oklch(0.2_0.045_136/0.55)] backdrop-blur lg:hidden">
-        <div className="mx-auto flex max-w-md items-center gap-3">
-          <div className="shrink-0">
-            <p className="text-xs font-semibold text-muted-foreground">Total</p>
-            <p className="truncate text-lg font-black">{formatPrice(total)}</p>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gloria-200 bg-background/98 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-18px_45px_-28px_oklch(0.2_0.045_136/0.55)] backdrop-blur lg:hidden">
+        <div className="mx-auto grid max-w-md gap-2">
+          <div className="flex items-center justify-between gap-4 px-1">
+            <span className="text-sm font-bold text-muted-foreground">Total</span>
+            <strong className="text-xl font-black text-gloria-950">{formatPrice(total)}</strong>
           </div>
           <Button
-            className="min-h-12 min-w-0 flex-1 rounded-xl border border-[#0089c7] bg-[#009ee3] px-3 text-sm font-extrabold text-white shadow-[0_8px_20px_-10px_rgba(0,158,227,0.9)] hover:bg-[#008fce] focus-visible:ring-2 focus-visible:ring-[#009ee3] focus-visible:ring-offset-2"
+            className="min-h-12 w-full rounded-xl border border-[#0089c7] bg-[#009ee3] px-3 text-sm font-extrabold text-white shadow-[0_8px_20px_-10px_rgba(0,158,227,0.9)] hover:bg-[#008fce] focus-visible:ring-2 focus-visible:ring-[#009ee3] focus-visible:ring-offset-2"
             type="submit"
             form={formId}
             data-testid="checkout-submit-mobile"
             onClick={handleCheckoutCtaClick}
-            disabled={isProcessing || !hasAvailableShippingMethod}
+            disabled={checkoutDisabled}
           >
-            <MercadoPagoButtonContent isProcessing={isProcessing} compact />
+            <MercadoPagoButtonContent isProcessing={isProcessing} />
           </Button>
         </div>
-        <p className="mx-auto mt-1 max-w-md text-center text-[0.68rem] font-semibold text-muted-foreground">
-          Tarjeta o dinero disponible · sin registrarte
-        </p>
       </div>
     </main>
   );
