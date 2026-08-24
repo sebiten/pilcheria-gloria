@@ -14,7 +14,7 @@ interface RetryPaymentRouteContext {
 }
 
 const retrySchema = z.object({
-  paymentProvider: z.enum(["mercadopago", "viumi"]),
+  paymentProvider: z.enum(["mercadopago", "viumi", "bank_transfer"]),
   deviceId: z
     .string()
     .trim()
@@ -39,7 +39,7 @@ export async function POST(
     )?.value;
 
     await getOrderForConfirmation(orderId, accessToken);
-    if (!getEnabledPaymentProviders().includes(body.paymentProvider)) {
+    if (!(await getEnabledPaymentProviders()).includes(body.paymentProvider)) {
       throw new Error("El procesador de pago elegido no está disponible.");
     }
     await enforceCheckoutRateLimit(request);

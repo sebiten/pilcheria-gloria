@@ -18,6 +18,8 @@ import {
   markOrderItemUnavailable,
 } from "@/actions/inventory";
 import { ConfirmSubmitButton } from "@/components/dashboard/confirm-submit-button";
+import { approveBankTransfer, rejectBankTransfer } from "@/actions/bank-transfer";
+import { Input } from "@/components/ui/input";
 import {
   getGoogleMapsDirectionsUrl,
   getPickupAddress,
@@ -75,6 +77,12 @@ export default async function DashboardOrderDetailPage({
     customerPhone && canSendManualWhatsapp
       ? `https://wa.me/${customerPhone}?text=${encodeURIComponent(notificationMessage)}`
       : null;
+  const bankAttempt = [...(order.payment_attempts || [])]
+    .sort(
+      (first: any, second: any) =>
+        new Date(second.created_at).getTime() - new Date(first.created_at).getTime()
+    )
+    .find((attempt: any) => attempt.provider === "bank_transfer");
 
   return (
     <div className="space-y-6">
@@ -205,6 +213,42 @@ export default async function DashboardOrderDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      {bankAttempt ? (
+        <Card className="border-amber-300">
+          <CardHeader><CardTitle>Transferencia bancaria</CardTitle></CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <p><strong>Método:</strong> Transferencia bancaria</p>
+              <p><strong>Importe:</strong> {formatPrice(Number(bankAttempt.amount))}</p>
+              <p><strong>Estado:</strong> {bankAttempt.status === "review" ? "Avisada · en revisión" : bankAttempt.status}</p>
+              <p><strong>Fecha del aviso:</strong> {bankAttempt.transfer_notified_at ? new Date(bankAttempt.transfer_notified_at).toLocaleString("es-AR") : "Sin aviso"}</p>
+              {bankAttempt.bank_reference ? <p><strong>Referencia bancaria:</strong> {bankAttempt.bank_reference}</p> : null}
+              {bankAttempt.transfer_reviewed_at ? <p><strong>Confirmada:</strong> {new Date(bankAttempt.transfer_reviewed_at).toLocaleString("es-AR")}</p> : null}
+            </div>
+            <p className="rounded-xl border border-red-300 bg-red-50 p-3 font-semibold leading-6 text-red-950">
+              Nunca apruebes una transferencia solo por una captura. Verificá el movimiento acreditado en la cuenta y que coincidan importe y titular.
+            </p>
+            {bankAttempt.status === "review" ? (
+              <div className="grid gap-3 lg:grid-cols-2">
+                <form action={approveBankTransfer.bind(null, order.id, bankAttempt.id)} className="space-y-2 rounded-xl border p-3">
+                  <label htmlFor="bankReference" className="font-semibold">Referencia bancaria (opcional)</label>
+                  <Input id="bankReference" name="bankReference" maxLength={200} placeholder="ID o referencia del movimiento" />
+                  <ConfirmSubmitButton className="min-h-11 w-full" confirmation="¿Confirmaste la acreditación directamente en la cuenta bancaria?">
+                    Confirmar acreditación
+                  </ConfirmSubmitButton>
+                </form>
+                <form action={rejectBankTransfer.bind(null, order.id, bankAttempt.id)} className="rounded-xl border p-3">
+                  <p className="mb-3 leading-6 text-muted-foreground">Cancela el pedido, libera stock y restaura el cupón una sola vez.</p>
+                  <ConfirmSubmitButton variant="outline" className="min-h-11 w-full text-destructive" confirmation="¿Confirmás que la transferencia no fue recibida?">
+                    Transferencia no recibida
+                  </ConfirmSubmitButton>
+                </form>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="admin-responsive-table overflow-hidden">
         <CardHeader>

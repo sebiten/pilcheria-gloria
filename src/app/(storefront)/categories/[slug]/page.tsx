@@ -42,6 +42,7 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: `/categories/${category.slug}` },
+    robots: isSchoolUniforms ? undefined : { index: false, follow: true },
     openGraph: {
       title,
       description,

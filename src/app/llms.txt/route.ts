@@ -20,7 +20,7 @@ export function GET() {
 - Sitio oficial: ${absoluteUrl("/")}
 - Idioma: es-AR
 - Ubicacion: ${SITE_LOCALITY}, ${SITE_DEPARTMENT}, ${SITE_REGION}, ${SITE_COUNTRY}
-- Actividad: indumentaria, ropa para toda la familia y uniformes escolares
+- Actividad: uniformes escolares para primaria y secundaria
 
 ## Paginas importantes
 

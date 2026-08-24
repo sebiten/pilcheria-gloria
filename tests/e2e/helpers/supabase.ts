@@ -219,11 +219,13 @@ export async function getLatestOrderForProduct(productId: string) {
       status,
       mercadopago_id,
       mercadopago_status,
+      mercadopago_status_detail,
       stock_restored,
       stock_reserved,
       reservation_expires_at,
       guest_access_token,
-      items:order_items(product_id, variant_id, quantity)
+      items:order_items(product_id, variant_id, quantity),
+      payment_attempts:order_payment_attempts(id, provider, status, amount, transfer_notified_at, created_at)
     `)
     .in("id", orderIds)
     .order("created_at", { ascending: false })
@@ -235,6 +237,59 @@ export async function getLatestOrderForProduct(productId: string) {
   }
 
   return data as OrderWithItems;
+}
+
+export async function enableBankTransferForTest() {
+  const supabase = getSupabaseAdmin();
+  const [{ data: bank, error: bankError }, { data: store, error: storeError }] =
+    await Promise.all([
+      supabase.from("bank_transfer_settings").select("*").eq("id", 1).single(),
+      supabase.from("store_settings").select("whatsapp_phone").eq("id", 1).single(),
+    ]);
+  if (bankError || storeError) throw bankError || storeError;
+
+  const { error: updateBankError } = await supabase
+    .from("bank_transfer_settings")
+    .update({
+      enabled: true,
+      account_alias: "gloria.e2e",
+      account_holder: "PILCHERIA GLORIA E2E",
+      institution_name: "Banco E2E",
+      account_number: "0000000000000000000000",
+    })
+    .eq("id", 1);
+  if (updateBankError) throw updateBankError;
+  const { error: updateStoreError } = await supabase
+    .from("store_settings")
+    .update({ whatsapp_phone: "3884000000" })
+    .eq("id", 1);
+  if (updateStoreError) throw updateStoreError;
+  return { bank, whatsappPhone: store.whatsapp_phone };
+}
+
+export async function restoreBankTransferAfterTest(snapshot: {
+  bank: Record<string, unknown>;
+  whatsappPhone: string | null;
+}) {
+  const supabase = getSupabaseAdmin();
+  const { id: _id, created_at: _createdAt, ...bank } = snapshot.bank;
+  await supabase.from("bank_transfer_settings").update(bank).eq("id", 1);
+  await supabase
+    .from("store_settings")
+    .update({ whatsapp_phone: snapshot.whatsappPhone })
+    .eq("id", 1);
+}
+
+export async function getBankTransferAttempt(orderId: string) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("order_payment_attempts")
+    .select("id, provider, status, amount, transfer_notified_at")
+    .eq("order_id", orderId)
+    .eq("provider", "bank_transfer")
+    .single();
+  if (error || !data) throw error ?? new Error("Intento bancario no encontrado");
+  return data;
 }
 
 async function createReservedOrderForProduct(

@@ -9,7 +9,7 @@ export type OrderStatus =
   | "delivered"
   | "cancelled";
 
-export type PaymentProvider = "mercadopago" | "viumi";
+export type PaymentProvider = "mercadopago" | "viumi" | "bank_transfer";
 export type PaymentAttemptStatus =
   | "created"
   | "pending"
@@ -207,6 +207,25 @@ export interface OrderPaymentAttempt {
   created_at: string;
   updated_at: string;
   terminal_at: string | null;
+  transfer_notified_at?: string | null;
+  transfer_reviewed_at?: string | null;
+  transfer_reviewed_by?: string | null;
+  bank_reference?: string | null;
+}
+
+export interface BankTransferSettings {
+  enabled: boolean;
+  account_alias: string;
+  account_holder: string;
+  institution_name: string | null;
+  account_number: string | null;
+}
+
+export interface BankTransferDetails {
+  alias: string;
+  holder: string;
+  institution: string | null;
+  accountNumber: string | null;
 }
 
 export interface OrderItem {

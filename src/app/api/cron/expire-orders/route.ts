@@ -37,8 +37,8 @@ async function expireAbandonedOrders(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data: orders, error } = await supabase
     .from("orders")
-    .select("id")
-    .eq("status", "pending")
+    .select("id, status, payment_attempts:order_payment_attempts(id, provider, status)")
+    .in("status", ["pending", "payment_review"])
     .lte("reservation_expires_at", new Date().toISOString())
     .order("reservation_expires_at", { ascending: true })
     .limit(50);
@@ -57,6 +57,32 @@ async function expireAbandonedOrders(request: Request) {
 
   for (const order of orders || []) {
     try {
+      const bankAttempt = (order.payment_attempts || []).find(
+        (attempt: any) =>
+          attempt.provider === "bank_transfer" &&
+          ["pending", "review"].includes(attempt.status)
+      );
+      if (bankAttempt) {
+        const reason =
+          bankAttempt.status === "review"
+            ? "Revisión de transferencia vencida sin resolver"
+            : "Reserva de transferencia vencida sin aviso";
+        const { data: cancelled, error: bankError } = await supabase.rpc(
+          "reject_bank_transfer",
+          {
+            p_order_id: order.id,
+            p_attempt_id: bankAttempt.id,
+            p_reason: reason,
+          }
+        );
+        if (bankError) throw bankError;
+        if (cancelled) {
+          await sendOrderEmail(order.id, "cancelled").catch(console.error);
+          summary.expired += 1;
+        }
+        continue;
+      }
+
       const paymentSearch = await searchPaymentsByExternalReference(order.id);
       const payments = Array.isArray(paymentSearch?.results)
         ? paymentSearch.results

@@ -16,6 +16,19 @@ const supabaseHostname = (() => {
   }
 })();
 
+const retiredCategorySlugs = [
+  "colchones",
+  "sommiers",
+  "accesorios",
+  "hombre",
+  "hombre-remeras",
+  "hombre-jeans",
+  "mujer",
+  "mujer-remeras",
+  "mujer-jeans",
+  "mujer-otras-prendas",
+];
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${
@@ -55,6 +68,11 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      ...retiredCategorySlugs.map((slug) => ({
+        source: `/categories/${slug}`,
+        destination: "/uniformes",
+        permanent: true,
+      })),
       {
         source: "/products",
         destination: "/uniformes",

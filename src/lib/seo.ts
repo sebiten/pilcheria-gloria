@@ -90,25 +90,14 @@ export function getStorefrontJsonLd(settings: StoreSettings) {
       : undefined,
     hasOfferCatalog: {
       "@type": "OfferCatalog",
-      name: "Uniformes escolares y ropa",
-      itemListElement: [
-        {
+      name: "Uniformes escolares",
+      description: SCHOOL_UNIFORMS_DESCRIPTION,
+      itemListElement: ["Remeras escolares", "Chombas escolares"].map(
+        (name) => ({
           "@type": "OfferCatalog",
-          name: "Uniformes escolares",
-          description: SCHOOL_UNIFORMS_DESCRIPTION,
-          itemListElement: [
-            "Remeras escolares",
-            "Chombas escolares",
-          ].map((name) => ({
-            "@type": "OfferCatalog",
-            name,
-          })),
-        },
-        {
-          "@type": "OfferCatalog",
-          name: "Indumentaria para mujer y hombre",
-        },
-      ],
+          name,
+        })
+      ),
     },
   };
 

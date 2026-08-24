@@ -354,6 +354,16 @@ async function reconcilePendingOrderPayment(order: any) {
     return order;
   }
 
+  if (
+    order.payment_attempts?.some(
+      (attempt: any) =>
+        attempt.provider === "bank_transfer" &&
+        ["pending", "review", "approved"].includes(attempt.status)
+    )
+  ) {
+    return order;
+  }
+
   try {
     const paymentSearch = await searchPaymentsByExternalReference(order.id);
     const payments = Array.isArray(paymentSearch?.results)
@@ -705,7 +715,6 @@ export async function startOrderPayment(
 ) {
   assertCheckoutRouteCapability(capability);
   const supabase = getSupabaseAdmin();
-  const adapter = getPaymentAdapter(provider);
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select("id, status, total, shipping_address, reservation_expires_at")
@@ -724,6 +733,46 @@ export async function startOrderPayment(
   ) {
     throw new Error("La reserva de stock venció. Volvé al carrito para continuar");
   }
+
+  const { data: currentAttempt, error: currentAttemptError } = await supabase
+    .from("order_payment_attempts")
+    .select("id, provider, status")
+    .eq("order_id", orderId)
+    .in("status", ["created", "pending", "in_process", "review"])
+    .maybeSingle();
+  if (currentAttemptError) throw currentAttemptError;
+
+  if (provider === "bank_transfer") {
+    const { data: attemptId, error: bankError } = await supabase.rpc(
+      "create_bank_transfer_attempt",
+      { p_order_id: orderId }
+    );
+    if (bankError) throw new Error(bankError.message);
+    const checkoutUrl = `/order-confirmation/${orderId}`;
+    const { data: bankAttempt, error: bankAttemptError } = await supabase
+      .from("order_payment_attempts")
+      .update({ checkout_url: checkoutUrl, updated_at: new Date().toISOString() })
+      .eq("id", attemptId)
+      .select()
+      .single();
+    if (bankAttemptError || !bankAttempt) {
+      throw bankAttemptError ?? new Error("No se pudo preparar la transferencia");
+    }
+    return bankAttempt;
+  }
+
+  if (currentAttempt?.provider === "bank_transfer") {
+    if (provider !== "mercadopago") {
+      throw new Error("La transferencia solo puede reemplazarse por Mercado Pago.");
+    }
+    const { error: replaceError } = await supabase.rpc(
+      "replace_bank_transfer_attempt",
+      { p_order_id: orderId, p_attempt_id: currentAttempt.id }
+    );
+    if (replaceError) throw new Error(replaceError.message);
+  }
+
+  const adapter = getPaymentAdapter(provider);
 
   const address = (order.shipping_address || {}) as CheckoutAddressMetadata;
   const checkoutFingerprint = address._checkout_fingerprint;
@@ -894,8 +943,14 @@ export async function getOrders() {
         provider,
         status,
         status_detail,
+        amount,
         checkout_url,
-        created_at
+        created_at,
+        updated_at,
+        transfer_notified_at,
+        transfer_reviewed_at,
+        transfer_reviewed_by,
+        bank_reference
       )
     `)
     .eq("clerk_user_id", userId)
@@ -937,8 +992,14 @@ export async function getOrderById(id: string) {
         provider,
         status,
         status_detail,
+        amount,
         checkout_url,
-        created_at
+        created_at,
+        updated_at,
+        transfer_notified_at,
+        transfer_reviewed_at,
+        transfer_reviewed_by,
+        bank_reference
       )
     `)
     .eq("id", id)
@@ -981,10 +1042,15 @@ export async function getOrderForConfirmation(id: string, accessToken?: string) 
         provider,
         status,
         status_detail,
+        amount,
         checkout_url,
         created_at,
         updated_at,
-        terminal_at
+        terminal_at,
+        transfer_notified_at,
+        transfer_reviewed_at,
+        transfer_reviewed_by,
+        bank_reference
       )
     `)
     .eq("id", id)
@@ -1066,7 +1132,16 @@ export async function updateOrderStatus(id: string, status: string) {
   }
 
   if (status === "cancelled") {
-    if (paymentAttempt?.external_id) {
+    if (
+      paymentAttempt?.provider === "bank_transfer" &&
+      paymentAttempt.status === "approved"
+    ) {
+      const { error: refundError } = await supabase.rpc(
+        "create_order_bank_refund",
+        { p_order_id: id }
+      );
+      if (refundError) throw new Error(refundError.message);
+    } else if (paymentAttempt?.external_id) {
       const adapter = getPaymentAdapter(paymentAttempt.provider as PaymentProvider);
       if (
         ["approved", "review"].includes(paymentAttempt.status) ||

@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ExternalLink,
   LoaderCircle,
+  Landmark,
   MapPin,
   MessageCircle,
   RefreshCw,
@@ -111,14 +112,18 @@ function PaymentButtonContent({
             className="h-auto w-6"
             aria-hidden="true"
           />
+        ) : provider === "bank_transfer" ? (
+          <Landmark className="size-5 text-gloria-800" aria-hidden="true" />
         ) : (
           <span className="text-xs font-black text-violet-700">viüMi</span>
         )}
       </span>
       <span>
         {isProcessing
-          ? "Preparando el pago…"
-          : `Continuar a ${provider === "mercadopago" ? "Mercado Pago" : "viüMi"}`}
+          ? provider === "bank_transfer" ? "Reservando…" : "Preparando el pago…"
+          : provider === "bank_transfer"
+            ? "Reservar y ver datos de transferencia"
+            : `Continuar a ${provider === "mercadopago" ? "Mercado Pago" : "viüMi"}`}
       </span>
     </>
   );
@@ -755,11 +760,15 @@ export function CheckoutForm({
       <ul className="space-y-2 text-sm font-semibold text-gloria-950">
         <li className="flex items-center gap-2">
           <ShieldCheck className="size-4 shrink-0 text-gloria-700" aria-hidden="true" />
-          Pago protegido por {paymentProvider === "mercadopago" ? "Mercado Pago" : "viüMi"}
+          {paymentProvider === "bank_transfer"
+            ? "Transferencia vinculada a este pedido"
+            : `Pago protegido por ${paymentProvider === "mercadopago" ? "Mercado Pago" : "viüMi"}`}
         </li>
         <li className="flex items-center gap-2">
           <UserRoundCheck className="size-4 shrink-0 text-gloria-700" aria-hidden="true" />
-          Tus datos de pago se ingresan en el procesador elegido
+          {paymentProvider === "bank_transfer"
+            ? "Confirmamos manualmente al verificar la acreditación"
+            : "Tus datos de pago se ingresan en el procesador elegido"}
         </li>
         <li className="flex items-center gap-2">
           <MessageCircle className="size-4 shrink-0 text-gloria-700" aria-hidden="true" />
@@ -1042,7 +1051,7 @@ export function CheckoutForm({
                 <h2 id="checkout-review-title" className="font-semibold leading-none tracking-tight">
                   3. Revisá y continuá al pago
                 </h2>
-                <p className="text-sm leading-5 text-muted-foreground">Te redirigiremos al procesador que elijas.</p>
+                <p className="text-sm leading-5 text-muted-foreground">El importe es el mismo con cualquier método.</p>
               </CardHeader>
               <CardContent className="space-y-5">
                 <RadioGroup
@@ -1066,6 +1075,13 @@ export function CheckoutForm({
                       id="viumi"
                       name="viüMi"
                       description="Pago seguro con viüMi"
+                    />
+                  ) : null}
+                  {enabledPaymentProviders.includes("bank_transfer") ? (
+                    <PaymentProviderOption
+                      id="bank_transfer"
+                      name="Transferencia bancaria"
+                      description="Mismo precio · confirmación manual"
                     />
                   ) : null}
                 </RadioGroup>
@@ -1096,7 +1112,7 @@ export function CheckoutForm({
 
                 <div className="lg:hidden">{trustContent}</div>
                 <p className="text-xs leading-5 text-muted-foreground lg:hidden">
-                  El stock se reserva durante 30 minutos. Al continuar aceptás los <Link href="/terminos" className="font-semibold underline">términos de compra</Link> y la <Link href="/privacidad" className="font-semibold underline">política de privacidad</Link>.
+                  El stock se reserva durante {paymentProvider === "bank_transfer" ? "2 horas" : "30 minutos"}. Al continuar aceptás los <Link href="/terminos" className="font-semibold underline">términos de compra</Link> y la <Link href="/privacidad" className="font-semibold underline">política de privacidad</Link>.
                 </p>
 
                 {error ? (
@@ -1130,7 +1146,7 @@ export function CheckoutForm({
                 <PaymentButtonContent isProcessing={isProcessing} provider={paymentProvider} />
               </Button>
               <p className="text-xs leading-5 text-muted-foreground">
-                El stock se reserva durante 30 minutos. Al continuar aceptás los <Link href="/terminos" className="font-semibold underline">términos de compra</Link> y la <Link href="/privacidad" className="font-semibold underline">política de privacidad</Link>.
+                El stock se reserva durante {paymentProvider === "bank_transfer" ? "2 horas" : "30 minutos"}. Al continuar aceptás los <Link href="/terminos" className="font-semibold underline">términos de compra</Link> y la <Link href="/privacidad" className="font-semibold underline">política de privacidad</Link>.
               </p>
             </CardContent>
           </Card>
@@ -1180,6 +1196,8 @@ function PaymentProviderOption({
         <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
           {imageSrc ? (
             <Image src={imageSrc} alt="" width={30} height={22} aria-hidden="true" />
+          ) : id === "bank_transfer" ? (
+            <Landmark className="size-5 text-gloria-800" aria-hidden="true" />
           ) : (
             <span className="text-xs font-black text-violet-700">viüMi</span>
           )}

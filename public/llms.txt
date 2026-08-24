@@ -1,21 +1,19 @@
 # Pilchería Gloria
 
-Pilchería Gloria es una tienda de ropa y uniformes escolares ubicada en Libertador General San Martín, departamento Ledesma, Jujuy, Argentina.
+Pilchería Gloria es una tienda de uniformes escolares ubicada en Libertador General San Martín, departamento Ledesma, Jujuy, Argentina.
 
 ## Oferta principal
 
-- Indumentaria para mujer y hombre.
 - Uniformes para escuelas primarias y secundarias de Ledesma.
-- Remeras, camisas, pantalones y medias escolares.
+- Remeras y chombas escolares.
 - Talles infantiles, juveniles y de adulto, sujetos al stock publicado.
 - Compra online, atención por WhatsApp, retiro coordinado y entrega local cuando estén habilitados.
 
 ## Páginas principales
 
 - Inicio: /
-- Catálogo: /products
-- Tienda de uniformes escolares: /products
-- Guía de talles: /guia-de-talles
+- Catálogo: /uniformes
+- Tienda de uniformes escolares: /uniformes
 - Cambios y devoluciones: /cambios-y-devoluciones
 - Términos de compra: /terminos
 - Privacidad: /privacidad

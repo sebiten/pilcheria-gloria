@@ -12,10 +12,11 @@ export const metadata: Metadata = {
 };
 
 export default async function CheckoutPage() {
-  const [addresses, profile, settings] = await Promise.all([
+  const [addresses, profile, settings, enabledPaymentProviders] = await Promise.all([
     getAddresses(),
     getProfile(),
     getStoreSettings(),
+    getEnabledPaymentProviders(),
   ]);
 
   return (
@@ -23,7 +24,7 @@ export default async function CheckoutPage() {
       addresses={addresses}
       profile={profile}
       settings={settings}
-      enabledPaymentProviders={getEnabledPaymentProviders()}
+      enabledPaymentProviders={enabledPaymentProviders}
     />
   );
 }

@@ -216,6 +216,21 @@ export const orderPaymentAttempts = pgTable("order_payment_attempts", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   terminalAt: timestamp("terminal_at", { withTimezone: true }),
+  transferNotifiedAt: timestamp("transfer_notified_at", { withTimezone: true }),
+  transferReviewedAt: timestamp("transfer_reviewed_at", { withTimezone: true }),
+  transferReviewedBy: text("transfer_reviewed_by"),
+  bankReference: text("bank_reference"),
+});
+
+export const bankTransferSettings = pgTable("bank_transfer_settings", {
+  id: smallint("id").primaryKey().default(1),
+  enabled: boolean("enabled").notNull().default(false),
+  accountAlias: text("account_alias").notNull().default(""),
+  accountHolder: text("account_holder").notNull().default(""),
+  institutionName: text("institution_name"),
+  accountNumber: text("account_number"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const productReviewInvites = pgTable("product_review_invites", {

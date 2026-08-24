@@ -29,6 +29,8 @@ import { RetryPaymentButton } from "./retry-payment-button";
 import styles from "./purchase-celebration.module.css";
 import { getEnabledPaymentProviders } from "@/lib/payments/providers";
 import type { PaymentProvider } from "@/types";
+import { getAuthorizedBankTransferDetails } from "@/lib/payments/bank-transfer";
+import { BankTransferPanel } from "./bank-transfer-panel";
 
 export const metadata: Metadata = {
   title: "Confirmación del pedido",
@@ -143,7 +145,7 @@ export default async function OrderConfirmationPage({
 
   if (isRejected && order) {
     const settings = await getStoreSettings();
-    const enabledProviders = getEnabledPaymentProviders();
+    const enabledProviders = await getEnabledPaymentProviders();
     const whatsappPhone = settings.whatsapp_phone?.replace(/\D/g, "");
     const whatsappHref = whatsappPhone
       ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(
@@ -200,6 +202,40 @@ export default async function OrderConfirmationPage({
           </Button>
         </div>
       </main>
+    );
+  }
+
+  const isActiveBankTransfer = Boolean(
+    order &&
+      latestAttempt?.provider === "bank_transfer" &&
+      ["pending", "review"].includes(latestAttempt.status) &&
+      ["pending", "payment_review"].includes(order.status)
+  );
+
+  if (isActiveBankTransfer && order) {
+    const [details, enabledProviders] = await Promise.all([
+      getAuthorizedBankTransferDetails(),
+      getEnabledPaymentProviders(),
+    ]);
+    const canSwitchToMercadoPago =
+      latestAttempt.status === "pending" && enabledProviders.includes("mercadopago");
+
+    return (
+      <BankTransferPanel
+        orderId={id}
+        total={Number(order.total)}
+        details={details}
+        notified={latestAttempt.status === "review"}
+        mercadoPagoFallback={
+          canSwitchToMercadoPago ? (
+            <RetryPaymentButton
+              orderId={id}
+              providers={["mercadopago"]}
+              previousProvider={"bank_transfer"}
+            />
+          ) : undefined
+        }
+      />
     );
   }
 

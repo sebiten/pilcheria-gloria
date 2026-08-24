@@ -68,7 +68,7 @@ export default function OpenGraphImage() {
               letterSpacing: -4,
             }}
           >
-            Ropa para sentirte vos.
+            El uniforme de tu escuela.
           </div>
           <div
             style={{
@@ -78,7 +78,7 @@ export default function OpenGraphImage() {
               color: "#486139",
             }}
           >
-            Uniformes escolares y ropa · Ledesma, Jujuy
+            Uniformes escolares · Ledesma, Jujuy
           </div>
         </div>
       </div>

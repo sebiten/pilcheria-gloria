@@ -113,7 +113,11 @@ export function RetryPaymentButton({
                 htmlFor={`retry-${item}`}
                 className="flex min-h-14 cursor-pointer items-center justify-center rounded-xl border p-3 font-bold peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5"
               >
-                {item === "mercadopago" ? "Mercado Pago" : "viüMi"}
+                {item === "mercadopago"
+                  ? "Mercado Pago"
+                  : item === "bank_transfer"
+                    ? "Transferencia"
+                    : "viüMi"}
               </Label>
             </div>
           ))}
@@ -132,7 +136,9 @@ export function RetryPaymentButton({
         )}
         {isLoading
           ? "Preparando el pago…"
-          : `Pagar con ${provider === "mercadopago" ? "Mercado Pago" : "viüMi"}`}
+          : provider === "bank_transfer"
+            ? "Reservar y ver datos de transferencia"
+            : `Pagar con ${provider === "mercadopago" ? "Mercado Pago" : "viüMi"}`}
       </Button>
       {isCoolingDown ? (
         <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold leading-5 text-amber-950">
