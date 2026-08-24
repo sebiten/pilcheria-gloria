@@ -13,6 +13,7 @@ type OrderWithItems = {
   status: string;
   mercadopago_id: string | null;
   mercadopago_status: string | null;
+  mercadopago_status_detail: string | null;
   stock_restored: boolean;
   stock_reserved: boolean;
   reservation_expires_at: string | null;
@@ -162,10 +163,29 @@ export async function cleanupCheckoutSmokeProduct(seed: SeededProduct) {
   const orderIds = Array.from(
     new Set((orderItems || []).map((item) => item.order_id).filter(Boolean))
   );
+  const { data: orders } = orderIds.length
+    ? await supabase
+        .from("orders")
+        .select("analytics_session_id")
+        .in("id", orderIds)
+    : { data: [] };
+  const analyticsSessionIds = (orders || [])
+    .map((order) => order.analytics_session_id)
+    .filter(Boolean);
 
   await supabase.from("order_items").delete().eq("product_id", seed.productId);
   if (orderIds.length > 0) {
+    await supabase
+      .from("storefront_analytics_events")
+      .delete()
+      .in("order_id", orderIds);
     await supabase.from("orders").delete().in("id", orderIds);
+  }
+  if (analyticsSessionIds.length > 0) {
+    await supabase
+      .from("storefront_analytics_events")
+      .delete()
+      .in("session_id", analyticsSessionIds);
   }
   await supabase.from("cart_items").delete().eq("product_id", seed.productId);
   await supabase.from("product_images").delete().eq("product_id", seed.productId);
@@ -223,6 +243,19 @@ async function createReservedOrderForProduct(
   email: string
 ) {
   const supabase = getSupabaseAdmin();
+  const analyticsSessionId = crypto.randomUUID();
+  const { error: analyticsError } = await supabase
+    .from("storefront_analytics_events")
+    .insert({
+      session_id: analyticsSessionId,
+      event_name: "checkout_view",
+      path: "/checkout",
+      source: "direct",
+      device_type: "mobile",
+      analytics_version: 6,
+    });
+  if (analyticsError) throw analyticsError;
+
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -236,6 +269,7 @@ async function createReservedOrderForProduct(
       },
       status: "pending",
       reservation_expires_at: reservationExpiresAt,
+      analytics_session_id: analyticsSessionId,
     })
     .select("id")
     .single();
@@ -287,7 +321,7 @@ export async function getOrderState(orderId: string) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("orders")
-    .select("status, stock_reserved, stock_restored, cancel_reason, mercadopago_id, mercadopago_status")
+    .select("status, stock_reserved, stock_restored, reservation_expires_at, cancel_reason, mercadopago_id, mercadopago_status, mercadopago_status_detail")
     .eq("id", orderId)
     .single();
 
@@ -296,6 +330,23 @@ export async function getOrderState(orderId: string) {
   }
 
   return data;
+}
+
+export async function getPaymentAnalyticsEvents(orderId: string) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("storefront_analytics_events")
+    .select("event_name, event_detail, payment_id")
+    .eq("order_id", orderId)
+    .in("event_name", [
+      "payment_approved",
+      "payment_rejected",
+      "payment_pending",
+      "purchase",
+    ]);
+
+  if (error) throw error;
+  return data || [];
 }
 
 export async function getVariantStock(variantId: string) {

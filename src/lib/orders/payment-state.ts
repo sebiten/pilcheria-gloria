@@ -11,6 +11,7 @@ export const PENDING_PAYMENT_EXTENSION_HOURS = 24;
 export type MercadoPagoPayment = {
   id: string | number;
   status: string;
+  status_detail?: string | null;
   external_reference?: string | null;
   transaction_amount?: number | null;
   currency_id?: string | null;
@@ -100,6 +101,7 @@ export async function applyMercadoPagoPayment(
           status: "payment_review",
           mercadopago_id: String(payment.id),
           mercadopago_status: payment.status,
+          mercadopago_status_detail: payment.status_detail ?? null,
           cancel_reason:
             "Pago recibido con importe, moneda o cuenta receptora inconsistente",
         })
@@ -118,6 +120,7 @@ export async function applyMercadoPagoPayment(
     p_order_id: orderId,
     p_payment_id: String(payment.id),
     p_payment_status: payment.status,
+    p_payment_status_detail: payment.status_detail ?? null,
   });
 
   if (error) {
@@ -153,6 +156,7 @@ export async function extendPendingPaymentReservation(
     .update({
       mercadopago_id: String(payment.id),
       mercadopago_status: payment.status,
+      mercadopago_status_detail: payment.status_detail ?? null,
       reservation_expires_at: reservationExpiresAt,
     })
     .eq("id", orderId)

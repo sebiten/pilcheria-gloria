@@ -514,7 +514,7 @@ export async function createOrder(
     shippingMethod: string;
     shippingAddress: ShippingAddress;
     couponCode?: string;
-    expectedSubtotal: number;
+    expectedSubtotal?: number;
     checkoutRequestId: string;
     requestFingerprint: string;
     analyticsSessionId?: string | null;
@@ -534,7 +534,10 @@ export async function createOrder(
     (sum, item) => sum + item.unitPrice * item.quantity,
     0
   );
-  if (Math.abs(subtotal - expectedSubtotal) > 0.01) {
+  if (
+    expectedSubtotal !== undefined &&
+    Math.abs(subtotal - expectedSubtotal) > 0.01
+  ) {
     throw new Error(
       "El precio o la disponibilidad cambió. Revisá el carrito antes de pagar."
     );
@@ -738,8 +741,8 @@ export async function createOrder(
       notification_url: `${appUrl}/api/webhooks/mercadopago?source_news=webhooks`,
       back_urls: {
         success: `${appUrl}/order-confirmation/${order.id}`,
-        failure: `${appUrl}/checkout`,
-        pending: `${appUrl}/checkout`,
+        failure: `${appUrl}/order-confirmation/${order.id}`,
+        pending: `${appUrl}/order-confirmation/${order.id}`,
       },
       auto_return: "approved",
       expires: true,

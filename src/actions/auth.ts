@@ -10,6 +10,10 @@ import { revalidatePath } from "next/cache";
 import type { Profile } from "@/types";
 import type { Role } from "@/types";
 import { reportDataFallback } from "@/lib/logging";
+import {
+  isValidArgentinaContactPhone,
+  normalizeArgentinaWhatsAppPhone,
+} from "@/lib/contact";
 
 const idSchema = z.string().uuid();
 const addressSchema = z.object({
@@ -22,7 +26,14 @@ const addressSchema = z.object({
 });
 const profileContactSchema = z.object({
   fullName: z.string().trim().max(120).optional(),
-  phone: z.string().trim().max(32).optional(),
+  phone: z
+    .string()
+    .trim()
+    .max(32)
+    .refine((phone) => !phone || isValidArgentinaContactPhone(phone), {
+      message: "Ingresá un WhatsApp válido con código de área.",
+    })
+    .optional(),
 });
 
 type ProfileRow = {
@@ -327,7 +338,9 @@ export async function updateProfileContact(input: {
   const parsedInput = profileContactSchema.parse(input);
   const payload = {
     full_name: parsedInput.fullName || null,
-    phone: parsedInput.phone || null,
+    phone: parsedInput.phone
+      ? normalizeArgentinaWhatsAppPhone(parsedInput.phone)
+      : null,
   };
 
   const { error } = await supabase

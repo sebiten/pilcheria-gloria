@@ -1,4 +1,4 @@
-export const ANALYTICS_VERSION = 5;
+export const ANALYTICS_VERSION = 6;
 
 export const CLIENT_ANALYTICS_EVENT_NAMES = [
   "page_view",
@@ -21,6 +21,8 @@ export const CLIENT_ANALYTICS_EVENT_NAMES = [
 
 export const SERVER_ANALYTICS_EVENT_NAMES = [
   "payment_approved",
+  "payment_rejected",
+  "payment_pending",
   "purchase",
 ] as const;
 
@@ -75,6 +77,8 @@ export type AnalyticsDashboardData = {
     checkout_submits: number;
     payment_redirect_sessions: number;
     payment_approved_sessions: number;
+    payment_rejected_sessions: number;
+    payment_pending_sessions: number;
     confirmation_sessions: number;
     purchasing_sessions: number;
     paid_orders: number;
@@ -86,6 +90,12 @@ export type AnalyticsDashboardData = {
   };
   checkout_errors: Array<{
     detail: AnalyticsEventDetail;
+    sessions: number;
+  }>;
+  payment_rejection_reasons: Array<{
+    category: "data" | "issuer" | "risk" | "other";
+    detail: string;
+    payments: number;
     sessions: number;
   }>;
   campaigns: Array<{

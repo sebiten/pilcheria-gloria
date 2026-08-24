@@ -173,6 +173,7 @@ export interface Order {
   cancel_reason?: string | null;
   mercadopago_id: string | null;
   mercadopago_status: string | null;
+  mercadopago_status_detail?: string | null;
   refund_status?: RefundStatus;
   refunded_amount?: number;
   refunds?: ManualRefund[];

@@ -14,12 +14,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
 import { getOrderForConfirmation } from "@/actions/orders";
+import { getStoreSettings } from "@/actions/store-settings";
 import {
   getOrderStatusDescription,
   getOrderStatusLabel,
 } from "@/lib/commerce";
 import { getOrderConfirmationCookieName } from "@/lib/orders/confirmation-access";
+import { getPaymentRejectionHint } from "@/lib/orders/payment-rejection";
 import { ClearCartOnMount } from "./clear-cart-on-mount";
+import { RetryPaymentButton } from "./retry-payment-button";
 import styles from "./purchase-celebration.module.css";
 
 export const metadata: Metadata = {
@@ -33,6 +36,7 @@ interface OrderConfirmationPageProps {
     token?: string;
     payment_id?: string;
     collection_id?: string;
+    external_reference?: string;
     verification?: string;
   }>;
 }
@@ -77,7 +81,13 @@ export default async function OrderConfirmationPage({
   searchParams,
 }: OrderConfirmationPageProps) {
   const { id } = await params;
-  const { token, payment_id, collection_id, verification } = await searchParams;
+  const {
+    token,
+    payment_id,
+    collection_id,
+    external_reference,
+    verification,
+  } = await searchParams;
 
   if (token) {
     redirect(
@@ -88,8 +98,12 @@ export default async function OrderConfirmationPage({
   const returnPaymentId = payment_id || collection_id;
 
   if (returnPaymentId) {
+    const returnParams = new URLSearchParams({ payment_id: returnPaymentId });
+    if (external_reference) {
+      returnParams.set("external_reference", external_reference);
+    }
     redirect(
-      `/api/order-confirmation/${encodeURIComponent(id)}?payment_id=${encodeURIComponent(returnPaymentId)}`
+      `/api/order-confirmation/${encodeURIComponent(id)}?${returnParams.toString()}`
     );
   }
 
@@ -109,6 +123,63 @@ export default async function OrderConfirmationPage({
   const orderCode = id.slice(0, 8).toUpperCase();
   const retryPath = `/api/order-confirmation/${encodeURIComponent(id)}?retry=1`;
   const isPending = order?.status === "pending";
+  const isRejected = Boolean(
+    order?.status === "cancelled" &&
+      ["rejected", "cancelled"].includes(order.mercadopago_status || "")
+  );
+
+  if (isRejected && order) {
+    const settings = await getStoreSettings();
+    const whatsappPhone = settings.whatsapp_phone?.replace(/\D/g, "");
+    const whatsappHref = whatsappPhone
+      ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(
+          `Hola, necesito ayuda con el pago del pedido ${orderCode}.`
+        )}`
+      : null;
+
+    return (
+      <main className="mx-auto w-full max-w-xl px-4 py-10 sm:py-16">
+        <div className="text-center">
+          <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-red-100 text-red-800">
+            <CircleAlert className="size-8" />
+          </div>
+          <h1 className="mt-5 font-display text-4xl leading-none text-gloria-950">
+            El pago no se completó
+          </h1>
+          <p className="mx-auto mt-4 max-w-md leading-7 text-muted-foreground">
+            Tu pedido sigue guardado. Probá otra tarjeta o dinero disponible en
+            Mercado Pago.
+          </p>
+        </div>
+
+        <section className="mt-7 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-950">
+          <p className="font-bold">
+            {getPaymentRejectionHint(order.mercadopago_status_detail)}
+          </p>
+          <p className="mt-2 text-sm leading-6">
+            Antes de abrir Mercado Pago vamos a revisar de nuevo precios y stock.
+          </p>
+          <div className="mt-4 rounded-xl bg-white/80 px-4 py-3 text-center font-mono text-lg font-black tracking-[0.12em]">
+            {orderCode}
+          </div>
+        </section>
+
+        <div className="mt-7 space-y-3">
+          <RetryPaymentButton orderId={id} />
+          {whatsappHref ? (
+            <Button className="min-h-12 w-full" variant="outline" asChild>
+              <a href={whatsappHref} target="_blank" rel="noreferrer">
+                Pedir ayuda por WhatsApp
+              </a>
+            </Button>
+          ) : null}
+          <Button className="min-h-12 w-full" variant="ghost" asChild>
+            <Link href="/uniformes">Volver al catálogo</Link>
+          </Button>
+        </div>
+      </main>
+    );
+  }
 
   if (isConfirmed && order) {
     const isPickup = order.shipping_method !== "local_delivery";

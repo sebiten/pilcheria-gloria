@@ -157,6 +157,7 @@ export const orders = pgTable("orders", {
   cancelReason: text("cancel_reason"),
   mercadopagoId: text("mercadopago_id"),
   mercadopagoStatus: text("mercadopago_status"),
+  mercadopagoStatusDetail: text("mercadopago_status_detail"),
   refundStatus: text("refund_status").notNull().default("none"),
   refundedAmount: numeric("refunded_amount", { precision: 10, scale: 2 })
     .notNull()
@@ -400,6 +401,7 @@ export const storefrontAnalyticsEvents = pgTable("storefront_analytics_events", 
   medium: text("medium"),
   content: text("content"),
   eventDetail: text("event_detail"),
+  paymentId: text("payment_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

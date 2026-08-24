@@ -6,6 +6,7 @@ import {
   createPendingOrderForProduct,
   getLatestOrderForProduct,
   getOrderState,
+  getPaymentAnalyticsEvents,
   getVariantStock,
   seedCheckoutSmokeProduct,
 } from "./helpers/supabase";
@@ -167,6 +168,103 @@ test("MercadoPago webhook rejects an invalid signature", async ({ page }) => {
       mercadopago_status: null,
     });
     await expect.poll(async () => getVariantStock(seed.variantId)).toBe(4);
+  } finally {
+    await cleanupCheckoutSmokeProduct(seed);
+  }
+});
+
+test("rejected webhook releases stock and deduplicates analytics", async ({ page }) => {
+  const seed = await seedCheckoutSmokeProduct();
+
+  try {
+    const orderId = await createPendingOrderForProduct(seed);
+    const requestId = `rejected-${Date.now()}`;
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const headers = {
+      "x-request-id": requestId,
+      "x-signature": createMercadoPagoSignature({
+        dataId: orderId,
+        requestId,
+        timestamp,
+      }),
+      "x-e2e-payment-status": "rejected",
+      "x-e2e-payment-status-detail": "cc_rejected_insufficient_amount",
+    };
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await page.request.post(
+        `/api/webhooks/mercadopago?type=payment&data.id=${orderId}`,
+        { headers, data: { type: "payment", data: { id: orderId } } }
+      );
+      expect(response.ok()).toBe(true);
+    }
+
+    await expect.poll(async () => getOrderState(orderId)).toMatchObject({
+      status: "cancelled",
+      stock_reserved: false,
+      stock_restored: true,
+      mercadopago_status: "rejected",
+      mercadopago_status_detail: "cc_rejected_insufficient_amount",
+    });
+    await expect.poll(async () => getVariantStock(seed.variantId)).toBe(5);
+    await expect.poll(async () => getPaymentAnalyticsEvents(orderId)).toEqual([
+      expect.objectContaining({
+        event_name: "payment_rejected",
+        event_detail: "cc_rejected_insufficient_amount",
+        payment_id: orderId,
+      }),
+    ]);
+  } finally {
+    await cleanupCheckoutSmokeProduct(seed);
+  }
+});
+
+test("pending webhook keeps stock and deduplicates analytics", async ({ page }) => {
+  const seed = await seedCheckoutSmokeProduct();
+
+  try {
+    const orderId = await createPendingOrderForProduct(seed);
+    const initialOrder = await getOrderState(orderId);
+    const requestId = `pending-${Date.now()}`;
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const headers = {
+      "x-request-id": requestId,
+      "x-signature": createMercadoPagoSignature({
+        dataId: orderId,
+        requestId,
+        timestamp,
+      }),
+      "x-e2e-payment-status": "pending",
+      "x-e2e-payment-status-detail": "pending_contingency",
+    };
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await page.request.post(
+        `/api/webhooks/mercadopago?type=payment&data.id=${orderId}`,
+        { headers, data: { type: "payment", data: { id: orderId } } }
+      );
+      expect(response.ok()).toBe(true);
+    }
+
+    const pendingOrder = await getOrderState(orderId);
+    expect(pendingOrder).toMatchObject({
+      status: "pending",
+      stock_reserved: true,
+      stock_restored: false,
+      mercadopago_status: "pending",
+      mercadopago_status_detail: "pending_contingency",
+    });
+    expect(new Date(pendingOrder.reservation_expires_at).getTime()).toBeGreaterThan(
+      new Date(initialOrder.reservation_expires_at).getTime()
+    );
+    await expect.poll(async () => getVariantStock(seed.variantId)).toBe(4);
+    await expect.poll(async () => getPaymentAnalyticsEvents(orderId)).toEqual([
+      expect.objectContaining({
+        event_name: "payment_pending",
+        event_detail: "pending_contingency",
+        payment_id: orderId,
+      }),
+    ]);
   } finally {
     await cleanupCheckoutSmokeProduct(seed);
   }

@@ -67,12 +67,19 @@ export async function GET(
 
   const id = parsedId.data;
   const legacyToken = requestUrl.searchParams.get("token");
+  const returnedExternalReference =
+    requestUrl.searchParams.get("external_reference");
   const paymentCookieName = getOrderPaymentReturnCookieName(id);
   let paymentId =
     requestUrl.searchParams.get("payment_id") ||
     request.cookies.get(paymentCookieName)?.value ||
     "";
   const retryRequested = requestUrl.searchParams.get("retry") === "1";
+
+  if (returnedExternalReference && returnedExternalReference !== id) {
+    cleanUrl.searchParams.set("verification", "failed");
+    return NextResponse.redirect(cleanUrl, 303);
+  }
 
   const supabase = getSupabaseAdmin();
   const { data: order, error } = await supabase
@@ -138,9 +145,16 @@ export async function GET(
 
   try {
     const payment = await getPayment(paymentId);
+    const supportedPaymentStatus = [
+      "approved",
+      "rejected",
+      "cancelled",
+      "pending",
+      "in_process",
+    ].includes(payment.status);
     if (
       String(payment.id) !== paymentId ||
-      payment.status !== "approved" ||
+      !supportedPaymentStatus ||
       payment.external_reference !== id
     ) {
       cleanUrl.searchParams.set("verification", "failed");
@@ -155,6 +169,8 @@ export async function GET(
         ? "payment-approved"
         : nextStatus === "payment_review"
           ? "payment-review"
+          : nextStatus === "cancelled"
+            ? "cancelled"
           : null;
 
     if (emailEvent) {
@@ -169,7 +185,14 @@ export async function GET(
     }
 
     revalidateProductCacheFromRouteHandler();
-    cleanUrl.searchParams.set("payment", "confirmed");
+    cleanUrl.searchParams.set(
+      "payment",
+      payment.status === "approved"
+        ? "confirmed"
+        : ["rejected", "cancelled"].includes(payment.status)
+          ? "rejected"
+          : "pending"
+    );
     const response = NextResponse.redirect(cleanUrl, 303);
     setOrderAccessCookie(response, id, guestToken);
     clearPaymentReturnCookie(response, id);

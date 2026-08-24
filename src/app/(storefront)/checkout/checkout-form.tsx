@@ -385,7 +385,7 @@ export function CheckoutForm({
     if (!isValidArgentinaContactPhone(formData.phone)) {
       showFieldError(
         "phone",
-        "Ingresá un WhatsApp válido con código de área, sin 0 ni 15.",
+        "Ingresá un WhatsApp válido con código de área.",
         "invalid_phone"
       );
       return;
@@ -765,7 +765,7 @@ export function CheckoutForm({
                 autoComplete="tel"
                 inputMode="tel"
                 placeholder="Ej. 388 4123456"
-                hint="Ingresá un número con código de área y WhatsApp, sin 0 ni 15."
+                hint="Podés escribirlo con 0, 15, +54 9, espacios o guiones."
                 error={fieldErrors.phone}
                 required
               />

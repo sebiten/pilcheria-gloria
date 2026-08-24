@@ -5,7 +5,10 @@ import {
   CheckoutRateLimitError,
   enforceCheckoutRateLimit,
 } from "@/lib/security/checkout-rate-limit";
-import { isValidArgentinaContactPhone } from "@/lib/contact";
+import {
+  isValidArgentinaContactPhone,
+  normalizeArgentinaWhatsAppPhone,
+} from "@/lib/contact";
 import { getOrderConfirmationCookieName } from "@/lib/orders/confirmation-access";
 import { getCheckoutRouteCapability } from "@/lib/security/checkout-capability";
 
@@ -61,6 +64,10 @@ export async function POST(request: Request) {
     const result = await createOrder(
       {
         ...body,
+        shippingAddress: {
+          ...body.shippingAddress,
+          phone: normalizeArgentinaWhatsAppPhone(body.shippingAddress.phone),
+        },
         checkoutRequestId,
         requestFingerprint,
       },

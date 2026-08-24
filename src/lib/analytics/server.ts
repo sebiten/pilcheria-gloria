@@ -14,8 +14,18 @@ export async function getAnalyticsDashboard(days: number) {
   if (dashboardResult.error) throw dashboardResult.error;
   if (attributionResult.error) throw attributionResult.error;
 
+  const dashboard = dashboardResult.data as AnalyticsDashboardData;
+
   return {
-    ...(dashboardResult.data as AnalyticsDashboardData),
+    ...dashboard,
+    metrics: {
+      ...dashboard.metrics,
+      payment_rejected_sessions:
+        dashboard.metrics.payment_rejected_sessions ?? 0,
+      payment_pending_sessions:
+        dashboard.metrics.payment_pending_sessions ?? 0,
+    },
+    payment_rejection_reasons: dashboard.payment_rejection_reasons ?? [],
     campaigns: attributionResult.data ?? [],
   } as AnalyticsDashboardData;
 }

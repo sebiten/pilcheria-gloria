@@ -136,6 +136,12 @@ export async function POST(request: Request) {
 
       let payment;
       if (process.env.E2E_MERCADOPAGO_FAKE === "1") {
+        const requestedStatus = request.headers.get("x-e2e-payment-status");
+        const paymentStatus = ["approved", "rejected", "pending"].includes(
+          requestedStatus || ""
+        )
+          ? requestedStatus!
+          : "approved";
         const supabase = getSupabaseAdmin();
         const { data: order, error } = await supabase
           .from("orders")
@@ -149,7 +155,9 @@ export async function POST(request: Request) {
 
         payment = {
           id: paymentId,
-          status: "approved",
+          status: paymentStatus,
+          status_detail:
+            request.headers.get("x-e2e-payment-status-detail") || null,
           external_reference: paymentId,
           transaction_amount: Number(order.total),
           currency_id: "ARS",

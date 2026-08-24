@@ -6,6 +6,8 @@ import {
   Banknote,
   BarChart3,
   CreditCard,
+  CircleX,
+  Clock3,
   Eye,
   Lightbulb,
   MousePointerClick,
@@ -58,6 +60,13 @@ const checkoutErrorLabels = {
   missing_payment_link: "Faltó enlace de Mercado Pago",
 } as const;
 
+const rejectionCategoryLabels = {
+  data: "Datos mal ingresados",
+  issuer: "Fondos o banco emisor",
+  risk: "Validación de seguridad",
+  other: "Otro motivo",
+} as const;
+
 function percent(value: number, total: number) {
   if (!total) return 0;
   return Math.min(100, Math.round((value / total) * 100));
@@ -69,7 +78,7 @@ function getRecommendations(data: Awaited<ReturnType<typeof getAnalyticsDashboar
 
   if (data.sample_warning) {
     return [
-      `Hay ${data.comparable_sessions} sesiones comparables. Esperá al menos 10 entradas al catálogo antes de decidir un cambio grande.`,
+      `Hay ${metrics.product_viewers} aperturas de producto. Esperá 100 aperturas o 30 días comparables antes de cambiar fichas o surtido.`,
       "Compartí enlaces con utm_source y utm_campaign para comparar cada publicación.",
     ];
   }
@@ -157,6 +166,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const maxDailyVisitors = Math.max(1, ...data.daily.map((item) => item.visitors));
   const maxSourceSessions = Math.max(1, ...data.sources.map((item) => item.sessions));
   const maxDeviceSessions = Math.max(1, ...data.devices.map((item) => item.sessions));
+  const rejectedPayments = data.payment_rejection_reasons.reduce(
+    (total, item) => total + item.payments,
+    0
+  );
+  const knownRejectedPayments = data.payment_rejection_reasons.reduce(
+    (total, item) => total + (item.detail === "unknown" ? 0 : item.payments),
+    0
+  );
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -217,8 +234,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
       {data.sample_warning ? (
         <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-950">
-          Muestra chica: hay {data.comparable_sessions} sesiones comparables. Mirá
-          los errores concretos, pero esperá más visitas antes de sacar conclusiones.
+          Muestra chica: hay {metrics.product_viewers} aperturas de producto. Mirá
+          los problemas operativos, pero esperá 100 aperturas o 30 días comparables
+          antes de cambiar fichas o surtido.
         </p>
       ) : null}
 
@@ -347,6 +365,80 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </Card>
       </div>
 
+      <section>
+        <p className="text-sm font-bold text-primary">Problemas operativos</p>
+        <h2 className="mt-1 text-xl font-black text-gloria-950">Pagos y checkout</h2>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          Estos datos sí requieren acción inmediata porque bloquean compras ya iniciadas.
+        </p>
+      </section>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardContent className="flex items-center gap-4 p-5 sm:p-6">
+            <span className="flex size-11 items-center justify-center rounded-full bg-red-100 text-red-800">
+              <CircleX className="size-5" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground">Pagos rechazados</p>
+              <p className="text-3xl font-black text-gloria-950">{metrics.payment_rejected_sessions}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-4 p-5 sm:p-6">
+            <span className="flex size-11 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+              <Clock3 className="size-5" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground">Pagos pendientes</p>
+              <p className="text-3xl font-black text-gloria-950">{metrics.payment_pending_sessions}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <section className="rounded-xl border bg-muted/40 p-4 text-sm leading-6">
+        <p className="font-extrabold text-gloria-950">Criterio de revisión</p>
+        <p className="mt-1 text-muted-foreground">
+          Evaluá el resultado al llegar a 20 redirecciones a Mercado Pago. Hoy hay{" "}
+          <strong>{metrics.payment_redirect_sessions}</strong>: se aprobó el{" "}
+          <strong>{percent(metrics.payment_approved_sessions, metrics.payment_redirect_sessions)}%</strong>{" "}
+          y conocemos el motivo del{" "}
+          <strong>{percent(knownRejectedPayments, rejectedPayments)}%</strong> de los rechazos.
+          Objetivo inicial: 50% de aprobación y 100% de motivos conocidos.
+        </p>
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Distribution
+          title="Motivos de rechazo"
+          items={data.payment_rejection_reasons.map((item) => ({
+            label: `${rejectionCategoryLabels[item.category]} · ${item.detail}`,
+            value: item.payments,
+          }))}
+          max={Math.max(1, ...data.payment_rejection_reasons.map((item) => item.payments))}
+          icon={CircleX}
+        />
+        <Distribution
+          title="Errores del checkout"
+          items={data.checkout_errors.map((item) => ({
+            label: checkoutErrorLabels[item.detail],
+            value: item.sessions,
+          }))}
+          max={Math.max(1, ...data.checkout_errors.map((item) => item.sessions))}
+          icon={CreditCard}
+        />
+      </div>
+
+      <section>
+        <p className="text-sm font-bold text-primary">Decisiones de catálogo</p>
+        <h2 className="mt-1 text-xl font-black text-gloria-950">Interés por prenda y escuela</h2>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          Usá estas señales cuando haya 100 aperturas de producto o 30 días comparables.
+        </p>
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2"><CardTitle>Prendas con más interés</CardTitle></CardHeader>
@@ -386,18 +478,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[0.7fr_1.3fr]">
-        <Distribution
-          title="Errores del checkout"
-          items={data.checkout_errors.map((item) => ({
-            label: checkoutErrorLabels[item.detail],
-            value: item.sessions,
-          }))}
-          max={Math.max(1, ...data.checkout_errors.map((item) => item.sessions))}
-          icon={CreditCard}
-        />
-        <CampaignAttribution campaigns={data.campaigns} />
-      </div>
+      <CampaignAttribution campaigns={data.campaigns} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Distribution title="De dónde llegan" items={data.sources.map((item) => ({ label: sourceLabels[item.source] || "Otros", value: item.sessions }))} max={maxSourceSessions} icon={BarChart3} />
