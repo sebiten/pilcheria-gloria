@@ -118,3 +118,10 @@ Playwright usa `.env.local`, crea datos temporales en Supabase y los elimina al 
 
 - `PRODUCT.md`: alcance funcional y datos comerciales pendientes.
 - `DESIGN.md`: identidad visual, tipografía, color, fotografía y voz.
+# Operación de tareas programadas
+
+La expiración y conciliación de reservas depende exclusivamente del job externo
+de cron-job.org configurado con `pnpm cron:configure`. El cron interno de Supabase
+fue retirado porque, sin secretos de Vault, podía figurar como exitoso sin invocar
+la aplicación. Cada llamada real a `/api/cron/expire-orders` queda registrada en
+`cron_job_runs` y su última ejecución aparece en “Integridad operativa” del dashboard.

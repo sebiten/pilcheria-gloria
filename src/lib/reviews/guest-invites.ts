@@ -18,6 +18,7 @@ export async function createGuestReviewLinks(orderId: string) {
       id,
       status,
       guest_access_token,
+      guest_access_token_hash,
       items:order_items(
         product_id,
         product:products(name)
@@ -26,7 +27,8 @@ export async function createGuestReviewLinks(orderId: string) {
     .eq("id", orderId)
     .single();
 
-  if (error || !order || order.status !== "delivered" || !order.guest_access_token) {
+  const guestSecret = order?.guest_access_token_hash || order?.guest_access_token;
+  if (error || !order || order.status !== "delivered" || !guestSecret) {
     return [];
   }
 
@@ -44,7 +46,7 @@ export async function createGuestReviewLinks(orderId: string) {
   const links: Array<{ productName: string; url: string }> = [];
 
   for (const [productId, productName] of uniqueProducts) {
-    const token = createHmac("sha256", order.guest_access_token)
+    const token = createHmac("sha256", guestSecret)
       .update(`review:${order.id}:${productId}`)
       .digest("base64url");
     const { error: inviteError } = await supabase

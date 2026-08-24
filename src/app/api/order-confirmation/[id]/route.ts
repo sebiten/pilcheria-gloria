@@ -3,17 +3,15 @@ import { after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import {
-  getPayment,
-  searchPaymentsByExternalReference,
-} from "@/lib/mercadopago/client";
+import { getPayment } from "@/lib/mercadopago/client";
 import { applyMercadoPagoPayment } from "@/lib/orders/payment-state";
+import { findMercadoPagoPaymentForOrder } from "@/lib/mercadopago/reconciliation";
 import { sendOrderEmail } from "@/lib/notifications/email";
 import { revalidateProductCacheFromRouteHandler } from "@/lib/cache/products";
 import {
   getOrderConfirmationCookieName,
   getOrderPaymentReturnCookieName,
-  secureTokenEquals,
+  guestAccessTokenMatches,
 } from "@/lib/orders/confirmation-access";
 
 interface ConfirmationRouteContext {
@@ -84,7 +82,7 @@ export async function GET(
   const supabase = getSupabaseAdmin();
   const { data: order, error } = await supabase
     .from("orders")
-    .select("guest_access_token, clerk_user_id, status")
+    .select("guest_access_token, guest_access_token_hash, clerk_user_id, status")
     .eq("id", id)
     .maybeSingle();
 
@@ -92,7 +90,6 @@ export async function GET(
     cleanUrl.searchParams.set("verification", "failed");
     return NextResponse.redirect(cleanUrl, 303);
   }
-  const guestToken = order.guest_access_token;
   const orderAccessCookie = request.cookies.get(
     getOrderConfirmationCookieName(id)
   )?.value;
@@ -101,28 +98,33 @@ export async function GET(
     order.clerk_user_id && userId === order.clerk_user_id
   );
   const ownsGuestOrder = Boolean(
-    guestToken &&
-      orderAccessCookie &&
-      secureTokenEquals(orderAccessCookie, guestToken)
+    orderAccessCookie &&
+      guestAccessTokenMatches(
+        orderAccessCookie,
+        order.guest_access_token_hash,
+        order.guest_access_token
+      )
   );
   const hasOrderAccess = ownsSignedOrder || ownsGuestOrder;
 
-  if (legacyToken && guestToken && secureTokenEquals(legacyToken, guestToken)) {
+  if (
+    legacyToken &&
+    guestAccessTokenMatches(
+      legacyToken,
+      order.guest_access_token_hash,
+      order.guest_access_token
+    )
+  ) {
     const response = NextResponse.redirect(cleanUrl, 303);
-    setOrderAccessCookie(response, id, guestToken);
+    setOrderAccessCookie(response, id, legacyToken);
     response.headers.set("Cache-Control", "no-store");
     return response;
   }
 
   if (!paymentId && retryRequested && hasOrderAccess) {
     try {
-      const search = await searchPaymentsByExternalReference(id);
-      const payments: Array<{ id?: string | number; status?: string }> =
-        Array.isArray(search?.results) ? search.results : [];
-      const payment =
-        payments.find((item) => item.status === "approved") ??
-        payments.find((item) => Boolean(item.status));
-      paymentId = payment?.id ? String(payment.id) : "";
+      const selection = await findMercadoPagoPaymentForOrder(id);
+      paymentId = selection.payment?.id ? String(selection.payment.id) : "";
     } catch (searchError) {
       console.error("No se pudo buscar el pago por referencia externa:", {
         orderId: id,
@@ -163,7 +165,15 @@ export async function GET(
       return response;
     }
 
-    const nextStatus = await applyMercadoPagoPayment(id, payment);
+    const selection = await findMercadoPagoPaymentForOrder(id, payment);
+    if (!selection.payment) {
+      throw new Error("No se encontró un pago conciliable");
+    }
+    const nextStatus = await applyMercadoPagoPayment(id, selection.payment, {
+      source: "buyer_return",
+      ambiguous: selection.ambiguous,
+      candidatePaymentIds: selection.candidatePaymentIds,
+    });
     const emailEvent =
       nextStatus === "paid"
         ? "payment-approved"
@@ -194,7 +204,7 @@ export async function GET(
           : "pending"
     );
     const response = NextResponse.redirect(cleanUrl, 303);
-    setOrderAccessCookie(response, id, guestToken);
+    setOrderAccessCookie(response, id, orderAccessCookie ?? legacyToken);
     clearPaymentReturnCookie(response, id);
     response.headers.set("Cache-Control", "no-store");
     return response;

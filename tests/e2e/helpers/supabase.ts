@@ -25,7 +25,7 @@ type OrderWithItems = {
   }>;
 };
 
-function getSupabaseAdmin() {
+export function getSupabaseAdmin() {
   const supabaseUrl =
     process.env.E2E_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey =

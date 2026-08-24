@@ -173,7 +173,7 @@ export async function sendOrderEmail(
   const supabase = getSupabaseAdmin();
   const { data: order, error } = await supabase
     .from("orders")
-    .select("id, total, shipping_address, guest_access_token")
+    .select("id, total, shipping_address, guest_access_token, guest_access_token_hash")
     .eq("id", orderId)
     .single();
 
@@ -206,7 +206,10 @@ export async function sendOrderEmail(
     `;
   }
 
-  const guestOrderHtml = order.guest_access_token && customerEmail
+  const isGuestOrder = Boolean(
+    order.guest_access_token_hash || order.guest_access_token
+  );
+  const guestOrderHtml = isGuestOrder && customerEmail
     ? `
       <div style="margin:24px 0;padding:18px;border:1px solid #d8e8c5;border-radius:14px">
         <p style="margin:0 0 8px"><strong>Tu pedido está registrado aunque no tengas una cuenta.</strong></p>
@@ -215,7 +218,7 @@ export async function sendOrderEmail(
     `
     : "";
   let reviewInvitationHtml = "";
-  if (event === "delivered" && order.guest_access_token && customerEmail) {
+  if (event === "delivered" && isGuestOrder && customerEmail) {
     const reviewLinks = await createGuestReviewLinks(orderId).catch((inviteError) => {
       console.error("No se pudieron crear las invitaciones de reseña:", inviteError);
       return [];

@@ -150,7 +150,7 @@ async function upsertJob(
     title: definition.title,
     url,
     enabled,
-    saveResponses: false,
+    saveResponses: definition.target === "app",
     requestMethod,
     requestTimeout: 60,
     redirectSuccess: false,
@@ -248,6 +248,7 @@ async function main() {
       : {
           Authorization: `Bearer ${cronSecret}`,
           "Content-Type": "application/json",
+          "X-Cron-Source": "cron-job.org",
         };
     const enabled = !forceDisabled && (isSupabaseKeepalive || ready);
     const result = await upsertJob(

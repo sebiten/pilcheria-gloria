@@ -173,6 +173,38 @@ test("MercadoPago webhook rejects an invalid signature", async ({ page }) => {
   }
 });
 
+test("MercadoPago webhook rejects an expired signature", async ({ page }) => {
+  const seed = await seedCheckoutSmokeProduct();
+
+  try {
+    const orderId = await createPendingOrderForProduct(seed);
+    const requestId = `expired-signature-${Date.now()}`;
+    const timestamp = String(Date.now() - 16 * 60 * 1000);
+    const response = await page.request.post(
+      `/api/webhooks/mercadopago?type=payment&data.id=${orderId}`,
+      {
+        headers: {
+          "x-request-id": requestId,
+          "x-signature": createMercadoPagoSignature({
+            dataId: orderId,
+            requestId,
+            timestamp,
+          }),
+        },
+        data: { type: "payment", data: { id: orderId } },
+      }
+    );
+
+    expect(response.status()).toBe(401);
+    await expect.poll(async () => getOrderState(orderId)).toMatchObject({
+      status: "pending",
+      mercadopago_id: null,
+    });
+  } finally {
+    await cleanupCheckoutSmokeProduct(seed);
+  }
+});
+
 test("rejected webhook keeps the order and stock reserved", async ({ page }) => {
   const seed = await seedCheckoutSmokeProduct();
 

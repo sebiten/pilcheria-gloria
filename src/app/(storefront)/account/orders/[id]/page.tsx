@@ -32,6 +32,12 @@ export default async function AccountOrderDetailPage({
   }
 
   const shippingAddress = order.shipping_address as Record<string, string> | null;
+  const mercadoPagoAttempt = [...(order.payment_attempts || [])]
+    .sort(
+      (first: any, second: any) =>
+        new Date(second.created_at).getTime() - new Date(first.created_at).getTime()
+    )
+    .find((attempt: any) => attempt.provider === "mercadopago");
 
   return (
     <div className="space-y-6">
@@ -107,7 +113,7 @@ export default async function AccountOrderDetailPage({
               {getDeliveryMethodLabel(order.shipping_method)}
             </p>
             <p>
-              <strong>Mercado Pago:</strong> {order.mercadopago_status || "Pendiente"}
+              <strong>Mercado Pago:</strong> {mercadoPagoAttempt?.status || "Pendiente"}
             </p>
           </CardContent>
         </Card>

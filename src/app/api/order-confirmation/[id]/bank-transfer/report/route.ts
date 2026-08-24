@@ -40,11 +40,11 @@ export async function POST(
     );
     const address = (order.shipping_address || {}) as Record<string, string>;
     const orderCode = orderId.slice(0, 8).toUpperCase();
-    const message = `Hola, ya transferí el pedido ${orderCode} por $${Number(
+    const message = `Hola, ya realicé la transferencia del pedido ${orderCode} por $${Number(
       order.total
     ).toLocaleString("es-AR", { minimumFractionDigits: 2 })}. Comprador: ${
       address.name || "Sin nombre"
-    }. Adjunto el comprobante para revisión.`;
+    }. Quisiera confirmar la compra y coordinar el retiro o envío con la persona encargada del local.`;
 
     const response = NextResponse.json({
       whatsappUrl: `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`,

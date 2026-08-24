@@ -5,6 +5,8 @@ import { getMercadoPagoAccountId } from "@/lib/mercadopago/client";
 import { sendAdminSalePush } from "@/lib/notifications/admin-push";
 import { sendMetaPurchaseEvent } from "@/lib/meta/conversions";
 import type { PaymentProvider } from "@/types";
+import { logCommerceEvent } from "@/lib/logging";
+import type { MercadoPagoReconciliationSource } from "@/lib/mercadopago/reconciliation-selection";
 
 export const ORDER_RESERVATION_MINUTES = 30;
 export const PENDING_PAYMENT_EXTENSION_HOURS = 24;
@@ -34,6 +36,7 @@ export async function reserveOrderStock(orderId: string) {
   if (error) {
     throw new Error(error.message);
   }
+
 }
 
 export async function claimOrderCoupon(orderId: string) {
@@ -78,7 +81,12 @@ export async function cancelOrderAndRelease(
 
 export async function applyMercadoPagoPayment(
   orderId: string,
-  payment: MercadoPagoPayment
+  payment: MercadoPagoPayment,
+  reconciliation: {
+    source: MercadoPagoReconciliationSource;
+    ambiguous?: boolean;
+    candidatePaymentIds?: string[];
+  }
 ) {
   const supabase = getSupabaseAdmin();
 
@@ -111,17 +119,22 @@ export async function applyMercadoPagoPayment(
         status: "review",
         status_detail:
           "Pago recibido con importe, moneda o cuenta receptora inconsistente",
-      });
+      }, reconciliation);
     }
   }
 
-  return applyProviderPayment(orderId, "mercadopago", payment);
+  return applyProviderPayment(orderId, "mercadopago", payment, reconciliation);
 }
 
 export async function applyProviderPayment(
   orderId: string,
   provider: PaymentProvider,
-  payment: MercadoPagoPayment
+  payment: MercadoPagoPayment,
+  reconciliation?: {
+    source: MercadoPagoReconciliationSource;
+    ambiguous?: boolean;
+    candidatePaymentIds?: string[];
+  }
 ) {
   const supabase = getSupabaseAdmin();
   const externalId = String(payment.id);
@@ -142,7 +155,11 @@ export async function applyProviderPayment(
     throw new Error("No existe un intento activo para este pago");
   }
 
-  const { data, error } = await supabase.rpc("apply_order_payment_attempt", {
+  const rpcName =
+    provider === "mercadopago" && reconciliation
+      ? "reconcile_order_payment_attempt"
+      : "apply_order_payment_attempt";
+  const { data, error } = await supabase.rpc(rpcName, {
     p_order_id: orderId,
     p_attempt_id: attempt.id,
     p_provider: provider,
@@ -152,11 +169,29 @@ export async function applyProviderPayment(
     p_receiver_account_id: payment.collector_id
       ? String(payment.collector_id)
       : null,
+    ...(reconciliation
+      ? {
+          p_source: reconciliation.source,
+          p_ambiguous: reconciliation.ambiguous ?? false,
+          p_candidate_payment_ids: reconciliation.candidatePaymentIds ?? [externalId],
+        }
+      : {}),
   });
 
   if (error) {
     throw new Error(error.message);
   }
+
+  logCommerceEvent({
+    event: "payment.status_changed",
+    route: reconciliation?.source || "payment-state/apply-provider-payment",
+    orderId,
+    attemptId: attempt.id,
+    provider,
+    previousStatus: attempt.status,
+    newStatus: payment.status,
+    externalId,
+  });
 
   if (String(data) === "paid") {
     const [pushResult, metaResult] = await Promise.allSettled([
@@ -182,11 +217,31 @@ export async function extendPendingPaymentReservation(
   const reservationExpiresAt = new Date(
     Date.now() + PENDING_PAYMENT_EXTENSION_HOURS * 60 * 60 * 1000
   ).toISOString();
+  const now = new Date().toISOString();
+  const attemptStatus = ["pending", "in_process"].includes(payment.status)
+    ? payment.status
+    : "pending";
+  const { error: attemptError } = await supabase
+    .from("order_payment_attempts")
+    .update({
+      external_id: String(payment.id),
+      status: attemptStatus,
+      status_detail: payment.status_detail ?? null,
+      updated_at: now,
+    })
+    .eq("order_id", orderId)
+    .eq("provider", "mercadopago")
+    .in("status", ["created", "pending", "in_process"]);
+
+  if (attemptError) {
+    throw new Error(attemptError.message);
+  }
+
   const { error } = await supabase
     .from("orders")
     .update({
       mercadopago_id: String(payment.id),
-      mercadopago_status: payment.status,
+      mercadopago_status: attemptStatus,
       mercadopago_status_detail: payment.status_detail ?? null,
       reservation_expires_at: reservationExpiresAt,
     })

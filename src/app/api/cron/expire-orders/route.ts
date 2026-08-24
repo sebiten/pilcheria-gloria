@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateProductCacheFromRouteHandler } from "@/lib/cache/products";
 import { hasCronSecret, isCronAuthorized } from "@/lib/cron/auth";
-import { searchPaymentsByExternalReference } from "@/lib/mercadopago/client";
+import { findMercadoPagoPaymentForOrder } from "@/lib/mercadopago/reconciliation";
 import {
   applyMercadoPagoPayment,
   cancelOrderAndRelease,
@@ -13,6 +13,7 @@ import { sendOrderEmail } from "@/lib/notifications/email";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+const JOB_NAME = "expire-orders";
 
 const TERMINAL_PAYMENT_STATUSES = new Set([
   "approved",
@@ -83,19 +84,15 @@ async function expireAbandonedOrders(request: Request) {
         continue;
       }
 
-      const paymentSearch = await searchPaymentsByExternalReference(order.id);
-      const payments = Array.isArray(paymentSearch?.results)
-        ? paymentSearch.results
-        : [];
-      const payment =
-        payments.find((item: { status?: string }) => item.status === "approved") ??
-        payments.find((item: { status?: string }) =>
-          item.status ? TERMINAL_PAYMENT_STATUSES.has(item.status) : false
-        ) ??
-        payments.find((item: { status?: string }) => Boolean(item.status));
+      const selection = await findMercadoPagoPaymentForOrder(order.id);
+      const payment = selection.payment;
 
       if (payment?.status && TERMINAL_PAYMENT_STATUSES.has(payment.status)) {
-        const nextStatus = await applyMercadoPagoPayment(order.id, payment);
+        const nextStatus = await applyMercadoPagoPayment(order.id, payment, {
+          source: "expiration_cron",
+          ambiguous: selection.ambiguous,
+          candidatePaymentIds: selection.candidatePaymentIds,
+        });
         const emailEvent =
           nextStatus === "paid"
             ? "payment-approved"
@@ -158,9 +155,66 @@ async function expireAbandonedOrders(request: Request) {
 }
 
 export async function GET(request: Request) {
-  return expireAbandonedOrders(request);
+  return runTrackedSweep(request);
 }
 
 export async function POST(request: Request) {
-  return expireAbandonedOrders(request);
+  return runTrackedSweep(request);
+}
+
+async function runTrackedSweep(request: Request) {
+  if (!hasCronSecret() || !isCronAuthorized(request)) {
+    return expireAbandonedOrders(request);
+  }
+
+  const supabase = getSupabaseAdmin();
+  const startedAt = new Date().toISOString();
+  const { data: run } = await supabase
+    .from("cron_job_runs")
+    .insert({
+      job_name: JOB_NAME,
+      source: request.headers.get("x-cron-source") || "external",
+      status: "running",
+      started_at: startedAt,
+    })
+    .select("id")
+    .single();
+
+  try {
+    const response = await expireAbandonedOrders(request);
+    const summary = await response.clone().json().catch(() => ({}));
+
+    if (run?.id) {
+      await supabase
+        .from("cron_job_runs")
+        .update({
+          status: response.ok ? "succeeded" : "failed",
+          summary,
+          error_message: response.ok ? null : String(summary?.error || "HTTP error"),
+          finished_at: new Date().toISOString(),
+        })
+        .eq("id", run.id);
+    }
+
+    return response;
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message.slice(0, 500) : "Error desconocido";
+    if (run?.id) {
+      await supabase
+        .from("cron_job_runs")
+        .update({
+          status: "failed",
+          error_message: errorMessage,
+          finished_at: new Date().toISOString(),
+        })
+        .eq("id", run.id);
+    }
+    console.error("Falló el barrido de reservas", {
+      event: "cron.failed",
+      route: "/api/cron/expire-orders",
+      reason: errorMessage,
+    });
+    return NextResponse.json({ error: "Falló el barrido" }, { status: 500 });
+  }
 }

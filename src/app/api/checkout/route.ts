@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       },
       preference: { init_point: String(attempt.checkout_url) },
     });
-    const guestToken = result.order?.guest_access_token;
+    const guestToken = result.guestAccessToken;
 
     if (guestToken) {
       response.cookies.set(

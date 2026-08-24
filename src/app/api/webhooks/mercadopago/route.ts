@@ -6,6 +6,8 @@ import { applyMercadoPagoPayment } from "@/lib/orders/payment-state";
 import { sendOrderEmail } from "@/lib/notifications/email";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { mercadoPagoAdapter } from "@/lib/payments/mercadopago-adapter";
+import { logCommerceEvent } from "@/lib/logging";
+import { findMercadoPagoPaymentForOrder } from "@/lib/mercadopago/reconciliation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,10 +115,30 @@ export async function POST(request: Request) {
       const externalReference = payment.external_reference;
 
       if (externalReference) {
-        const nextStatus = await applyMercadoPagoPayment(
+        const selection = await findMercadoPagoPaymentForOrder(
           externalReference,
           payment
         );
+        if (!selection.payment) {
+          throw new Error("No se encontró un pago conciliable");
+        }
+        const nextStatus = await applyMercadoPagoPayment(
+          externalReference,
+          selection.payment,
+          {
+            source: "webhook",
+            ambiguous: selection.ambiguous,
+            candidatePaymentIds: selection.candidatePaymentIds,
+          }
+        );
+        logCommerceEvent({
+          event: "payment.webhook_applied",
+          route: "/api/webhooks/mercadopago",
+          orderId: externalReference,
+          provider: "mercadopago",
+          newStatus: nextStatus,
+          externalId: paymentId,
+        });
         const emailEvent =
           nextStatus === "paid"
             ? "payment-approved"
@@ -146,7 +168,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Webhook error:", error);
+    logCommerceEvent({
+      event: "payment.webhook_failed",
+      route: "/api/webhooks/mercadopago",
+      provider: "mercadopago",
+      reason: error,
+    });
     return NextResponse.json({ error: "Webhook failed" }, { status: 500 });
   }
 }

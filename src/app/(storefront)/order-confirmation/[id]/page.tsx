@@ -232,6 +232,7 @@ export default async function OrderConfirmationPage({
               orderId={id}
               providers={["mercadopago"]}
               previousProvider={"bank_transfer"}
+              appearance="mercadopago"
             />
           ) : undefined
         }
@@ -314,7 +315,7 @@ export default async function OrderConfirmationPage({
             </span>
           </div>
 
-          {order.guest_access_token ? (
+          {order.guest_access_token_hash || order.guest_access_token ? (
             <p className="mt-4 rounded-xl bg-gloria-50 px-4 py-3 text-sm leading-6 text-gloria-950">
               Guardá el código <strong>{orderCode}</strong>. Te contactaremos al
               WhatsApp que ingresaste; si dejaste un email, también recibirás
@@ -344,7 +345,7 @@ export default async function OrderConfirmationPage({
               Seguir viendo uniformes <ArrowRight className="size-4" />
             </Link>
           </Button>
-          {!order.guest_access_token ? (
+          {!order.guest_access_token_hash && !order.guest_access_token ? (
             <Button className="min-h-12 rounded-full px-6" variant="outline" asChild>
               <Link href="/account/orders">Ver mis pedidos</Link>
             </Button>

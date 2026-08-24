@@ -145,6 +145,7 @@ export const orders = pgTable("orders", {
   shippingMethod: text("shipping_method"),
   shippingAddress: jsonb("shipping_address"),
   guestAccessToken: text("guest_access_token"),
+  guestAccessTokenHash: text("guest_access_token_hash"),
   analyticsSessionId: uuid("analytics_session_id"),
   couponCode: text("coupon_code"),
   discountTotal: numeric("discount_total", { precision: 10, scale: 2 }).default("0"),

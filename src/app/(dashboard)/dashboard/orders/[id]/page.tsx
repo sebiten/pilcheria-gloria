@@ -62,7 +62,8 @@ export default async function DashboardOrderDetailPage({
   const pickupMapsUrl = hasPickupAddress(settings)
     ? getGoogleMapsDirectionsUrl(pickupAddress)
     : null;
-  const guestOrderNotice = order.guest_access_token
+  const guestOrderNotice =
+    order.guest_access_token_hash || order.guest_access_token
     ? "\n\nEl pago fue procesado por Mercado Pago y tu pedido quedó registrado con este código. Aunque hayas comprado sin iniciar sesión, no necesitás crear una cuenta; te contactaremos usando el email o teléfono que ingresaste."
     : "";
   const canSendManualWhatsapp =
@@ -83,6 +84,12 @@ export default async function DashboardOrderDetailPage({
         new Date(second.created_at).getTime() - new Date(first.created_at).getTime()
     )
     .find((attempt: any) => attempt.provider === "bank_transfer");
+  const mercadoPagoAttempt = [...(order.payment_attempts || [])]
+    .sort(
+      (first: any, second: any) =>
+        new Date(second.created_at).getTime() - new Date(first.created_at).getTime()
+    )
+    .find((attempt: any) => attempt.provider === "mercadopago");
 
   return (
     <div className="space-y-6">
@@ -128,7 +135,7 @@ export default async function DashboardOrderDetailPage({
               {getDeliveryMethodLabel(order.shipping_method)}
             </p>
             <p>
-              <strong>Mercado Pago:</strong> {order.mercadopago_status || "Pendiente"}
+              <strong>Mercado Pago:</strong> {mercadoPagoAttempt?.status || "Pendiente"}
             </p>
             {order.refund_status && order.refund_status !== "none" ? (
               <p>

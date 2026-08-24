@@ -1,0 +1,1 @@
+drop index if exists public.order_payment_attempts_one_active_per_order_idx;

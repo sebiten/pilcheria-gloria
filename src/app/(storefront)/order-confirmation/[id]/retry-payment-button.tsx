@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { CreditCard, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,11 +17,13 @@ export function RetryPaymentButton({
   providers,
   previousProvider,
   riskRetryNotBefore,
+  appearance = "default",
 }: {
   orderId: string;
   providers: PaymentProvider[];
   previousProvider?: PaymentProvider | null;
   riskRetryNotBefore?: string | null;
+  appearance?: "default" | "mercadopago";
 }) {
   const defaultProvider =
     providers.find((provider) => provider !== previousProvider) ??
@@ -41,6 +44,8 @@ export function RetryPaymentButton({
   const remainingMinutes = isCoolingDown
     ? Math.max(1, Math.ceil((retryAt - now) / 60_000))
     : 0;
+  const useMercadoPagoAppearance =
+    appearance === "mercadopago" && provider === "mercadopago";
 
   useEffect(() => {
     setNow(Date.now());
@@ -124,13 +129,28 @@ export function RetryPaymentButton({
         </RadioGroup>
       ) : null}
       <Button
-        className="min-h-12 w-full"
+        className={`min-h-12 w-full font-black ${
+          useMercadoPagoAppearance
+            ? "bg-[#2abcff] text-[#0a0080] hover:bg-[#18adef]"
+            : ""
+        }`}
         type="button"
         onClick={retryPayment}
         disabled={isLoading || providers.length === 0 || isCoolingDown}
       >
         {isLoading ? (
           <LoaderCircle className="size-4 animate-spin" />
+        ) : useMercadoPagoAppearance ? (
+          <span className="flex size-8 items-center justify-center rounded-full bg-white shadow-sm">
+            <Image
+              src="/payment-methods/mercadopago.svg"
+              alt=""
+              width={25}
+              height={18}
+              className="h-auto w-6"
+              aria-hidden="true"
+            />
+          </span>
         ) : (
           <CreditCard className="size-4" />
         )}

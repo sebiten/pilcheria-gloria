@@ -89,16 +89,26 @@ export function BankTransferPanel({
         </div>
 
         {!notified ? (
-          <Button className="mt-5 min-h-12 w-full" onClick={reportTransfer} disabled={isReporting}>
-            {isReporting ? <LoaderCircle className="size-4 animate-spin" /> : <MessageCircle className="size-4" />}
-            {isReporting ? "Preparando WhatsApp…" : "Ya transferí y enviar comprobante"}
-          </Button>
+          <div className="mt-5">
+            <p className="mb-3 text-sm leading-6 text-gloria-900">
+              Te atiende la persona encargada del local para confirmar tu compra
+              y coordinar el retiro o envío.
+            </p>
+            <Button
+              className="min-h-12 w-full bg-[#25d366] font-black text-[#123d22] hover:bg-[#20c45d]"
+              onClick={reportTransfer}
+              disabled={isReporting}
+            >
+              {isReporting ? <LoaderCircle className="size-4 animate-spin" /> : <MessageCircle className="size-5" />}
+              {isReporting ? "Abriendo WhatsApp…" : "Hablar con el local por WhatsApp"}
+            </Button>
+          </div>
         ) : null}
         {error ? <p className="mt-3 text-sm font-semibold text-red-700" role="alert">{error}</p> : null}
 
         {!notified && mercadoPagoFallback ? (
           <div className="mt-6 border-t pt-5">
-            <p className="mb-3 text-sm text-muted-foreground">¿Preferís pagar con tarjeta o dinero disponible?</p>
+            <p className="mb-3 text-sm text-muted-foreground">¿Preferís pagar online con tarjeta o dinero disponible?</p>
             {mercadoPagoFallback}
           </div>
         ) : null}

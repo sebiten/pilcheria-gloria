@@ -50,6 +50,7 @@ export interface MPPreference {
     };
   };
   external_reference?: string;
+  metadata?: Record<string, string | number | boolean | null>;
   notification_url?: string;
   back_urls?: {
     success: string;

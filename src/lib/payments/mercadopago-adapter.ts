@@ -132,6 +132,7 @@ export const mercadoPagoAdapter: PaymentAdapter = {
           }
         : {}),
       external_reference: input.orderId,
+      metadata: { payment_attempt_id: input.attemptId },
       notification_url: `${appUrl}/api/webhooks/mercadopago?source_news=webhooks`,
       back_urls: {
         success: `${appUrl}/order-confirmation/${input.orderId}`,
