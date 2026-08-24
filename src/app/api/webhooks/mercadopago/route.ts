@@ -1,72 +1,16 @@
 import { NextResponse } from "next/server";
 import { after } from "next/server";
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { revalidateProductCacheFromRouteHandler } from "@/lib/cache/products";
 import { getPayment } from "@/lib/mercadopago/client";
 import { applyMercadoPagoPayment } from "@/lib/orders/payment-state";
 import { sendOrderEmail } from "@/lib/notifications/email";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { mercadoPagoAdapter } from "@/lib/payments/mercadopago-adapter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
-
-function parseSignatureHeader(signatureHeader: string | null) {
-  if (!signatureHeader) {
-    return null;
-  }
-
-  return Object.fromEntries(
-    signatureHeader.split(",").map((part) => {
-      const [key, value] = part.split("=");
-      return [key?.trim(), value?.trim()];
-    })
-  ) as { ts?: string; v1?: string };
-}
-
-function isValidWebhookSignature({
-  dataId,
-  requestId,
-  signatureHeader,
-}: {
-  dataId: string;
-  requestId: string | null;
-  signatureHeader: string | null;
-}) {
-  const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
-  if (!secret) return false;
-
-  const signature = parseSignatureHeader(signatureHeader);
-  if (
-    !signature?.ts ||
-    !signature.v1 ||
-    !requestId ||
-    !/^[a-f0-9]{64}$/i.test(signature.v1)
-  ) {
-    return false;
-  }
-
-  const timestamp = Number(signature.ts);
-  if (
-    !Number.isFinite(timestamp) ||
-    Math.abs(Date.now() / 1000 - timestamp) > 15 * 60
-  ) {
-    return false;
-  }
-
-  const manifest = `id:${dataId};request-id:${requestId};ts:${signature.ts};`;
-  const expectedSignature = createHmac("sha256", secret)
-    .update(manifest)
-    .digest("hex");
-  const expectedBuffer = Buffer.from(expectedSignature, "hex");
-  const receivedBuffer = Buffer.from(signature.v1, "hex");
-
-  return (
-    expectedBuffer.length === receivedBuffer.length &&
-    timingSafeEqual(expectedBuffer, receivedBuffer)
-  );
-}
 
 export async function POST(request: Request) {
   try {
@@ -119,10 +63,10 @@ export async function POST(request: Request) {
         );
       }
 
-      const isValidSignature = isValidWebhookSignature({
-        dataId: paymentId,
+      const isValidSignature = mercadoPagoAdapter.validateWebhook({
+        externalId: paymentId,
         requestId,
-        signatureHeader,
+        signature: signatureHeader,
       });
 
       if (!isValidSignature) {

@@ -26,11 +26,28 @@ export interface MPPreference {
     name: string;
     surname: string;
     email?: string;
+    phone?: {
+      area_code?: string;
+      number: string;
+    };
+    address?: {
+      zip_code?: string;
+      street_name?: string;
+      street_number?: number;
+    };
   };
   shipments?: {
     mode: string;
     default_shipping_method?: number;
     zip_code?: string;
+    receiver_address?: {
+      zip_code?: string;
+      street_name?: string;
+      street_number?: number;
+      city_name?: string;
+      state_name?: string;
+      country_name?: string;
+    };
   };
   external_reference?: string;
   notification_url?: string;
@@ -49,7 +66,11 @@ export interface MPPreference {
   statement_descriptor?: string;
 }
 
-export async function createPreference(preference: MPPreference) {
+export async function createPreference(
+  preference: MPPreference,
+  idempotencyKey?: string,
+  deviceId?: string | null
+) {
   if (process.env.E2E_MERCADOPAGO_FAKE === "1") {
     return {
       id: `e2e-${preference.external_reference ?? Date.now()}`,
@@ -65,7 +86,8 @@ export async function createPreference(preference: MPPreference) {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       "X-Idempotency-Key":
-        preference.external_reference || crypto.randomUUID(),
+        idempotencyKey || preference.external_reference || crypto.randomUUID(),
+      ...(deviceId ? { "X-meli-session-id": deviceId } : {}),
     },
     body: JSON.stringify(preference),
     signal: AbortSignal.timeout(MERCADOPAGO_TIMEOUT_MS),

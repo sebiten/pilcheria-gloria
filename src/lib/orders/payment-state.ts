@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getMercadoPagoAccountId } from "@/lib/mercadopago/client";
 import { sendAdminSalePush } from "@/lib/notifications/admin-push";
 import { sendMetaPurchaseEvent } from "@/lib/meta/conversions";
+import type { PaymentProvider } from "@/types";
 
 export const ORDER_RESERVATION_MINUTES = 30;
 export const PENDING_PAYMENT_EXTENSION_HOURS = 24;
@@ -62,6 +63,16 @@ export async function cancelOrderAndRelease(
     throw new Error(error.message);
   }
 
+  if (data) {
+    const now = new Date().toISOString();
+    const { error: attemptsError } = await supabase
+      .from("order_payment_attempts")
+      .update({ status: "cancelled", terminal_at: now, updated_at: now })
+      .eq("order_id", orderId)
+      .in("status", ["created", "pending", "in_process", "review"]);
+    if (attemptsError) throw new Error(attemptsError.message);
+  }
+
   return Boolean(data);
 }
 
@@ -95,32 +106,52 @@ export async function applyMercadoPagoPayment(
       String(payment.collector_id ?? "") === expectedAccountId;
 
     if (!amountMatches || !currencyMatches || !collectorMatches) {
-      const { error: reviewError } = await supabase
-        .from("orders")
-        .update({
-          status: "payment_review",
-          mercadopago_id: String(payment.id),
-          mercadopago_status: payment.status,
-          mercadopago_status_detail: payment.status_detail ?? null,
-          cancel_reason:
-            "Pago recibido con importe, moneda o cuenta receptora inconsistente",
-        })
-        .eq("id", orderId)
-        .in("status", ["pending", "payment_review"]);
-
-      if (reviewError) {
-        throw new Error(reviewError.message);
-      }
-
-      return "payment_review";
+      return applyProviderPayment(orderId, "mercadopago", {
+        ...payment,
+        status: "review",
+        status_detail:
+          "Pago recibido con importe, moneda o cuenta receptora inconsistente",
+      });
     }
   }
 
-  const { data, error } = await supabase.rpc("apply_order_payment", {
+  return applyProviderPayment(orderId, "mercadopago", payment);
+}
+
+export async function applyProviderPayment(
+  orderId: string,
+  provider: PaymentProvider,
+  payment: MercadoPagoPayment
+) {
+  const supabase = getSupabaseAdmin();
+  const externalId = String(payment.id);
+  const { data: attempts, error: attemptsError } = await supabase
+    .from("order_payment_attempts")
+    .select("id, external_id, status, created_at")
+    .eq("order_id", orderId)
+    .eq("provider", provider)
+    .order("created_at", { ascending: false });
+
+  if (attemptsError) throw new Error(attemptsError.message);
+  const attempt =
+    attempts?.find((item) => item.external_id === externalId) ??
+    attempts?.find((item) =>
+      ["created", "pending", "in_process", "review"].includes(item.status)
+    );
+  if (!attempt) {
+    throw new Error("No existe un intento activo para este pago");
+  }
+
+  const { data, error } = await supabase.rpc("apply_order_payment_attempt", {
     p_order_id: orderId,
-    p_payment_id: String(payment.id),
+    p_attempt_id: attempt.id,
+    p_provider: provider,
+    p_external_id: externalId,
     p_payment_status: payment.status,
     p_payment_status_detail: payment.status_detail ?? null,
+    p_receiver_account_id: payment.collector_id
+      ? String(payment.collector_id)
+      : null,
   });
 
   if (error) {

@@ -20,11 +20,11 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${
     process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""
-  } https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://clerk.pilcheriagloria.com.ar https://challenges.cloudflare.com https://*.protect.clerk.com https://www.googletagmanager.com https://connect.facebook.net`,
+  } https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://clerk.pilcheriagloria.com.ar https://challenges.cloudflare.com https://*.protect.clerk.com https://www.googletagmanager.com https://connect.facebook.net https://www.mercadopago.com https://*.mercadopago.com`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: https://images.unsplash.com${supabaseOrigin ? ` ${supabaseOrigin}` : ""} https://*.clerk.com https://*.clerk.dev https://img.clerk.com https://*.google-analytics.com https://www.googletagmanager.com https://www.facebook.com`,
+  `img-src 'self' data: blob: https://images.unsplash.com${supabaseOrigin ? ` ${supabaseOrigin}` : ""} https://*.clerk.com https://*.clerk.dev https://img.clerk.com https://*.google-analytics.com https://www.googletagmanager.com https://www.facebook.com https://www.mercadopago.com https://*.mercadopago.com`,
   "font-src 'self' data:",
-  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://clerk.pilcheriagloria.com.ar https://clerk-telemetry.com https://*.clerk-telemetry.com https://img.clerk.com https://*.protect.clerk.com https://api.clerk.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.google.com https://connect.facebook.net https://www.facebook.com",
+  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://clerk.pilcheriagloria.com.ar https://clerk-telemetry.com https://*.clerk-telemetry.com https://img.clerk.com https://*.protect.clerk.com https://api.clerk.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.google.com https://connect.facebook.net https://www.facebook.com https://www.mercadopago.com https://*.mercadopago.com",
   "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://*.protect.clerk.com https://www.google.com",
   "worker-src 'self' blob:",
   "media-src 'self'",

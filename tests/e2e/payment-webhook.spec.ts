@@ -77,7 +77,7 @@ test("approved MercadoPago webhook marks guest order as paid", async ({ page }) 
     await expect.poll(async () => getVariantStock(seed.variantId)).toBe(4);
 
     const requestId = `e2e-request-${Date.now()}`;
-    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const timestamp = Date.now().toString();
     const response = await page.request.post(
       `/api/webhooks/mercadopago?type=payment&data.id=${pendingOrder.id}`,
       {
@@ -152,7 +152,7 @@ test("MercadoPago webhook rejects an invalid signature", async ({ page }) => {
       {
         headers: {
           "x-request-id": `invalid-${Date.now()}`,
-          "x-signature": `ts=${Math.floor(Date.now() / 1000)},v1=${"0".repeat(64)}`,
+          "x-signature": `ts=${Date.now()},v1=${"0".repeat(64)}`,
         },
         data: {
           type: "payment",
@@ -173,13 +173,13 @@ test("MercadoPago webhook rejects an invalid signature", async ({ page }) => {
   }
 });
 
-test("rejected webhook releases stock and deduplicates analytics", async ({ page }) => {
+test("rejected webhook keeps the order and stock reserved", async ({ page }) => {
   const seed = await seedCheckoutSmokeProduct();
 
   try {
     const orderId = await createPendingOrderForProduct(seed);
     const requestId = `rejected-${Date.now()}`;
-    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const timestamp = Date.now().toString();
     const headers = {
       "x-request-id": requestId,
       "x-signature": createMercadoPagoSignature({
@@ -200,13 +200,13 @@ test("rejected webhook releases stock and deduplicates analytics", async ({ page
     }
 
     await expect.poll(async () => getOrderState(orderId)).toMatchObject({
-      status: "cancelled",
-      stock_reserved: false,
-      stock_restored: true,
+      status: "pending",
+      stock_reserved: true,
+      stock_restored: false,
       mercadopago_status: "rejected",
       mercadopago_status_detail: "cc_rejected_insufficient_amount",
     });
-    await expect.poll(async () => getVariantStock(seed.variantId)).toBe(5);
+    await expect.poll(async () => getVariantStock(seed.variantId)).toBe(4);
     await expect.poll(async () => getPaymentAnalyticsEvents(orderId)).toEqual([
       expect.objectContaining({
         event_name: "payment_rejected",
@@ -226,7 +226,7 @@ test("pending webhook keeps stock and deduplicates analytics", async ({ page }) 
     const orderId = await createPendingOrderForProduct(seed);
     const initialOrder = await getOrderState(orderId);
     const requestId = `pending-${Date.now()}`;
-    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const timestamp = Date.now().toString();
     const headers = {
       "x-request-id": requestId,
       "x-signature": createMercadoPagoSignature({

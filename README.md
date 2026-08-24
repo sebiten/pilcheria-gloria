@@ -28,6 +28,22 @@ Completá `.env.local` con:
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` y `CLERK_WEBHOOK_SECRET`.
 - `MERCADOPAGO_ACCESS_TOKEN` y `MERCADOPAGO_WEBHOOK_SECRET`.
 
+### Proveedores de pago
+
+Los pedidos y la reserva de stock son independientes del procesador. Cada inicio
+se registra en `order_payment_attempts`; solo puede existir un intento activo por
+pedido.
+
+El checkout carga el código de seguridad de Mercado Pago y envía
+`MP_DEVICE_SESSION_ID` como `X-meli-session-id` al crear la preferencia. Después
+de un rechazo de riesgo, el mismo pedido no puede volver a abrir Mercado Pago
+durante 10 minutos; otro proveedor habilitado no queda bloqueado.
+
+viüMi no se muestra ni acepta pagos hasta contar con sandbox, credenciales,
+documentación de Checkout y consulta de estado, firma verificable de webhooks e
+instrucciones de cancelación/devolución. Las variables `VIUMI_*` de
+`.env.example` están reservadas para esa activación y no la habilitan por sí solas.
+
 No expongas `SUPABASE_SERVICE_ROLE_KEY`, `CLERK_SECRET_KEY` ni los secretos de Mercado Pago en variables públicas.
 
 ## Base de datos

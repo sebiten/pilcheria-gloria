@@ -20,10 +20,15 @@ import {
   getOrderStatusLabel,
 } from "@/lib/commerce";
 import { getOrderConfirmationCookieName } from "@/lib/orders/confirmation-access";
-import { getPaymentRejectionHint } from "@/lib/orders/payment-rejection";
+import {
+  getPaymentRejectionHint,
+  getRiskRetryNotBefore,
+} from "@/lib/orders/payment-rejection";
 import { ClearCartOnMount } from "./clear-cart-on-mount";
 import { RetryPaymentButton } from "./retry-payment-button";
 import styles from "./purchase-celebration.module.css";
+import { getEnabledPaymentProviders } from "@/lib/payments/providers";
+import type { PaymentProvider } from "@/types";
 
 export const metadata: Metadata = {
   title: "Confirmación del pedido",
@@ -119,17 +124,26 @@ export default async function OrderConfirmationPage({
   }
 
   const isConfirmed = Boolean(order && CONFIRMED_STATUSES.has(order.status));
+  const latestAttempt = order?.payment_attempts
+    ? [...order.payment_attempts].sort(
+        (first: any, second: any) =>
+          new Date(second.created_at).getTime() -
+          new Date(first.created_at).getTime()
+      )[0]
+    : null;
 
   const orderCode = id.slice(0, 8).toUpperCase();
   const retryPath = `/api/order-confirmation/${encodeURIComponent(id)}?retry=1`;
   const isPending = order?.status === "pending";
   const isRejected = Boolean(
-    order?.status === "cancelled" &&
-      ["rejected", "cancelled"].includes(order.mercadopago_status || "")
+    order?.status === "pending" &&
+      ["rejected", "cancelled", "failed"].includes(latestAttempt?.status || "")
   );
+  const riskRetryNotBefore = getRiskRetryNotBefore(latestAttempt);
 
   if (isRejected && order) {
     const settings = await getStoreSettings();
+    const enabledProviders = getEnabledPaymentProviders();
     const whatsappPhone = settings.whatsapp_phone?.replace(/\D/g, "");
     const whatsappHref = whatsappPhone
       ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(
@@ -147,17 +161,20 @@ export default async function OrderConfirmationPage({
             El pago no se completó
           </h1>
           <p className="mx-auto mt-4 max-w-md leading-7 text-muted-foreground">
-            Tu pedido sigue guardado. Probá otra tarjeta o dinero disponible en
-            Mercado Pago.
+            Tu pedido y el stock siguen reservados. Podés volver a intentar sin
+            crear otro pedido.
           </p>
         </div>
 
         <section className="mt-7 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-950">
           <p className="font-bold">
-            {getPaymentRejectionHint(order.mercadopago_status_detail)}
+            {latestAttempt?.provider === "mercadopago"
+              ? getPaymentRejectionHint(latestAttempt.status_detail)
+              : latestAttempt?.status_detail ||
+                "Podés volver a intentar con otro medio de pago."}
           </p>
           <p className="mt-2 text-sm leading-6">
-            Antes de abrir Mercado Pago vamos a revisar de nuevo precios y stock.
+            No volveremos a descontar stock ni a contabilizar el cupón.
           </p>
           <div className="mt-4 rounded-xl bg-white/80 px-4 py-3 text-center font-mono text-lg font-black tracking-[0.12em]">
             {orderCode}
@@ -165,7 +182,12 @@ export default async function OrderConfirmationPage({
         </section>
 
         <div className="mt-7 space-y-3">
-          <RetryPaymentButton orderId={id} />
+          <RetryPaymentButton
+            orderId={id}
+            providers={enabledProviders}
+            previousProvider={latestAttempt?.provider as PaymentProvider | null}
+            riskRetryNotBefore={riskRetryNotBefore}
+          />
           {whatsappHref ? (
             <Button className="min-h-12 w-full" variant="outline" asChild>
               <a href={whatsappHref} target="_blank" rel="noreferrer">
@@ -306,7 +328,7 @@ export default async function OrderConfirmationPage({
           Estamos confirmando tu pago
         </h1>
         <p className="mx-auto mt-4 max-w-md leading-7 text-muted-foreground">
-          El pedido <strong>{orderCode}</strong> ya está registrado. Mercado Pago
+          El pedido <strong>{orderCode}</strong> ya está registrado. El procesador
           puede tardar unos instantes en enviarnos la confirmación.
         </p>
         <Button className="mt-7 min-h-12 w-full sm:w-auto" asChild>

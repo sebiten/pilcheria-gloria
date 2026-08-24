@@ -33,7 +33,12 @@ import {
 } from "@/lib/commerce";
 import { formatStorefrontVariantSize } from "@/lib/inventory";
 import { formatPrice } from "@/lib/utils";
-import type { Address, Profile, StoreSettings } from "@/types";
+import type {
+  Address,
+  PaymentProvider,
+  Profile,
+  StoreSettings,
+} from "@/types";
 import { PaymentConfidence } from "@/components/storefront/payment-confidence";
 import {
   getGoogleMapsDirectionsUrl,
@@ -48,11 +53,16 @@ import {
   getAnalyticsSessionId,
   trackStorefrontEvent,
 } from "@/lib/analytics/client";
+import {
+  getMercadoPagoDeviceId,
+  MercadoPagoDeviceIdScript,
+} from "@/components/storefront/mercadopago-device-id";
 
 interface CheckoutFormProps {
   addresses: Address[];
   profile: Profile | null;
   settings: StoreSettings;
+  enabledPaymentProviders: PaymentProvider[];
 }
 
 type DeliveryMethod = "pickup" | "local_delivery";
@@ -82,27 +92,33 @@ type CheckoutFieldName =
 type CheckoutFieldErrors = Partial<Record<CheckoutFieldName, string>>;
 type CartRefreshStatus = "updating" | "ready" | "error";
 
-function MercadoPagoButtonContent({
+function PaymentButtonContent({
   isProcessing,
+  provider,
 }: {
   isProcessing: boolean;
+  provider: PaymentProvider;
 }) {
   return (
     <>
       <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
-        <Image
-          src="/payment-methods/mercadopago.svg"
-          alt=""
-          width={24}
-          height={17}
-          className="h-auto w-6"
-          aria-hidden="true"
-        />
+        {provider === "mercadopago" ? (
+          <Image
+            src="/payment-methods/mercadopago.svg"
+            alt=""
+            width={24}
+            height={17}
+            className="h-auto w-6"
+            aria-hidden="true"
+          />
+        ) : (
+          <span className="text-xs font-black text-violet-700">viüMi</span>
+        )}
       </span>
       <span>
         {isProcessing
           ? "Preparando el pago…"
-          : "Continuar a Mercado Pago"}
+          : `Continuar a ${provider === "mercadopago" ? "Mercado Pago" : "viüMi"}`}
       </span>
     </>
   );
@@ -116,6 +132,7 @@ export function CheckoutForm({
   addresses,
   profile,
   settings,
+  enabledPaymentProviders,
 }: CheckoutFormProps) {
   const formId = "checkout-form";
   const router = useRouter();
@@ -136,6 +153,8 @@ export function CheckoutForm({
   const [isEmailOpen, setIsEmailOpen] = useState(Boolean(profile?.email));
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+  const [paymentProvider, setPaymentProvider] =
+    useState<PaymentProvider>(enabledPaymentProviders[0] ?? "mercadopago");
   const [couponFeedback, setCouponFeedback] =
     useState<CouponFeedback | null>(null);
   const [selectedAddressId, setSelectedAddressId] = useState(
@@ -438,6 +457,12 @@ export function CheckoutForm({
       return;
     }
 
+    if (!enabledPaymentProviders.includes(paymentProvider)) {
+      setError("No hay un procesador de pago disponible en este momento.");
+      focusField("checkout-error");
+      return;
+    }
+
     if (!isValidArgentinaContactPhone(formData.phone)) {
       showFieldError(
         "phone",
@@ -539,6 +564,11 @@ export function CheckoutForm({
           "Idempotency-Key": checkoutRequestId.current,
         },
         body: JSON.stringify({
+          paymentProvider,
+          deviceId:
+            paymentProvider === "mercadopago"
+              ? getMercadoPagoDeviceId()
+              : null,
           items,
           expectedSubtotal: subtotal,
           analyticsSessionId: getAnalyticsSessionId(),
@@ -567,19 +597,17 @@ export function CheckoutForm({
             response.status >= 500 ? "api_server_error" : "api_client_error",
           quantity: getCartItemCount(items),
         });
-        if (response.status < 500 && response.status !== 409) {
-          checkoutRequestId.current = null;
-        }
         throw new Error(data.error || "No se pudo iniciar el checkout");
       }
 
-      if (!data.preference?.init_point) {
+      const checkoutUrl = data.payment?.checkoutUrl || data.preference?.init_point;
+      if (!checkoutUrl) {
         trackStorefrontEvent({
           event: "checkout_validation_error",
           eventDetail: "missing_payment_link",
           quantity: getCartItemCount(items),
         });
-        throw new Error("Mercado Pago no devolvió un enlace de pago");
+        throw new Error("El procesador no devolvió un enlace de pago");
       }
 
       window.sessionStorage.removeItem(FACEBOOK_PROMOTION.storageKey);
@@ -587,7 +615,7 @@ export function CheckoutForm({
         event: "payment_redirect",
         quantity: getCartItemCount(items),
       });
-      window.location.assign(data.preference.init_point);
+      window.location.assign(checkoutUrl);
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -727,11 +755,11 @@ export function CheckoutForm({
       <ul className="space-y-2 text-sm font-semibold text-gloria-950">
         <li className="flex items-center gap-2">
           <ShieldCheck className="size-4 shrink-0 text-gloria-700" aria-hidden="true" />
-          Pago protegido por Mercado Pago
+          Pago protegido por {paymentProvider === "mercadopago" ? "Mercado Pago" : "viüMi"}
         </li>
         <li className="flex items-center gap-2">
           <UserRoundCheck className="size-4 shrink-0 text-gloria-700" aria-hidden="true" />
-          No necesitás una cuenta de Mercado Pago
+          Tus datos de pago se ingresan en el procesador elegido
         </li>
         <li className="flex items-center gap-2">
           <MessageCircle className="size-4 shrink-0 text-gloria-700" aria-hidden="true" />
@@ -744,21 +772,25 @@ export function CheckoutForm({
   const checkoutDisabled =
     isProcessing ||
     cartRefreshStatus !== "ready" ||
+    enabledPaymentProviders.length === 0 ||
     !hasAvailableShippingMethod;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pb-44 pt-7 sm:px-6 sm:pt-10 lg:pb-16">
+      {enabledPaymentProviders.includes("mercadopago") ? (
+        <MercadoPagoDeviceIdScript />
+      ) : null}
       <div className="mb-7">
         <h1 className="text-3xl font-black tracking-tight text-gloria-950 sm:text-4xl">
           Finalizar compra
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Completá la entrega y tus datos. El pago se realiza en Mercado Pago.
+          Completá la entrega, tus datos y elegí cómo pagar.
         </p>
         <ol className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-gloria-800" aria-label="Pasos para finalizar la compra">
           <li>Datos y entrega</li>
           <li aria-hidden="true">→</li>
-          <li>Mercado Pago</li>
+          <li>Pago seguro</li>
           <li aria-hidden="true">→</li>
           <li>Confirmación</li>
         </ol>
@@ -976,7 +1008,7 @@ export function CheckoutForm({
                 <p className="text-sm leading-5 text-muted-foreground">Usamos tu WhatsApp para confirmar y coordinar el pedido.</p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <FormField label="Nombre y apellido" name="fullName" value={formData.fullName} onChange={handleInputChange} autoComplete="name" error={fieldErrors.fullName} placeholder="Ej. María López" />
+                <FormField label="Nombre y apellido de quien realiza la compra" name="fullName" value={formData.fullName} onChange={handleInputChange} autoComplete="name" error={fieldErrors.fullName} placeholder="Ej. María López" />
                 <FormField
                   label="WhatsApp"
                   name="phone"
@@ -1010,9 +1042,38 @@ export function CheckoutForm({
                 <h2 id="checkout-review-title" className="font-semibold leading-none tracking-tight">
                   3. Revisá y continuá al pago
                 </h2>
-                <p className="text-sm leading-5 text-muted-foreground">Mercado Pago se abrirá para que elijas cómo pagar.</p>
+                <p className="text-sm leading-5 text-muted-foreground">Te redirigiremos al procesador que elijas.</p>
               </CardHeader>
               <CardContent className="space-y-5">
+                <RadioGroup
+                  aria-label="Procesador de pago"
+                  value={paymentProvider}
+                  onValueChange={(value) => {
+                    setPaymentProvider(value as PaymentProvider);
+                  }}
+                  className="grid gap-3 sm:grid-cols-2"
+                >
+                  {enabledPaymentProviders.includes("mercadopago") ? (
+                    <PaymentProviderOption
+                      id="mercadopago"
+                      name="Mercado Pago"
+                      description="Tarjetas y dinero disponible"
+                      imageSrc="/payment-methods/mercadopago.svg"
+                    />
+                  ) : null}
+                  {enabledPaymentProviders.includes("viumi") ? (
+                    <PaymentProviderOption
+                      id="viumi"
+                      name="viüMi"
+                      description="Pago seguro con viüMi"
+                    />
+                  ) : null}
+                </RadioGroup>
+                {enabledPaymentProviders.length === 0 ? (
+                  <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950" role="alert">
+                    Los pagos están temporalmente deshabilitados. Contactanos para completar tu compra.
+                  </p>
+                ) : null}
                 <div className="rounded-xl border">
                   <button type="button" onClick={() => setIsCouponOpen((open) => !open)} aria-expanded={isCouponOpen} aria-controls="checkout-coupon-content" className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
                     <span>Agregar cupón <span className="font-normal text-muted-foreground">(opcional)</span></span>
@@ -1066,7 +1127,7 @@ export function CheckoutForm({
                 onClick={handleCheckoutCtaClick}
                 disabled={checkoutDisabled}
               >
-                <MercadoPagoButtonContent isProcessing={isProcessing} />
+                <PaymentButtonContent isProcessing={isProcessing} provider={paymentProvider} />
               </Button>
               <p className="text-xs leading-5 text-muted-foreground">
                 El stock se reserva durante 30 minutos. Al continuar aceptás los <Link href="/terminos" className="font-semibold underline">términos de compra</Link> y la <Link href="/privacidad" className="font-semibold underline">política de privacidad</Link>.
@@ -1090,11 +1151,45 @@ export function CheckoutForm({
             onClick={handleCheckoutCtaClick}
             disabled={checkoutDisabled}
           >
-            <MercadoPagoButtonContent isProcessing={isProcessing} />
+            <PaymentButtonContent isProcessing={isProcessing} provider={paymentProvider} />
           </Button>
         </div>
       </div>
     </main>
+  );
+}
+
+function PaymentProviderOption({
+  id,
+  name,
+  description,
+  imageSrc,
+}: {
+  id: PaymentProvider;
+  name: string;
+  description: string;
+  imageSrc?: string;
+}) {
+  return (
+    <div>
+      <RadioGroupItem value={id} id={`payment-${id}`} className="peer sr-only" />
+      <Label
+        htmlFor={`payment-${id}`}
+        className="flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border p-4 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5"
+      >
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+          {imageSrc ? (
+            <Image src={imageSrc} alt="" width={30} height={22} aria-hidden="true" />
+          ) : (
+            <span className="text-xs font-black text-violet-700">viüMi</span>
+          )}
+        </span>
+        <span>
+          <span className="block font-black">{name}</span>
+          <span className="mt-1 block text-sm text-muted-foreground">{description}</span>
+        </span>
+      </Label>
+    </div>
   );
 }
 

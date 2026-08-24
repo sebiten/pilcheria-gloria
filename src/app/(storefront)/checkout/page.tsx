@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getAddresses, getProfile } from "@/actions/auth";
 import { getStoreSettings } from "@/actions/store-settings";
 import { CheckoutForm } from "./checkout-form";
+import { getEnabledPaymentProviders } from "@/lib/payments/providers";
 
 export const metadata: Metadata = {
   title: "Finalizar compra",
@@ -17,5 +18,12 @@ export default async function CheckoutPage() {
     getStoreSettings(),
   ]);
 
-  return <CheckoutForm addresses={addresses} profile={profile} settings={settings} />;
+  return (
+    <CheckoutForm
+      addresses={addresses}
+      profile={profile}
+      settings={settings}
+      enabledPaymentProviders={getEnabledPaymentProviders()}
+    />
+  );
 }

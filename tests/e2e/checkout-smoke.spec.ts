@@ -36,6 +36,7 @@ function visibleCheckoutSubmit(page: Page) {
 test("guest user can go from product to checkout", async ({ page }) => {
   const seed = await seedCheckoutSmokeProduct();
   let checkoutRequests = 0;
+  const checkoutIdempotencyKeys: string[] = [];
 
   try {
     await page.addInitScript(() => {
@@ -45,6 +46,9 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await page.route("**/api/checkout", async (route) => {
       checkoutRequests += 1;
       const request = route.request();
+      checkoutIdempotencyKeys.push(
+        request.headers()["idempotency-key"] || ""
+      );
       const payload = request.postDataJSON() as {
         items?: Array<{ product_id: string; variant_id: string | null; quantity: number }>;
         shippingAddress?: { email?: string | null; street?: string | null };
@@ -63,7 +67,7 @@ test("guest user can go from product to checkout", async ({ page }) => {
       if (checkoutRequests === 1) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         await route.fulfill({
-          status: 503,
+          status: 422,
           contentType: "application/json",
           body: JSON.stringify({ error: "Mercado Pago no respondió. Reintentá." }),
         });
@@ -156,6 +160,10 @@ test("guest user can go from product to checkout", async ({ page }) => {
 
     await submit.click();
     await expect.poll(() => checkoutRequests).toBe(2);
+    expect(new Set(checkoutIdempotencyKeys).size).toBe(1);
+    expect(checkoutIdempotencyKeys[0]).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
     await expect(page).toHaveURL(/mercadopago\.com\.ar\/checkout/);
   } finally {
     await cleanupCheckoutSmokeProduct(seed);
@@ -258,6 +266,7 @@ test("repeated checkout request is idempotent", async ({ request }) => {
   try {
     const checkoutRequestId = randomUUID();
     const checkoutPayload = {
+      paymentProvider: "mercadopago",
       items: [
         {
           product_id: seed.productId,

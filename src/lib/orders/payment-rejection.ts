@@ -4,6 +4,8 @@ export type PaymentRejectionCategory =
   | "risk"
   | "other";
 
+export const RISK_RETRY_COOLDOWN_MINUTES = 10;
+
 const DATA_ERRORS = new Set([
   "cc_rejected_bad_filled_card_number",
   "cc_rejected_bad_filled_date",
@@ -46,4 +48,29 @@ export function getPaymentRejectionHint(statusDetail?: string | null) {
     default:
       return "Podés volver a intentar con otro medio de pago.";
   }
+}
+
+export function getRiskRetryNotBefore(attempt?: {
+  provider?: string | null;
+  status?: string | null;
+  status_detail?: string | null;
+  terminal_at?: string | null;
+  updated_at?: string | null;
+}) {
+  if (
+    attempt?.provider !== "mercadopago" ||
+    attempt.status !== "rejected" ||
+    getPaymentRejectionCategory(attempt.status_detail) !== "risk"
+  ) {
+    return null;
+  }
+
+  const rejectedAt = new Date(
+    attempt.terminal_at || attempt.updated_at || ""
+  ).getTime();
+  if (!Number.isFinite(rejectedAt)) return null;
+
+  return new Date(
+    rejectedAt + RISK_RETRY_COOLDOWN_MINUTES * 60 * 1000
+  ).toISOString();
 }

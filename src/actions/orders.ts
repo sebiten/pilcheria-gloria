@@ -5,9 +5,6 @@ import { createHash } from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ensureUserProfile, getProfile, requireAdmin } from "@/actions/auth";
 import {
-  cancelPayment,
-  createPreference,
-  refundPayment,
   searchPaymentsByExternalReference,
 } from "@/lib/mercadopago/client";
 import { revalidatePath } from "next/cache";
@@ -41,6 +38,12 @@ import {
   type CheckoutRouteCapability,
 } from "@/lib/security/checkout-capability";
 import { secureTokenEquals } from "@/lib/orders/confirmation-access";
+import { getPaymentAdapter } from "@/lib/payments/providers";
+import type { PaymentProvider } from "@/types";
+import {
+  getRiskRetryNotBefore,
+  RISK_RETRY_COOLDOWN_MINUTES,
+} from "@/lib/orders/payment-rejection";
 
 const ORDER_STATUS_VALUES: OrderStatus[] = [
   "pending",
@@ -80,14 +83,6 @@ type FinancialCheckoutItem = ResolvedCheckoutItem & {
   partnerShare: number;
 };
 
-type MercadoPagoCheckoutItem = {
-  id: string;
-  title: string;
-  unit_price: number;
-  quantity: number;
-  picture_url?: string;
-};
-
 type CheckoutAddressMetadata = ShippingAddress & {
   _checkout_hash: string;
   _checkout_fingerprint: string;
@@ -100,10 +95,6 @@ type CheckoutAddressMetadata = ShippingAddress & {
 
 function createGuestAccessToken() {
   return crypto.randomUUID().replaceAll("-", "");
-}
-
-function getAppUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
 }
 
 function revalidateProductCacheAfterStockChange() {
@@ -470,35 +461,6 @@ function allocateOrderFinancials(
   });
 }
 
-function buildMercadoPagoItems(
-  items: FinancialCheckoutItem[],
-  shippingCost: number
-): MercadoPagoCheckoutItem[] {
-  const preferenceItems: MercadoPagoCheckoutItem[] = items.map((item) => {
-    return {
-      id: item.product_id,
-      title: item.title,
-      unit_price: Math.max(
-        0.01,
-        Number((item.netAmount / item.quantity).toFixed(2))
-      ),
-      quantity: item.quantity,
-      picture_url: item.pictureUrl,
-    };
-  });
-
-  if (shippingCost > 0) {
-    preferenceItems.push({
-      id: "shipping",
-      title: "Entrega local",
-      unit_price: Number(shippingCost.toFixed(2)),
-      quantity: 1,
-    });
-  }
-
-  return preferenceItems;
-}
-
 export async function createOrder(
   {
     items,
@@ -526,7 +488,6 @@ export async function createOrder(
   const profile = userId ? await ensureUserProfile() : null;
 
   const supabase = getSupabaseAdmin();
-  const appUrl = getAppUrl();
   const resolvedItems = await resolveCheckoutItems(items, {
     allowDemoProducts: profile?.role === "admin",
   });
@@ -642,18 +603,12 @@ export async function createOrder(
       throw new Error("El intento de compra no coincide con el checkout original");
     }
 
-    if (
-      existingOrder.status !== "pending" ||
-      !existingAddress._checkout_preference?.init_point
-    ) {
+    if (existingOrder.status !== "pending") {
       throw new Error("Este intento de compra ya fue procesado o sigue en curso");
     }
 
     await clearUserCart(userId);
-    return {
-      order: existingOrder,
-      preference: existingAddress._checkout_preference,
-    };
+    return { order: existingOrder };
   }
 
   const { data: order, error: orderError } = await supabase
@@ -723,69 +678,12 @@ export async function createOrder(
     throw error;
   }
 
-  let preference;
   try {
-    preference = await createPreference({
-      items: buildMercadoPagoItems(
-        financialItems,
-        shippingCost
-      ),
-      payer: {
-        name: shippingAddress.name.split(" ")[0] || shippingAddress.name,
-        surname: shippingAddress.name.split(" ").slice(1).join(" "),
-        ...(shippingAddress.email?.trim()
-          ? { email: shippingAddress.email.trim() }
-          : {}),
-      },
-      external_reference: order.id,
-      notification_url: `${appUrl}/api/webhooks/mercadopago?source_news=webhooks`,
-      back_urls: {
-        success: `${appUrl}/order-confirmation/${order.id}`,
-        failure: `${appUrl}/order-confirmation/${order.id}`,
-        pending: `${appUrl}/order-confirmation/${order.id}`,
-      },
-      auto_return: "approved",
-      expires: true,
-      expiration_date_from: new Date().toISOString(),
-      expiration_date_to: reservationExpiresAt,
-      payment_methods: {
-        excluded_payment_types: [
-          { id: "ticket" },
-          { id: "atm" },
-          { id: "bank_transfer" },
-        ],
-      },
-      statement_descriptor: "PILCHERIA GLORIA",
-    });
-
-    const preferenceMetadata = {
-      id: String(preference.id),
-      init_point: String(preference.init_point),
-      ...(preference.sandbox_init_point
-        ? { sandbox_init_point: String(preference.sandbox_init_point) }
-        : {}),
-    };
-    const { error: preferenceMetadataError } = await supabase
-      .from("orders")
-      .update({
-        shipping_address: {
-          ...checkoutAddress,
-          _checkout_preference: preferenceMetadata,
-        },
-      })
-      .eq("id", order.id)
-      .eq("status", "pending");
-
-    if (preferenceMetadataError) {
-      throw preferenceMetadataError;
-    }
-
-    preference = preferenceMetadata;
     await claimOrderCoupon(order.id);
   } catch (error) {
     await cancelOrderAndRelease(
       order.id,
-      "No se pudo iniciar o confirmar la preferencia de pago"
+      "No se pudo confirmar el cupón del pedido"
     );
     revalidateProductCacheAfterStockChange();
     throw error;
@@ -796,7 +694,175 @@ export async function createOrder(
     console.error("No se pudo enviar el email de reserva:", notificationError);
   });
 
-  return { order, preference };
+  return { order };
+}
+
+export async function startOrderPayment(
+  orderId: string,
+  provider: PaymentProvider,
+  capability: CheckoutRouteCapability,
+  deviceId?: string | null
+) {
+  assertCheckoutRouteCapability(capability);
+  const supabase = getSupabaseAdmin();
+  const adapter = getPaymentAdapter(provider);
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("id, status, total, shipping_address, reservation_expires_at")
+    .eq("id", orderId)
+    .single();
+
+  if (orderError || !order) {
+    throw orderError ?? new Error("Pedido no encontrado");
+  }
+  if (order.status !== "pending") {
+    throw new Error("Este pedido no admite un nuevo intento de pago");
+  }
+  if (
+    !order.reservation_expires_at ||
+    new Date(order.reservation_expires_at).getTime() <= Date.now()
+  ) {
+    throw new Error("La reserva de stock venció. Volvé al carrito para continuar");
+  }
+
+  const address = (order.shipping_address || {}) as CheckoutAddressMetadata;
+  const checkoutFingerprint = address._checkout_fingerprint;
+  let relatedOrderIds = [orderId];
+
+  if (checkoutFingerprint && address.phone) {
+    const { data: relatedOrders, error: relatedOrdersError } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("shipping_address->>_checkout_fingerprint", checkoutFingerprint)
+      .eq("shipping_address->>phone", address.phone)
+      .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .limit(20);
+    if (relatedOrdersError) throw relatedOrdersError;
+    relatedOrderIds = Array.from(
+      new Set([orderId, ...(relatedOrders || []).map((item) => item.id)])
+    );
+  }
+
+  const { data: previousAttempt, error: previousAttemptError } = await supabase
+    .from("order_payment_attempts")
+    .select("provider, status, status_detail, terminal_at, updated_at")
+    .in("order_id", relatedOrderIds)
+    .eq("provider", provider)
+    .eq("status", "rejected")
+    .gte(
+      "terminal_at",
+      new Date(
+        Date.now() - RISK_RETRY_COOLDOWN_MINUTES * 60 * 1000
+      ).toISOString()
+    )
+    .order("terminal_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (previousAttemptError) throw previousAttemptError;
+
+  const retryNotBefore = getRiskRetryNotBefore(previousAttempt || undefined);
+  if (retryNotBefore && new Date(retryNotBefore).getTime() > Date.now()) {
+    const remainingMinutes = Math.max(
+      1,
+      Math.ceil((new Date(retryNotBefore).getTime() - Date.now()) / 60_000)
+    );
+    throw new Error(
+      `Mercado Pago rechazó el intento por seguridad. Esperá ${remainingMinutes} min o elegí otro procesador.`
+    );
+  }
+
+  const { data: activeAttempt, error: activeAttemptError } = await supabase
+    .from("order_payment_attempts")
+    .select("*")
+    .eq("order_id", orderId)
+    .in("status", ["created", "pending", "in_process", "review"])
+    .maybeSingle();
+
+  if (activeAttemptError) throw activeAttemptError;
+  if (activeAttempt) {
+    if (
+      activeAttempt.provider === provider &&
+      activeAttempt.checkout_url &&
+      activeAttempt.status !== "review"
+    ) {
+      return activeAttempt;
+    }
+    throw new Error(
+      activeAttempt.status === "review"
+        ? "El pago está siendo verificado. No inicies otro intento."
+        : "Ya existe un intento de pago activo para este pedido."
+    );
+  }
+
+  const { data: attempt, error: attemptError } = await supabase
+    .from("order_payment_attempts")
+    .insert({
+      order_id: orderId,
+      provider,
+      status: "created",
+      amount: Number(order.total),
+      currency: "ARS",
+    })
+    .select()
+    .single();
+
+  if (attemptError || !attempt) {
+    if (attemptError?.code === "23505") {
+      throw new Error("Ya existe un intento de pago activo para este pedido.");
+    }
+    throw attemptError ?? new Error("No se pudo registrar el intento de pago");
+  }
+
+  try {
+    const started = await adapter.start({
+      attemptId: attempt.id,
+      orderId,
+      amount: Number(order.total),
+      currency: "ARS",
+      reservationExpiresAt: order.reservation_expires_at,
+      deviceId,
+      buyer: {
+        name: address.name,
+        email: address.email,
+        phone: address.phone || "",
+        street: address.street,
+        city: address.city,
+        state: address.state,
+        zip: address.zip,
+      },
+    });
+    const { data: updatedAttempt, error: updateError } = await supabase
+      .from("order_payment_attempts")
+      .update({
+        external_id: started.externalId,
+        checkout_url: started.checkoutUrl,
+        status: started.status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", attempt.id)
+      .eq("status", "created")
+      .select()
+      .single();
+
+    if (updateError || !updatedAttempt) {
+      throw updateError ?? new Error("No se pudo guardar el enlace de pago");
+    }
+    return updatedAttempt;
+  } catch (error) {
+    await supabase
+      .from("order_payment_attempts")
+      .update({
+        status: "failed",
+        status_detail:
+          error instanceof Error ? error.message.slice(0, 300) : "Error desconocido",
+        terminal_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", attempt.id)
+      .eq("status", "created");
+    throw error;
+  }
 }
 
 export async function getOrders() {
@@ -822,6 +888,14 @@ export async function getOrders() {
         transfer_reference,
         created_at,
         paid_at
+      ),
+      payment_attempts:order_payment_attempts(
+        id,
+        provider,
+        status,
+        status_detail,
+        checkout_url,
+        created_at
       )
     `)
     .eq("clerk_user_id", userId)
@@ -857,6 +931,14 @@ export async function getOrderById(id: string) {
         transfer_reference,
         created_at,
         paid_at
+      ),
+      payment_attempts:order_payment_attempts(
+        id,
+        provider,
+        status,
+        status_detail,
+        checkout_url,
+        created_at
       )
     `)
     .eq("id", id)
@@ -893,6 +975,16 @@ export async function getOrderForConfirmation(id: string, accessToken?: string) 
         transfer_reference,
         created_at,
         paid_at
+      ),
+      payment_attempts:order_payment_attempts(
+        id,
+        provider,
+        status,
+        status_detail,
+        checkout_url,
+        created_at,
+        updated_at,
+        terminal_at
       )
     `)
     .eq("id", id)
@@ -934,6 +1026,15 @@ export async function updateOrderStatus(id: string, status: string) {
   if (existingOrderError) {
     throw existingOrderError;
   }
+  const { data: paymentAttempt, error: paymentAttemptError } = await supabase
+    .from("order_payment_attempts")
+    .select("id, provider, external_id, status, receiver_account_id")
+    .eq("order_id", id)
+    .in("status", ["approved", "pending", "in_process", "review"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (paymentAttemptError) throw paymentAttemptError;
 
   if (existingOrder.stock_restored && status !== "cancelled") {
     throw new Error("No se puede reabrir una orden con stock restaurado");
@@ -965,17 +1066,29 @@ export async function updateOrderStatus(id: string, status: string) {
   }
 
   if (status === "cancelled") {
-    if (
-      existingOrder.mercadopago_id &&
-      (existingOrder.mercadopago_status === "approved" ||
-        ["paid", "ready_for_pickup", "shipped"].includes(currentStatus))
-    ) {
-      await refundPayment(existingOrder.mercadopago_id, id);
-    } else if (
-      existingOrder.mercadopago_id &&
-      ["pending", "in_process"].includes(existingOrder.mercadopago_status || "")
-    ) {
-      await cancelPayment(existingOrder.mercadopago_id);
+    if (paymentAttempt?.external_id) {
+      const adapter = getPaymentAdapter(paymentAttempt.provider as PaymentProvider);
+      if (
+        ["approved", "review"].includes(paymentAttempt.status) ||
+        ["paid", "payment_review", "ready_for_pickup", "shipped"].includes(currentStatus)
+      ) {
+        await adapter.refund(paymentAttempt.external_id, id);
+        await supabase
+          .from("order_payment_attempts")
+          .update({ status: "refunded", terminal_at: new Date().toISOString() })
+          .eq("id", paymentAttempt.id);
+      } else if (paymentAttempt.receiver_account_id) {
+        await adapter.cancel(paymentAttempt.external_id);
+        await supabase
+          .from("order_payment_attempts")
+          .update({ status: "cancelled", terminal_at: new Date().toISOString() })
+          .eq("id", paymentAttempt.id);
+      } else {
+        await supabase
+          .from("order_payment_attempts")
+          .update({ status: "cancelled", terminal_at: new Date().toISOString() })
+          .eq("id", paymentAttempt.id);
+      }
     }
 
     await restoreOrderStock(id);
@@ -987,9 +1100,9 @@ export async function updateOrderStatus(id: string, status: string) {
   } = { status };
   if (
     status === "cancelled" &&
-    existingOrder.mercadopago_id &&
-    (existingOrder.mercadopago_status === "approved" ||
-      ["paid", "ready_for_pickup", "shipped"].includes(currentStatus))
+    paymentAttempt?.provider === "mercadopago" &&
+    (["approved", "review"].includes(paymentAttempt.status) ||
+      ["paid", "payment_review", "ready_for_pickup", "shipped"].includes(currentStatus))
   ) {
     updatePayload.mercadopago_status = "refunded";
   }

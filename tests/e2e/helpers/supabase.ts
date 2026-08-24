@@ -298,6 +298,17 @@ async function createReservedOrderForProduct(
     throw reserveError;
   }
 
+  const { error: attemptError } = await supabase
+    .from("order_payment_attempts")
+    .insert({
+      order_id: order.id,
+      provider: "mercadopago",
+      status: "pending",
+      amount: 125000,
+      currency: "ARS",
+    });
+  if (attemptError) throw attemptError;
+
   return order.id;
 }
 

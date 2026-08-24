@@ -36,7 +36,7 @@ const ORDER_EMAIL_COPY: Record<
   "order-created": {
     subject: "Terminá tu compra",
     heading: "Reservamos tus prendas por 30 minutos",
-    body: "Completá el pago en Mercado Pago antes de que venza la reserva.",
+    body: "Completá el pago en el procesador elegido antes de que venza la reserva.",
   },
   "payment-approved": {
     subject: "Pago confirmado",

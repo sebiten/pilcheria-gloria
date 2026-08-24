@@ -200,6 +200,24 @@ export const orderItems = pgTable("order_items", {
   }),
 });
 
+export const orderPaymentAttempts = pgTable("order_payment_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: uuid("order_id")
+    .references(() => orders.id, { onDelete: "cascade" })
+    .notNull(),
+  provider: text("provider").notNull(),
+  externalId: text("external_id"),
+  status: text("status").notNull().default("created"),
+  statusDetail: text("status_detail"),
+  checkoutUrl: text("checkout_url"),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("ARS"),
+  receiverAccountId: text("receiver_account_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  terminalAt: timestamp("terminal_at", { withTimezone: true }),
+});
+
 export const productReviewInvites = pgTable("product_review_invites", {
   id: uuid("id").primaryKey().defaultRandom(),
   orderId: uuid("order_id")
@@ -496,11 +514,22 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     references: [profiles.id],
   }),
   items: many(orderItems),
+  paymentAttempts: many(orderPaymentAttempts),
   manualRefunds: many(manualRefunds),
   analyticsEvents: many(storefrontAnalyticsEvents),
   reviews: many(productReviews),
   reviewInvites: many(productReviewInvites),
 }));
+
+export const orderPaymentAttemptsRelations = relations(
+  orderPaymentAttempts,
+  ({ one }) => ({
+    order: one(orders, {
+      fields: [orderPaymentAttempts.orderId],
+      references: [orders.id],
+    }),
+  })
+);
 
 export const productReviewInvitesRelations = relations(
   productReviewInvites,
@@ -653,6 +682,8 @@ export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type NewOrderItem = typeof orderItems.$inferInsert;
+export type OrderPaymentAttempt = typeof orderPaymentAttempts.$inferSelect;
+export type NewOrderPaymentAttempt = typeof orderPaymentAttempts.$inferInsert;
 export type ManualRefund = typeof manualRefunds.$inferSelect;
 export type NewManualRefund = typeof manualRefunds.$inferInsert;
 export type PartnerSettlement = typeof partnerSettlements.$inferSelect;

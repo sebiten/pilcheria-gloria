@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createOrder } from "@/actions/orders";
+import { createOrder, startOrderPayment } from "@/actions/orders";
 import {
   CheckoutRateLimitError,
   enforceCheckoutRateLimit,
@@ -11,8 +11,19 @@ import {
 } from "@/lib/contact";
 import { getOrderConfirmationCookieName } from "@/lib/orders/confirmation-access";
 import { getCheckoutRouteCapability } from "@/lib/security/checkout-capability";
+import type { CheckoutRouteCapability } from "@/lib/security/checkout-capability";
+import { getEnabledPaymentProviders } from "@/lib/payments/providers";
 
 const checkoutSchema = z.object({
+  paymentProvider: z.enum(["mercadopago", "viumi"]),
+  deviceId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(256)
+    .regex(/^[\x21-\x7e]+$/)
+    .nullable()
+    .optional(),
   items: z
     .array(
       z.object({
@@ -50,7 +61,7 @@ const checkoutSchema = z.object({
 });
 
 const SAFE_CHECKOUT_ERROR =
-  /carrito|producto|variante|stock|cantidad|precio|total|cup[oó]n|subtotal|retiro|entrega|direcci[oó]n|tel[eé]fono|tienda todav[ií]a|intento de compra/i;
+  /carrito|producto|variante|stock|cantidad|precio|total|cup[oó]n|subtotal|retiro|entrega|direcci[oó]n|tel[eé]fono|tienda todav[ií]a|intento de compra|mercado pago|procesador|seguridad/i;
 
 export async function POST(request: Request) {
   try {
@@ -59,8 +70,12 @@ export async function POST(request: Request) {
       .uuid()
       .parse(request.headers.get("idempotency-key"));
     const body = checkoutSchema.parse(await request.json());
+    if (!getEnabledPaymentProviders().includes(body.paymentProvider)) {
+      throw new Error("El procesador de pago elegido no está disponible.");
+    }
     const requestFingerprint = await enforceCheckoutRateLimit(request);
 
+    const capability: CheckoutRouteCapability = getCheckoutRouteCapability();
     const result = await createOrder(
       {
         ...body,
@@ -71,16 +86,22 @@ export async function POST(request: Request) {
         checkoutRequestId,
         requestFingerprint,
       },
-      getCheckoutRouteCapability()
+      capability
+    );
+    const attempt = await startOrderPayment(
+      result.order.id,
+      body.paymentProvider,
+      capability,
+      body.deviceId
     );
 
-    const initPoint = result.preference?.init_point;
-    if (!initPoint) {
-      throw new Error("Mercado Pago no devolvió un enlace de pago");
-    }
-
     const response = NextResponse.json({
-      preference: { init_point: String(initPoint) },
+      orderId: result.order.id,
+      payment: {
+        provider: attempt.provider,
+        checkoutUrl: attempt.checkout_url,
+      },
+      preference: { init_point: String(attempt.checkout_url) },
     });
     const guestToken = result.order?.guest_access_token;
 

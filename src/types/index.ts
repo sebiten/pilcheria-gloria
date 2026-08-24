@@ -9,6 +9,19 @@ export type OrderStatus =
   | "delivered"
   | "cancelled";
 
+export type PaymentProvider = "mercadopago" | "viumi";
+export type PaymentAttemptStatus =
+  | "created"
+  | "pending"
+  | "in_process"
+  | "approved"
+  | "rejected"
+  | "cancelled"
+  | "failed"
+  | "review"
+  | "refunded"
+  | "charged_back";
+
 export type CouponType = "percentage" | "fixed";
 
 export type SizeSystem = "infant" | "adult";
@@ -178,6 +191,22 @@ export interface Order {
   refunded_amount?: number;
   refunds?: ManualRefund[];
   created_at: string;
+}
+
+export interface OrderPaymentAttempt {
+  id: string;
+  order_id: string;
+  provider: PaymentProvider;
+  external_id: string | null;
+  status: PaymentAttemptStatus;
+  status_detail: string | null;
+  checkout_url: string | null;
+  amount: number;
+  currency: string;
+  receiver_account_id: string | null;
+  created_at: string;
+  updated_at: string;
+  terminal_at: string | null;
 }
 
 export interface OrderItem {

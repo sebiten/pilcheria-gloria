@@ -83,6 +83,17 @@ async function expireAbandonedOrders(request: Request) {
             console.error("No se pudo notificar la conciliación automática:", notificationError);
           });
         }
+        if (
+          nextStatus === "pending" &&
+          ["rejected", "cancelled"].includes(payment.status)
+        ) {
+          const cancelled = await cancelOrderAndRelease(
+            order.id,
+            "Reserva vencida después de un pago rechazado",
+            true
+          );
+          if (cancelled) summary.expired += 1;
+        }
         summary.reconciled += 1;
         continue;
       }
