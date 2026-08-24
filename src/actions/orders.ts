@@ -93,6 +93,14 @@ type CheckoutAddressMetadata = ShippingAddress & {
   };
 };
 
+type ExistingCheckoutOrder = Record<string, any> & {
+  items?: Array<{
+    product_id: string | null;
+    variant_id: string | null;
+    quantity: number;
+  }>;
+};
+
 function createGuestAccessToken() {
   return crypto.randomUUID().replaceAll("-", "");
 }
@@ -144,6 +152,90 @@ function normalizeCheckoutItems(items: CheckoutItem[]) {
   }
 
   return normalizedItems;
+}
+
+function normalizeCheckoutText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function getComparableShippingAddress(address: Partial<ShippingAddress> | null) {
+  return {
+    name: normalizeCheckoutText(address?.name),
+    email: normalizeCheckoutText(address?.email),
+    phone: normalizeCheckoutText(address?.phone),
+    street: normalizeCheckoutText(address?.street),
+    city: normalizeCheckoutText(address?.city),
+    state: normalizeCheckoutText(address?.state),
+    zip: normalizeCheckoutText(address?.zip),
+    references: normalizeCheckoutText(address?.references),
+  };
+}
+
+function getComparableCheckoutItems(
+  items: Array<{
+    product_id: string | null;
+    variant_id: string | null;
+    quantity: number;
+  }>
+) {
+  const quantities = new Map<string, number>();
+
+  for (const item of items) {
+    const key = `${item.product_id ?? ""}:${item.variant_id ?? ""}`;
+    quantities.set(key, (quantities.get(key) ?? 0) + Number(item.quantity));
+  }
+
+  return Array.from(quantities, ([key, quantity]) => ({ key, quantity })).sort(
+    (first, second) => first.key.localeCompare(second.key)
+  );
+}
+
+function assertExistingCheckoutMatches(
+  order: ExistingCheckoutOrder,
+  input: {
+    userId: string | null;
+    requestFingerprint: string;
+    items: CheckoutItem[];
+    shippingMethod: string;
+    shippingAddress: ShippingAddress;
+    couponCode?: string;
+    expectedSubtotal?: number;
+  }
+) {
+  const existingAddress =
+    order.shipping_address as CheckoutAddressMetadata | null;
+  const sameOwner = input.userId
+    ? order.clerk_user_id === input.userId
+    : !order.clerk_user_id &&
+      existingAddress?._checkout_fingerprint === input.requestFingerprint;
+  const requestedItems = getComparableCheckoutItems(
+    normalizeCheckoutItems(input.items)
+  );
+  const storedItems = getComparableCheckoutItems(order.items ?? []);
+  const storedSubtotal =
+    Number(order.total) -
+    Number(order.shipping_cost ?? 0) +
+    Number(order.discount_total ?? 0);
+  const sameSubtotal =
+    input.expectedSubtotal === undefined ||
+    Math.abs(storedSubtotal - input.expectedSubtotal) <= 0.01;
+  const sameCheckout =
+    order.shipping_method ===
+      (input.shippingMethod === "local_delivery" ? "local_delivery" : "pickup") &&
+    JSON.stringify(getComparableShippingAddress(existingAddress)) ===
+      JSON.stringify(getComparableShippingAddress(input.shippingAddress)) &&
+    JSON.stringify(storedItems) === JSON.stringify(requestedItems) &&
+    normalizeCheckoutText(order.coupon_code)?.toUpperCase() ===
+      normalizeCheckoutText(input.couponCode)?.toUpperCase() &&
+    sameSubtotal;
+
+  if (!sameOwner || !sameCheckout) {
+    throw new Error("El intento de compra no coincide con el checkout original");
+  }
+
+  if (order.status !== "pending") {
+    throw new Error("Este intento de compra ya fue procesado o sigue en curso");
+  }
 }
 
 async function resolveCheckoutItems(
@@ -498,6 +590,33 @@ export async function createOrder(
   const profile = userId ? await ensureUserProfile() : null;
 
   const supabase = getSupabaseAdmin();
+  const { data: existingOrder, error: existingOrderError } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      items:order_items(product_id, variant_id, quantity)
+    `)
+    .eq("id", checkoutRequestId)
+    .maybeSingle();
+
+  if (existingOrderError) {
+    throw existingOrderError;
+  }
+
+  if (existingOrder) {
+    assertExistingCheckoutMatches(existingOrder, {
+      userId,
+      requestFingerprint,
+      items,
+      shippingMethod,
+      shippingAddress,
+      couponCode,
+      expectedSubtotal,
+    });
+    await clearUserCart(userId);
+    return { order: existingOrder };
+  }
+
   const resolvedItems = await resolveCheckoutItems(items, {
     allowDemoProducts: profile?.role === "admin",
   });
@@ -590,36 +709,6 @@ export async function createOrder(
     _checkout_hash: checkoutHash,
     _checkout_fingerprint: requestFingerprint,
   };
-
-  const { data: existingOrder, error: existingOrderError } = await supabase
-    .from("orders")
-    .select("*")
-    .eq("id", checkoutRequestId)
-    .maybeSingle();
-
-  if (existingOrderError) {
-    throw existingOrderError;
-  }
-
-  if (existingOrder) {
-    const existingAddress =
-      existingOrder.shipping_address as CheckoutAddressMetadata | null;
-    const sameOwner = userId
-      ? existingOrder.clerk_user_id === userId
-      : !existingOrder.clerk_user_id &&
-        existingAddress?._checkout_fingerprint === requestFingerprint;
-
-    if (!sameOwner || existingAddress?._checkout_hash !== checkoutHash) {
-      throw new Error("El intento de compra no coincide con el checkout original");
-    }
-
-    if (existingOrder.status !== "pending") {
-      throw new Error("Este intento de compra ya fue procesado o sigue en curso");
-    }
-
-    await clearUserCart(userId);
-    return { order: existingOrder };
-  }
 
   const { data: order, error: orderError } = await supabase
     .from("orders")

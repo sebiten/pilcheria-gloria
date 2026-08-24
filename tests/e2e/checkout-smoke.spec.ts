@@ -261,7 +261,7 @@ test("guest local delivery asks only for the necessary address", async ({ page }
 });
 
 test("repeated checkout request is idempotent", async ({ request }) => {
-  const seed = await seedCheckoutSmokeProduct();
+  const seed = await seedCheckoutSmokeProduct({ stock: 1 });
 
   try {
     const checkoutRequestId = randomUUID();
@@ -305,7 +305,7 @@ test("repeated checkout request is idempotent", async ({ request }) => {
     expect(secondBody.preference.init_point).toBe(
       firstBody.preference.init_point
     );
-    await expect.poll(async () => getVariantStock(seed.variantId)).toBe(4);
+    await expect.poll(async () => getVariantStock(seed.variantId)).toBe(0);
     await expect
       .poll(async () => getLatestOrderForProduct(seed.productId))
       .toMatchObject({ id: checkoutRequestId, status: "pending" });

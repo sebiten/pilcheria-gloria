@@ -54,8 +54,11 @@ function getSupabaseAdmin() {
   });
 }
 
-export async function seedCheckoutSmokeProduct(): Promise<SeededProduct> {
+export async function seedCheckoutSmokeProduct(
+  options: { stock?: number } = {}
+): Promise<SeededProduct> {
   const supabase = getSupabaseAdmin();
+  const stock = options.stock ?? 5;
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const productName = `Playwright Remera ${suffix}`;
   const productSlug = `playwright-smoke-${suffix}`;
@@ -115,7 +118,7 @@ export async function seedCheckoutSmokeProduct(): Promise<SeededProduct> {
       color: "Negro",
       sku: `E2E-${suffix}`,
       price_override: null,
-      stock: 5,
+      stock,
       active: true,
     })
     .select("id")
@@ -139,7 +142,7 @@ export async function seedCheckoutSmokeProduct(): Promise<SeededProduct> {
     source_id: ownSource.id,
     availability_mode: "finite",
     sale_price: 125000,
-    stock_quantity: 5,
+    stock_quantity: stock,
     priority: ownSource.priority,
     active: true,
   });

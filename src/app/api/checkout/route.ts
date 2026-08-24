@@ -61,7 +61,7 @@ const checkoutSchema = z.object({
 });
 
 const SAFE_CHECKOUT_ERROR =
-  /carrito|producto|variante|stock|cantidad|precio|total|cup[oó]n|subtotal|retiro|entrega|direcci[oó]n|tel[eé]fono|tienda todav[ií]a|intento de compra|mercado pago|procesador|seguridad/i;
+  /carrito|producto|variante|stock|cantidad|precio|total|pago|transferencia|cup[oó]n|subtotal|retiro|entrega|direcci[oó]n|tel[eé]fono|tienda todav[ií]a|intento de compra|mercado pago|procesador|seguridad/i;
 
 export async function POST(request: Request) {
   try {
