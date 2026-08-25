@@ -118,6 +118,37 @@ export async function getPreference(preferenceId: string) {
   return response.json();
 }
 
+export async function expirePreference(preferenceId: string) {
+  if (process.env.E2E_MERCADOPAGO_FAKE === "1") {
+    return { id: preferenceId, expires: true, preference_expired: true };
+  }
+
+  const accessToken = getMercadoPagoAccessToken();
+  const response = await fetch(
+    `https://api.mercadopago.com/checkout/preferences/${preferenceId}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        expires: true,
+        expiration_date_to: new Date().toISOString(),
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(MERCADOPAGO_TIMEOUT_MS),
+    }
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`No se pudo expirar la preferencia de Mercado Pago: ${errorBody}`);
+  }
+
+  return response.json();
+}
+
 export async function searchPaymentsByExternalReference(externalReference: string) {
   if (process.env.E2E_MERCADOPAGO_FAKE === "1") {
     return { results: [] };

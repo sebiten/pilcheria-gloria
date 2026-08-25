@@ -15,19 +15,23 @@ import {
 import { formatStorefrontVariantSize } from "@/lib/inventory";
 
 export function CartContent() {
-  const { items, removeItem, updateQuantity, getTotal, setIsOpen } = useCartStore();
+  const {
+    items,
+    legacyVariantItems,
+    removeItem,
+    updateQuantity,
+    getTotal,
+    setIsOpen,
+  } = useCartStore();
   const itemCount = getCartItemCount(items);
   const localDeliveryAvailable = canUseLocalDelivery(items);
   const hasInvalidItems = items.some((item) => {
-    const selectedVariant = item.variant_id
-      ? item.product?.variants?.find(
-          (variant) => variant.id === item.variant_id
-        )
-      : null;
+    const selectedVariant = item.product?.variants?.find(
+      (variant) => variant.id === item.variant_id
+    );
 
     return Boolean(
       !item.product ||
-        !item.variant_id ||
         !selectedVariant ||
         selectedVariant.active === false ||
         !selectedVariant.available
@@ -37,10 +41,21 @@ export function CartContent() {
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center">
-        <p className="text-muted-foreground mb-4">Tu carrito está vacío</p>
+        <p className="text-muted-foreground mb-4">
+          {legacyVariantItems.length > 0
+            ? "Tu carrito anterior tenía prendas sin talle. Volvé a elegir el talle para agregarlas nuevamente."
+            : "Tu carrito está vacío"}
+        </p>
         <Button asChild>
-          <Link href="/uniformes" onClick={() => setIsOpen(false)}>
-            Ver uniformes
+          <Link
+            href={
+              legacyVariantItems.length === 1 && legacyVariantItems[0].productSlug
+                ? `/uniformes/${legacyVariantItems[0].productSlug}#elegir-talle`
+                : "/uniformes"
+            }
+            onClick={() => setIsOpen(false)}
+          >
+            {legacyVariantItems.length > 0 ? "Volver a elegir talle" : "Ver uniformes"}
           </Link>
         </Button>
       </div>
@@ -49,6 +64,15 @@ export function CartContent() {
 
   return (
     <div className="flex flex-col h-full">
+      {legacyVariantItems.length > 0 ? (
+        <p
+          className="mb-4 rounded-xl bg-destructive/10 p-3 text-sm font-semibold leading-5 text-destructive"
+          role="alert"
+        >
+          Quitamos {legacyVariantItems.length === 1 ? "una prenda" : "prendas"} de
+          un carrito anterior porque no tenían talle. Volvé a elegirlo antes de comprar.
+        </p>
+      ) : null}
       <p
         className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary"
         role="status"
@@ -59,9 +83,9 @@ export function CartContent() {
         {items.map((item) => {
           const imageUrl =
             item.product?.images?.[0]?.url || "/pilcheria-gloria-facebook.png";
-          const selectedVariant = item.variant_id
-            ? item.product?.variants?.find((variant) => variant.id === item.variant_id)
-            : null;
+          const selectedVariant = item.product?.variants?.find(
+            (variant) => variant.id === item.variant_id
+          );
           const maxQuantity = selectedVariant
             ? (selectedVariant.maxQuantity ?? 10)
             : null;
@@ -69,7 +93,6 @@ export function CartContent() {
             maxQuantity !== null && item.quantity >= maxQuantity;
           const isUnavailableVariant = Boolean(
             !item.product ||
-              !item.variant_id ||
               !selectedVariant ||
               selectedVariant.active === false ||
               !selectedVariant.available

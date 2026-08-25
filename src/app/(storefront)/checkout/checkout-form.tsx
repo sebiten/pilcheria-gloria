@@ -133,6 +133,10 @@ function getDefaultAddress(addresses: Address[]) {
   return addresses.find((address) => address.is_default) || addresses[0] || null;
 }
 
+function roundCurrency(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 export function CheckoutForm({
   addresses,
   profile,
@@ -183,7 +187,7 @@ export function CheckoutForm({
   const cartSignature = items
     .map(
       (item) =>
-        `${item.product_id}:${item.variant_id ?? "default"}:${item.quantity}`
+        `${item.product_id}:${item.variant_id}:${item.quantity}`
     )
     .sort()
     .join("|");
@@ -215,11 +219,9 @@ export function CheckoutForm({
       );
       setItems(refreshedItems);
       const hasUnavailableItem = refreshedItems.some((item) => {
-        const variant = item.variant_id
-          ? item.product?.variants?.find(
-              (current) => current.id === item.variant_id
-            )
-          : null;
+        const variant = item.product?.variants?.find(
+          (current) => current.id === item.variant_id
+        );
 
         return !item.product || !variant || !variant.active || !variant.available;
       });
@@ -273,16 +275,18 @@ export function CheckoutForm({
   const canChooseShipping = settings.pickup_enabled && localDeliveryAvailable;
   const hasAvailableShippingMethod =
     settings.pickup_enabled || localDeliveryAvailable;
-  const subtotal = getTotal();
-  const shippingCost = getShippingCost(formData.shippingMethod, {
-    localDeliveryCost: settings.local_delivery_cost,
-  });
+  const subtotal = roundCurrency(getTotal());
+  const shippingCost = roundCurrency(
+    getShippingCost(formData.shippingMethod, {
+      localDeliveryCost: settings.local_delivery_cost,
+    })
+  );
   const localDeliveryCost = getShippingCost("local_delivery", {
     localDeliveryCost: settings.local_delivery_cost,
   });
   const freeLocalDelivery = localDeliveryCost === 0;
-  const discount = appliedCoupon?.discount ?? 0;
-  const total = Math.max(0, subtotal - discount + shippingCost);
+  const discount = roundCurrency(appliedCoupon?.discount ?? 0);
+  const total = roundCurrency(Math.max(0, subtotal - discount + shippingCost));
   const needsAddress = formData.shippingMethod === "local_delivery";
   const shouldOfferSaveAddress =
     Boolean(profile) && needsAddress && selectedAddressId === "manual";
@@ -554,6 +558,9 @@ export function CheckoutForm({
               : null,
           items,
           expectedSubtotal: subtotal,
+          expectedDiscount: discount,
+          expectedShippingCost: shippingCost,
+          expectedTotal: total,
           analyticsSessionId: getAnalyticsSessionId(),
           shippingMethod: formData.shippingMethod,
           couponCode: appliedCoupon?.code,
@@ -689,11 +696,9 @@ export function CheckoutForm({
     <>
       <div className="space-y-4">
         {items.map((item) => {
-          const variant = item.variant_id
-            ? item.product?.variants?.find(
-                (current) => current.id === item.variant_id
-              )
-            : null;
+          const variant = item.product?.variants?.find(
+            (current) => current.id === item.variant_id
+          );
           const pricing = getCartItemPricingSegments(item);
 
           return (

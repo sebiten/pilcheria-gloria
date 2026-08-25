@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   cancelPayment,
   createPreference,
+  expirePreference,
   getMercadoPagoAccountId,
   getPayment,
   refundPayment,
@@ -159,7 +160,7 @@ export const mercadoPagoAdapter: PaymentAdapter = {
     }
 
     return {
-      externalId: String(preference.id),
+      providerCheckoutId: String(preference.id),
       checkoutUrl: String(checkoutUrl),
       status: "pending" as const,
     };
@@ -180,6 +181,10 @@ export const mercadoPagoAdapter: PaymentAdapter = {
 
   async cancel(externalId: string) {
     await cancelPayment(externalId);
+  },
+
+  async expireCheckout(providerCheckoutId: string) {
+    await expirePreference(providerCheckoutId);
   },
 
   async refund(externalId: string, orderId: string) {

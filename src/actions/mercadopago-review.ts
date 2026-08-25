@@ -13,6 +13,8 @@ import { sendMetaPurchaseEvent } from "@/lib/meta/conversions";
 import { sendAdminSalePush } from "@/lib/notifications/admin-push";
 import { sendOrderEmail } from "@/lib/notifications/email";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { recordPaymentPersistenceFailure } from "@/lib/orders/payment-state";
+import { MONEY_TOLERANCE } from "@/lib/commerce/constants";
 
 const uuidSchema = z.string().uuid();
 const paymentIdSchema = z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/);
@@ -76,6 +78,7 @@ export async function resolveMercadoPagoPaymentReview(
     throw new Error("Otro administrador ya está resolviendo estos pagos");
   }
 
+  let externalRefundsCompleted = false;
   try {
     const payments = await Promise.all(candidateIds.map((id) => getPayment(id)));
     const selectedPayment = payments.find(
@@ -89,7 +92,7 @@ export async function resolveMercadoPagoPaymentReview(
     const selectedIsValid =
       selectedPayment.external_reference === safeOrderId &&
       Math.abs(Number(selectedPayment.transaction_amount) - Number(order.total)) <=
-        0.01 &&
+        MONEY_TOLERANCE &&
       selectedPayment.currency_id === "ARS" &&
       String(selectedPayment.collector_id ?? "") === expectedAccountId;
     if (!selectedIsValid) {
@@ -117,6 +120,7 @@ export async function resolveMercadoPagoPaymentReview(
         }`
       );
     }
+    externalRefundsCompleted = refunds.length > 0;
 
     const { data: changed, error: resolutionError } = await supabase.rpc(
       "resolve_mercadopago_payment_review",
@@ -143,7 +147,7 @@ export async function resolveMercadoPagoPaymentReview(
     revalidatePath(`/order-confirmation/${safeOrderId}`);
     revalidatePath("/account/orders");
   } catch (error) {
-    await supabase
+    const { error: persistenceError } = await supabase
       .from("order_payment_review_resolutions")
       .update({
         status: "failed",
@@ -153,6 +157,17 @@ export async function resolveMercadoPagoPaymentReview(
       .eq("order_id", safeOrderId)
       .eq("claim_token", claimToken)
       .eq("status", "resolving");
+    if (externalRefundsCompleted || persistenceError) {
+      await recordPaymentPersistenceFailure({
+        orderId: safeOrderId,
+        provider: "mercadopago",
+        externalId: selectedPaymentId,
+        operation: externalRefundsCompleted
+          ? "resolve_multiple_payment_after_refunds"
+          : "persist_failed_payment_review",
+        error: persistenceError ?? error,
+      });
+    }
     throw error;
   }
 }

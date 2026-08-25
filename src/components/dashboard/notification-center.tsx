@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, BellRing, CheckCheck, Smartphone, ShoppingBag } from "lucide-react";
+import { AlertTriangle, Bell, BellRing, CheckCheck, Smartphone, ShoppingBag } from "lucide-react";
 import {
   getAdminPushPublicKey,
   getAdminSaleNotifications,
@@ -228,7 +228,7 @@ export function AdminNotificationCenter({ initialState }: { initialState: AdminN
       <button
         type="button"
         className="relative inline-flex size-11 items-center justify-center rounded-xl border bg-background text-foreground shadow-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label={state.unreadCount ? `${state.unreadCount} ventas nuevas` : "Notificaciones de ventas"}
+        aria-label={state.unreadCount ? `${state.unreadCount} alertas nuevas` : "Alertas de pagos y ventas"}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
@@ -244,7 +244,7 @@ export function AdminNotificationCenter({ initialState }: { initialState: AdminN
         <section className="fixed inset-x-3 top-[4.5rem] z-[70] overflow-hidden rounded-2xl border bg-card shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[23rem] lg:left-0 lg:right-auto">
           <div className="flex min-h-14 items-center justify-between gap-3 border-b px-4">
             <div>
-              <h2 className="font-bold">Ventas</h2>
+              <h2 className="font-bold">Pagos y ventas</h2>
               <p className="text-xs text-muted-foreground">
                 {state.unreadCount ? `${state.unreadCount} sin revisar` : "Todo revisado"}
               </p>
@@ -276,11 +276,25 @@ export function AdminNotificationCenter({ initialState }: { initialState: AdminN
                 )}
               >
                 <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
-                  <ShoppingBag className="size-5" />
+                  {notification.eventKey === "sale_paid" ? (
+                    <ShoppingBag className="size-5" />
+                  ) : (
+                    <AlertTriangle className="size-5" />
+                  )}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-start justify-between gap-2">
-                    <span className="truncate text-sm font-bold">Nueva venta de {notification.customerName}</span>
+                    <span className="truncate text-sm font-bold">
+                      {notification.eventKey === "late_approved"
+                        ? `Pago tardío de ${notification.customerName}`
+                        : notification.eventKey === "bank_transfer_review_overdue"
+                          ? `Transferencia vencida de ${notification.customerName}`
+                          : notification.eventKey === "bank_transfer_review_expired"
+                            ? `Stock liberado: ${notification.customerName}`
+                        : notification.eventKey === "payment_persistence_failure"
+                          ? `Pago requiere conciliación`
+                          : `Nueva venta de ${notification.customerName}`}
+                    </span>
                     {!notification.read ? <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" /> : null}
                   </span>
                   <span className="mt-0.5 block text-sm">{notification.totalLabel} · Pedido {notification.orderCode}</span>

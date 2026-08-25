@@ -21,6 +21,7 @@ export async function createGuestReviewLinks(orderId: string) {
       guest_access_token_hash,
       items:order_items(
         product_id,
+        product_name,
         product:products(name)
       )
     `)
@@ -35,8 +36,9 @@ export async function createGuestReviewLinks(orderId: string) {
   const uniqueProducts = new Map<string, string>();
   for (const item of order.items ?? []) {
     const product = Array.isArray(item.product) ? item.product[0] : item.product;
-    if (item.product_id && product?.name) {
-      uniqueProducts.set(item.product_id, product.name);
+    const productName = item.product_name || product?.name;
+    if (item.product_id && productName) {
+      uniqueProducts.set(item.product_id, productName);
     }
   }
 

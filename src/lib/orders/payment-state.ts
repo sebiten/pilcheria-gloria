@@ -7,9 +7,14 @@ import { sendMetaPurchaseEvent } from "@/lib/meta/conversions";
 import type { PaymentProvider } from "@/types";
 import { logCommerceEvent } from "@/lib/logging";
 import type { MercadoPagoReconciliationSource } from "@/lib/mercadopago/reconciliation-selection";
+import { getPaymentAdapter } from "@/lib/payments/providers";
+import {
+  MONEY_TOLERANCE,
+  ORDER_RESERVATION_MINUTES,
+  PENDING_PAYMENT_EXTENSION_HOURS,
+} from "@/lib/commerce/constants";
 
-export const ORDER_RESERVATION_MINUTES = 30;
-export const PENDING_PAYMENT_EXTENSION_HOURS = 24;
+export { ORDER_RESERVATION_MINUTES, PENDING_PAYMENT_EXTENSION_HOURS };
 
 export type MercadoPagoPayment = {
   id: string | number;
@@ -19,6 +24,7 @@ export type MercadoPagoPayment = {
   transaction_amount?: number | null;
   currency_id?: string | null;
   collector_id?: string | number | null;
+  metadata?: { payment_attempt_id?: string | null } | null;
 };
 
 export function getOrderReservationExpiration() {
@@ -56,6 +62,68 @@ export async function cancelOrderAndRelease(
   onlyIfPending = false
 ) {
   const supabase = getSupabaseAdmin();
+  const { data: checkoutAttempt, error: checkoutAttemptError } = await supabase
+    .from("order_payment_attempts")
+    .select(
+      "id, provider, provider_checkout_id, provider_checkout_invalidation_status"
+    )
+    .eq("order_id", orderId)
+    .not("provider_checkout_id", "is", null)
+    .in("status", ["created", "pending", "in_process", "review"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (checkoutAttemptError) throw new Error(checkoutAttemptError.message);
+
+  if (
+    checkoutAttempt?.provider_checkout_id &&
+    checkoutAttempt.provider_checkout_invalidation_status !== "succeeded"
+  ) {
+    const invalidationAt = new Date().toISOString();
+    let invalidationStatus: "succeeded" | "failed" | "not_supported";
+    let invalidationDetail: string | null = null;
+
+    try {
+      if (checkoutAttempt.provider === "bank_transfer") {
+        invalidationStatus = "not_supported";
+        invalidationDetail = "El proveedor no usa un checkout externo invalidable";
+      } else {
+        const adapter = getPaymentAdapter(checkoutAttempt.provider as PaymentProvider);
+        await adapter.expireCheckout(checkoutAttempt.provider_checkout_id);
+        invalidationStatus = "succeeded";
+      }
+    } catch (invalidationError) {
+      invalidationStatus = "failed";
+      invalidationDetail =
+        invalidationError instanceof Error
+          ? invalidationError.message.slice(0, 500)
+          : "No se pudo invalidar el checkout externo";
+    }
+
+    const { error: invalidationPersistenceError } = await supabase
+      .from("order_payment_attempts")
+      .update({
+        provider_checkout_invalidation_status: invalidationStatus,
+        provider_checkout_invalidation_detail: invalidationDetail,
+        provider_checkout_invalidation_at: invalidationAt,
+        updated_at: invalidationAt,
+      })
+      .eq("id", checkoutAttempt.id);
+
+    if (invalidationPersistenceError) {
+      await recordPaymentPersistenceFailure({
+        orderId,
+        attemptId: checkoutAttempt.id,
+        provider: checkoutAttempt.provider,
+        providerCheckoutId: checkoutAttempt.provider_checkout_id,
+        operation: "expire_checkout",
+        error: invalidationPersistenceError,
+      });
+      throw new Error(invalidationPersistenceError.message);
+    }
+  }
+
   const { data, error } = await supabase.rpc("cancel_order_and_release", {
     p_order_id: orderId,
     p_reason: reason,
@@ -77,6 +145,62 @@ export async function cancelOrderAndRelease(
   }
 
   return Boolean(data);
+}
+
+export async function recordPaymentPersistenceFailure({
+  orderId,
+  attemptId,
+  provider,
+  externalId,
+  providerCheckoutId,
+  operation,
+  error,
+}: {
+  orderId: string;
+  attemptId?: string;
+  provider: string;
+  externalId?: string | null;
+  providerCheckoutId?: string | null;
+  operation: string;
+  error: unknown;
+}) {
+  const supabase = getSupabaseAdmin();
+  const detail =
+    error instanceof Error ? error.message.slice(0, 500) : "Error de persistencia";
+  const results = await Promise.allSettled([
+    supabase.from("payment_flow_events").insert({
+      event_name: "payment.persistence_failed",
+      order_id: orderId,
+      attempt_id: attemptId ?? null,
+      provider,
+      external_id: externalId ?? null,
+      provider_checkout_id: providerCheckoutId ?? null,
+      route: "server_recovery",
+      failure_reason: detail,
+      metadata: { operation, requires_admin_review: true },
+    }),
+    supabase.from("admin_notifications").upsert(
+      { order_id: orderId, event_key: "payment_persistence_failure" },
+      { onConflict: "order_id,event_key", ignoreDuplicates: true }
+    ),
+  ]);
+
+  for (const result of results) {
+    if (result.status === "rejected" || result.value.error) {
+      console.error("No se pudo registrar una falla recuperable de pago", result);
+    }
+  }
+
+  logCommerceEvent({
+    event: "payment.persistence_failed",
+    route: operation,
+    orderId,
+    attemptId,
+    provider,
+    externalId,
+    providerCheckoutId,
+    reason: error,
+  });
 }
 
 export async function applyMercadoPagoPayment(
@@ -108,7 +232,8 @@ export async function applyMercadoPagoPayment(
     const expectedAccountId = await getMercadoPagoAccountId();
     const amountMatches =
       Number.isFinite(Number(payment.transaction_amount)) &&
-      Math.abs(Number(payment.transaction_amount) - Number(order.total)) <= 0.01;
+      Math.abs(Number(payment.transaction_amount) - Number(order.total)) <=
+      MONEY_TOLERANCE;
     const currencyMatches = payment.currency_id === "ARS";
     const collectorMatches =
       String(payment.collector_id ?? "") === expectedAccountId;
@@ -140,7 +265,7 @@ export async function applyProviderPayment(
   const externalId = String(payment.id);
   const { data: attempts, error: attemptsError } = await supabase
     .from("order_payment_attempts")
-    .select("id, external_id, status, created_at")
+    .select("id, external_id, provider_checkout_id, status, created_at")
     .eq("order_id", orderId)
     .eq("provider", provider)
     .order("created_at", { ascending: false });
@@ -148,9 +273,13 @@ export async function applyProviderPayment(
   if (attemptsError) throw new Error(attemptsError.message);
   const attempt =
     attempts?.find((item) => item.external_id === externalId) ??
+    attempts?.find(
+      (item) => item.id === payment.metadata?.payment_attempt_id
+    ) ??
     attempts?.find((item) =>
       ["created", "pending", "in_process", "review"].includes(item.status)
-    );
+    ) ??
+    (payment.status === "approved" ? attempts?.[0] : undefined);
   if (!attempt) {
     throw new Error("No existe un intento activo para este pago");
   }

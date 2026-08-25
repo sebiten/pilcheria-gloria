@@ -18,14 +18,13 @@ export async function findMercadoPagoPaymentForOrder(
   observedPayment?: MercadoPagoPaymentCandidate | null
 ) {
   const supabase = getSupabaseAdmin();
-  const [{ data: activeAttempt, error: attemptError }, paymentSearch] =
+  const [{ data: latestAttempt, error: attemptError }, paymentSearch] =
     await Promise.all([
       supabase
         .from("order_payment_attempts")
-        .select("id, external_id")
+        .select("id, external_id, provider_checkout_id")
         .eq("order_id", orderId)
         .eq("provider", "mercadopago")
-        .in("status", ["created", "pending", "in_process", "review"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
@@ -44,5 +43,5 @@ export async function findMercadoPagoPaymentForOrder(
         ),
       ]
     : searchedPayments;
-  return selectMercadoPagoPayment(payments, activeAttempt);
+  return selectMercadoPagoPayment(payments, latestAttempt);
 }

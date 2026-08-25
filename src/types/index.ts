@@ -1,34 +1,41 @@
+import type {
+  BANK_TRANSFER_REVIEW_RESOLUTION_VALUES,
+  CHECKOUT_INVALIDATION_STATUS_VALUES,
+  COUPON_TYPE_VALUES,
+  INVENTORY_SOURCE_TYPE_VALUES,
+  ORDER_STATUS_VALUES,
+  PAYMENT_ATTEMPT_STATUS_VALUES,
+  PAYMENT_PROVIDER_VALUES,
+  PROCUREMENT_STATUS_VALUES,
+  REFUND_STATUS_VALUES,
+  SCHOOL_LEVEL_VALUES,
+  SIZE_SYSTEM_VALUES,
+  UNIFORM_PRICE_GROUP_CODE_VALUES,
+  AVAILABILITY_MODE_VALUES,
+} from "@/lib/commerce/constants";
+
 export type Role = "client" | "admin";
 
-export type OrderStatus =
-  | "pending"
-  | "paid"
-  | "payment_review"
-  | "ready_for_pickup"
-  | "shipped"
-  | "delivered"
-  | "cancelled";
+export type OrderStatus = (typeof ORDER_STATUS_VALUES)[number];
 
-export type PaymentProvider = "mercadopago" | "viumi" | "bank_transfer";
-export type PaymentAttemptStatus =
-  | "created"
-  | "pending"
-  | "in_process"
-  | "approved"
-  | "rejected"
-  | "cancelled"
-  | "failed"
-  | "review"
-  | "refunded"
-  | "charged_back";
+export type PaymentProvider = (typeof PAYMENT_PROVIDER_VALUES)[number];
+export type PaymentAttemptStatus = (typeof PAYMENT_ATTEMPT_STATUS_VALUES)[number];
 
-export type CouponType = "percentage" | "fixed";
+export type CouponType = (typeof COUPON_TYPE_VALUES)[number];
 
-export type SizeSystem = "infant" | "adult";
-export type SchoolLevel = "primary" | "secondary";
+export type SizeSystem = (typeof SIZE_SYSTEM_VALUES)[number];
+export type SchoolLevel = (typeof SCHOOL_LEVEL_VALUES)[number];
+export type InventorySourceType = (typeof INVENTORY_SOURCE_TYPE_VALUES)[number];
+export type AvailabilityMode = (typeof AVAILABILITY_MODE_VALUES)[number];
 export type FulfillmentSpeed = "immediate" | "24_48_hours";
-export type RefundStatus = "none" | "pending" | "partial" | "refunded";
-export type UniformPriceGroupCode = "remera" | "chomba";
+export type RefundStatus = (typeof REFUND_STATUS_VALUES)[number];
+export type CheckoutInvalidationStatus =
+  (typeof CHECKOUT_INVALIDATION_STATUS_VALUES)[number];
+export type BankTransferReviewResolution =
+  (typeof BANK_TRANSFER_REVIEW_RESOLUTION_VALUES)[number];
+export type ProcurementStatus = (typeof PROCUREMENT_STATUS_VALUES)[number];
+export type UniformPriceGroupCode =
+  (typeof UNIFORM_PRICE_GROUP_CODE_VALUES)[number];
 
 export interface UniformPriceGroup {
   code: UniformPriceGroupCode;
@@ -174,22 +181,25 @@ export interface Order {
   clerk_user_id?: string | null;
   status: OrderStatus;
   total: number;
-  shipping_cost: number;
+  shipping_cost: number | null;
   shipping_method: string | null;
   shipping_address: ShippingAddress | null;
   guest_access_token?: string | null;
   guest_access_token_hash?: string | null;
   coupon_code?: string | null;
-  discount_total?: number | null;
-  stock_restored?: boolean;
-  stock_reserved?: boolean;
+  discount_total: number;
+  stock_restored: boolean;
+  stock_reserved: boolean;
+  coupon_counted: boolean;
   reservation_expires_at?: string | null;
   cancel_reason?: string | null;
   mercadopago_id: string | null;
   mercadopago_status: string | null;
   mercadopago_status_detail?: string | null;
-  refund_status?: RefundStatus;
-  refunded_amount?: number;
+  checkout_payload_hash?: string | null;
+  checkout_owner_fingerprint?: string | null;
+  refund_status: RefundStatus;
+  refunded_amount: number;
   refunds?: ManualRefund[];
   created_at: string;
 }
@@ -199,6 +209,7 @@ export interface OrderPaymentAttempt {
   order_id: string;
   provider: PaymentProvider;
   external_id: string | null;
+  provider_checkout_id: string | null;
   status: PaymentAttemptStatus;
   status_detail: string | null;
   checkout_url: string | null;
@@ -208,10 +219,21 @@ export interface OrderPaymentAttempt {
   created_at: string;
   updated_at: string;
   terminal_at: string | null;
-  transfer_notified_at?: string | null;
-  transfer_reviewed_at?: string | null;
-  transfer_reviewed_by?: string | null;
-  bank_reference?: string | null;
+  provider_checkout_invalidation_status: CheckoutInvalidationStatus | null;
+  provider_checkout_invalidation_detail: string | null;
+  provider_checkout_invalidation_at: string | null;
+  late_reconciliation_until: string | null;
+  late_reconciled_at: string | null;
+  transfer_notified_at: string | null;
+  transfer_reviewed_at: string | null;
+  transfer_reviewed_by: string | null;
+  bank_reference: string | null;
+  review_deadline_at: string | null;
+  review_max_deadline_at: string | null;
+  review_escalated_at: string | null;
+  review_resolution: BankTransferReviewResolution | null;
+  review_notes: string | null;
+  proof_reference: string | null;
 }
 
 export interface BankTransferSettings {
@@ -232,26 +254,32 @@ export interface BankTransferDetails {
 export interface OrderItem {
   id: string;
   order_id: string;
-  product_id: string;
-  variant_id: string | null;
+  product_id: string | null;
+  variant_id: string;
+  offer_id: string | null;
+  source_id: string | null;
+  product_name: string;
+  product_slug: string | null;
+  product_brand: string | null;
+  variant_size: string | null;
+  variant_size_system: SizeSystem | null;
+  variant_school_level: SchoolLevel | null;
+  variant_color: string | null;
+  variant_sku: string | null;
+  variant_label: string | null;
   quantity: number;
   unit_price: number;
-  source_code?: string | null;
-  source_name?: string | null;
-  availability_mode?: "finite" | "on_demand" | null;
-  line_subtotal?: number | null;
-  discount_allocated?: number;
-  net_amount?: number | null;
-  seller_share?: number | null;
-  partner_share?: number;
-  procurement_status?:
-    | "not_required"
-    | "awaiting_payment"
-    | "pending_collection"
-    | "collected"
-    | "unavailable"
-    | "cancelled";
-  procurement_collected_at?: string | null;
+  source_code: string | null;
+  source_name: string | null;
+  availability_mode: "finite" | "on_demand" | null;
+  seller_share_rate: number | null;
+  line_subtotal: number | null;
+  discount_allocated: number;
+  net_amount: number | null;
+  seller_share: number | null;
+  partner_share: number;
+  procurement_status: ProcurementStatus;
+  procurement_collected_at: string | null;
 }
 
 export interface ManualRefund {
@@ -268,7 +296,7 @@ export interface ManualRefund {
 }
 
 export interface OrderItemWithProduct extends OrderItem {
-  product: Product;
+  product: Product | null;
   variant: ProductVariant | null;
 }
 
@@ -292,7 +320,7 @@ export interface Coupon {
 export interface CartItem {
   id?: string;
   product_id: string;
-  variant_id: string | null;
+  variant_id: string;
   quantity: number;
   product?: ProductWithDetails;
 }
@@ -300,8 +328,8 @@ export interface CartItem {
 export interface CartState {
   items: CartItem[];
   addItem: (item: CartItem) => void;
-  removeItem: (productId: string, variantId?: string | null) => void;
-  updateQuantity: (productId: string, variantId: string | null, quantity: number) => void;
+  removeItem: (productId: string, variantId: string) => void;
+  updateQuantity: (productId: string, variantId: string, quantity: number) => void;
   clearCart: () => void;
   total: number;
 }

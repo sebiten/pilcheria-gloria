@@ -11,6 +11,7 @@ import { revalidateProductCacheFromRouteHandler } from "@/lib/cache/products";
 import {
   applyMercadoPagoPayment,
   cancelOrderAndRelease,
+  recordPaymentPersistenceFailure,
 } from "@/lib/orders/payment-state";
 import { sendOrderEmail } from "@/lib/notifications/email";
 import {
@@ -22,24 +23,18 @@ import {
 } from "@/lib/orders/confirmation-access";
 import { getPaymentAdapter } from "@/lib/payments/providers";
 import type { PaymentProvider } from "@/types";
+import type { StartedPayment } from "@/lib/payments/types";
 import {
   getRiskRetryNotBefore,
   RISK_RETRY_COOLDOWN_MINUTES,
 } from "@/lib/orders/payment-rejection";
 import { logCommerceEvent } from "@/lib/logging";
-
-const ORDER_STATUS_VALUES: OrderStatus[] = [
-  "pending",
-  "paid",
-  "payment_review",
-  "ready_for_pickup",
-  "shipped",
-  "delivered",
-  "cancelled",
-];
+import { z } from "zod";
+import { isOrderStatus } from "@/lib/commerce/constants";
+import { getAllowedOrderStatusTransitions } from "@/lib/orders/status";
 
 function assertValidOrderStatus(status: string): asserts status is OrderStatus {
-  if (!ORDER_STATUS_VALUES.includes(status as OrderStatus)) {
+  if (!isOrderStatus(status)) {
     throw new Error("Estado de orden invalido");
   }
 }
@@ -191,6 +186,9 @@ export async function createOrder(
     shippingAddress,
     couponCode,
     expectedSubtotal,
+    expectedDiscount,
+    expectedShippingCost,
+    expectedTotal,
     checkoutRequestId,
     requestFingerprint,
     analyticsSessionId,
@@ -199,7 +197,10 @@ export async function createOrder(
     shippingMethod: string;
     shippingAddress: ShippingAddress;
     couponCode?: string;
-    expectedSubtotal?: number;
+    expectedSubtotal: number;
+    expectedDiscount: number;
+    expectedShippingCost: number;
+    expectedTotal: number;
     checkoutRequestId: string;
     requestFingerprint: string;
     analyticsSessionId?: string | null;
@@ -224,7 +225,10 @@ export async function createOrder(
       p_shipping_method: shippingMethod,
       p_shipping_address: shippingAddress,
       p_coupon_code: couponCode ?? null,
-      p_expected_subtotal: expectedSubtotal ?? 0,
+      p_expected_subtotal: expectedSubtotal,
+      p_expected_discount: expectedDiscount,
+      p_expected_shipping_cost: expectedShippingCost,
+      p_expected_total: expectedTotal,
       p_analytics_session_id: analyticsSessionId ?? null,
       p_allow_demo_products: profile?.role === "admin",
       p_bypass_store_readiness:
@@ -409,8 +413,9 @@ export async function startOrderPayment(
     throw attemptError ?? new Error("No se pudo registrar el intento de pago");
   }
 
+  let startedPayment: StartedPayment | null = null;
   try {
-    const started = await adapter.start({
+    startedPayment = await adapter.start({
       attemptId: attempt.id,
       orderId,
       amount: Number(order.total),
@@ -430,9 +435,9 @@ export async function startOrderPayment(
     const { data: updatedAttempt, error: updateError } = await supabase
       .from("order_payment_attempts")
       .update({
-        external_id: started.externalId,
-        checkout_url: started.checkoutUrl,
-        status: started.status,
+        provider_checkout_id: startedPayment.providerCheckoutId,
+        checkout_url: startedPayment.checkoutUrl,
+        status: startedPayment.status,
         updated_at: new Date().toISOString(),
       })
       .eq("id", attempt.id)
@@ -448,17 +453,46 @@ export async function startOrderPayment(
     });
     return updatedAttempt;
   } catch (error) {
-    await supabase
+    const invalidationAt = new Date().toISOString();
+    let invalidationStatus: "succeeded" | "failed" | null = null;
+    let invalidationDetail: string | null = null;
+    if (startedPayment) {
+      try {
+        await adapter.expireCheckout(startedPayment.providerCheckoutId);
+        invalidationStatus = "succeeded";
+      } catch (invalidationError) {
+        invalidationStatus = "failed";
+        invalidationDetail =
+          invalidationError instanceof Error
+            ? invalidationError.message.slice(0, 500)
+            : "No se pudo invalidar el checkout externo";
+      }
+    }
+    const { error: failurePersistenceError } = await supabase
       .from("order_payment_attempts")
       .update({
+        provider_checkout_id: startedPayment?.providerCheckoutId ?? null,
         status: "failed",
         status_detail:
           error instanceof Error ? error.message.slice(0, 300) : "Error desconocido",
-        terminal_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        terminal_at: invalidationAt,
+        updated_at: invalidationAt,
+        provider_checkout_invalidation_status: invalidationStatus,
+        provider_checkout_invalidation_detail: invalidationDetail,
+        provider_checkout_invalidation_at: startedPayment ? invalidationAt : null,
       })
       .eq("id", attempt.id)
       .eq("status", "created");
+    if (failurePersistenceError) {
+      await recordPaymentPersistenceFailure({
+        orderId,
+        attemptId: attempt.id,
+        provider,
+        providerCheckoutId: startedPayment?.providerCheckoutId,
+        operation: "start_payment_failed",
+        error: failurePersistenceError,
+      });
+    }
     throw error;
   }
 }
@@ -491,6 +525,7 @@ export async function getOrders() {
         id,
         provider,
         external_id,
+        provider_checkout_id,
         status,
         status_detail,
         amount,
@@ -500,7 +535,16 @@ export async function getOrders() {
         transfer_notified_at,
         transfer_reviewed_at,
         transfer_reviewed_by,
-        bank_reference
+        bank_reference,
+        review_deadline_at,
+        review_max_deadline_at,
+        review_escalated_at,
+        review_resolution,
+        review_notes,
+        proof_reference,
+        provider_checkout_invalidation_status,
+        provider_checkout_invalidation_detail,
+        provider_checkout_invalidation_at
       )
     `)
     .eq("clerk_user_id", userId)
@@ -541,6 +585,7 @@ export async function getOrderById(id: string) {
         id,
         provider,
         external_id,
+        provider_checkout_id,
         status,
         status_detail,
         amount,
@@ -550,7 +595,16 @@ export async function getOrderById(id: string) {
         transfer_notified_at,
         transfer_reviewed_at,
         transfer_reviewed_by,
-        bank_reference
+        bank_reference,
+        review_deadline_at,
+        review_max_deadline_at,
+        review_escalated_at,
+        review_resolution,
+        review_notes,
+        proof_reference,
+        provider_checkout_invalidation_status,
+        provider_checkout_invalidation_detail,
+        provider_checkout_invalidation_at
       ),
       reconciliation_events:order_payment_reconciliation_events(
         id,
@@ -601,6 +655,7 @@ export async function getOrderForConfirmation(id: string, accessToken?: string) 
         id,
         provider,
         external_id,
+        provider_checkout_id,
         status,
         status_detail,
         amount,
@@ -611,7 +666,16 @@ export async function getOrderForConfirmation(id: string, accessToken?: string) 
         transfer_notified_at,
         transfer_reviewed_at,
         transfer_reviewed_by,
-        bank_reference
+        bank_reference,
+        review_deadline_at,
+        review_max_deadline_at,
+        review_escalated_at,
+        review_resolution,
+        review_notes,
+        proof_reference,
+        provider_checkout_invalidation_status,
+        provider_checkout_invalidation_detail,
+        provider_checkout_invalidation_at
       )
     `)
     .eq("id", id)
@@ -658,7 +722,9 @@ export async function updateOrderStatus(id: string, status: string) {
   }
   const { data: paymentAttempt, error: paymentAttemptError } = await supabase
     .from("order_payment_attempts")
-    .select("id, provider, external_id, status, receiver_account_id")
+    .select(
+      "id, provider, external_id, provider_checkout_id, status, receiver_account_id"
+    )
     .eq("order_id", id)
     .in("status", ["approved", "pending", "in_process", "review"])
     .order("created_at", { ascending: false })
@@ -670,15 +736,6 @@ export async function updateOrderStatus(id: string, status: string) {
     throw new Error("No se puede reabrir una orden con stock restaurado");
   }
 
-  const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
-    pending: ["pending", "cancelled"],
-    paid: ["paid", "ready_for_pickup", "shipped", "cancelled"],
-    payment_review: ["payment_review", "cancelled"],
-    ready_for_pickup: ["ready_for_pickup", "delivered", "cancelled"],
-    shipped: ["shipped", "delivered", "cancelled"],
-    delivered: ["delivered"],
-    cancelled: ["cancelled"],
-  };
   const currentStatus = existingOrder.status as OrderStatus;
   if (currentStatus === "payment_review" && status === "cancelled") {
     const { data: ambiguousReview, error: ambiguousReviewError } = await supabase
@@ -696,7 +753,12 @@ export async function updateOrderStatus(id: string, status: string) {
       );
     }
   }
-  if (!allowedTransitions[currentStatus]?.includes(status)) {
+  if (
+    !getAllowedOrderStatusTransitions(
+      currentStatus,
+      existingOrder.shipping_method
+    ).includes(status)
+  ) {
     throw new Error("Ese cambio de estado no es válido para esta orden");
   }
 
@@ -728,21 +790,56 @@ export async function updateOrderStatus(id: string, status: string) {
         ["paid", "payment_review", "ready_for_pickup", "shipped"].includes(currentStatus)
       ) {
         await adapter.refund(paymentAttempt.external_id, id);
-        await supabase
+        const { error: persistenceError } = await supabase
           .from("order_payment_attempts")
-          .update({ status: "refunded", terminal_at: new Date().toISOString() })
+          .update({
+            status: "refunded",
+            terminal_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", paymentAttempt.id);
+        if (persistenceError) {
+          await recordPaymentPersistenceFailure({
+            orderId: id,
+            attemptId: paymentAttempt.id,
+            provider: paymentAttempt.provider,
+            externalId: paymentAttempt.external_id,
+            operation: "refund_payment",
+            error: persistenceError,
+          });
+          throw new Error(persistenceError.message);
+        }
       } else if (paymentAttempt.receiver_account_id) {
         await adapter.cancel(paymentAttempt.external_id);
-        await supabase
+        const { error: persistenceError } = await supabase
           .from("order_payment_attempts")
-          .update({ status: "cancelled", terminal_at: new Date().toISOString() })
+          .update({
+            status: "cancelled",
+            terminal_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", paymentAttempt.id);
+        if (persistenceError) {
+          await recordPaymentPersistenceFailure({
+            orderId: id,
+            attemptId: paymentAttempt.id,
+            provider: paymentAttempt.provider,
+            externalId: paymentAttempt.external_id,
+            operation: "cancel_payment",
+            error: persistenceError,
+          });
+          throw new Error(persistenceError.message);
+        }
       } else {
-        await supabase
+        const { error: persistenceError } = await supabase
           .from("order_payment_attempts")
-          .update({ status: "cancelled", terminal_at: new Date().toISOString() })
+          .update({
+            status: "cancelled",
+            terminal_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", paymentAttempt.id);
+        if (persistenceError) throw new Error(persistenceError.message);
       }
     }
 
@@ -791,4 +888,29 @@ export async function updateOrderStatus(id: string, status: string) {
   revalidatePath(`/dashboard/orders/${id}`);
   revalidatePath("/account/orders");
   revalidatePath(`/account/orders/${id}`);
+}
+
+export async function fulfillLateApprovedOrder(id: string) {
+  await requireAdmin();
+  const orderId = z.string().uuid().parse(id);
+  const { userId } = await auth();
+  if (!userId) throw new Error("Administrador no autenticado");
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.rpc("fulfill_late_approved_order", {
+    p_order_id: orderId,
+    p_reviewed_by: userId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("No se pudo reservar el stock para el pago tardío");
+
+  await Promise.allSettled([
+    sendOrderEmail(orderId, "payment-approved"),
+  ]);
+  revalidateProductCacheAfterStockChange();
+  revalidatePath("/dashboard/orders");
+  revalidatePath(`/dashboard/orders/${orderId}`);
+  revalidatePath("/account/orders");
+  revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath(`/order-confirmation/${orderId}`);
 }

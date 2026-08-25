@@ -19,6 +19,9 @@ export const viumiAdapter: PaymentAdapter = {
   async getPayment() {
     throw new Error(NOT_AVAILABLE);
   },
+  async expireCheckout() {
+    throw new Error(NOT_AVAILABLE);
+  },
   async cancel() {
     throw new Error(NOT_AVAILABLE);
   },

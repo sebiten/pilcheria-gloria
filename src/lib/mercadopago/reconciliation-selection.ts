@@ -28,7 +28,11 @@ function getPaymentTimestamp(payment: MercadoPagoPaymentCandidate) {
 
 export function selectMercadoPagoPayment(
   payments: MercadoPagoPaymentCandidate[],
-  activeAttempt?: { id: string; external_id: string | null } | null
+  latestAttempt?: {
+    id: string;
+    external_id: string | null;
+    provider_checkout_id?: string | null;
+  } | null
 ): MercadoPagoPaymentSelection {
   const sorted = payments
     .filter((payment) => payment?.id != null && Boolean(payment.status))
@@ -38,11 +42,11 @@ export function selectMercadoPagoPayment(
         String(second.id).localeCompare(String(first.id))
     );
   const approved = sorted.filter((payment) => payment.status === "approved");
-  const associated = activeAttempt
+  const associated = latestAttempt
     ? sorted.find(
         (payment) =>
-          String(payment.id) === activeAttempt.external_id ||
-          payment.metadata?.payment_attempt_id === activeAttempt.id
+          String(payment.id) === latestAttempt.external_id ||
+          payment.metadata?.payment_attempt_id === latestAttempt.id
       )
     : null;
 

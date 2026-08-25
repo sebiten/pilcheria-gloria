@@ -21,7 +21,7 @@ export type StartPaymentInput = {
 };
 
 export type StartedPayment = {
-  externalId: string;
+  providerCheckoutId: string;
   checkoutUrl: string;
   status: Extract<PaymentAttemptStatus, "pending" | "in_process">;
 };
@@ -46,6 +46,7 @@ export interface PaymentAdapter {
   }): boolean;
   start(input: StartPaymentInput): Promise<StartedPayment>;
   getPayment(externalId: string): Promise<ProviderPayment>;
+  expireCheckout(providerCheckoutId: string): Promise<void>;
   cancel(externalId: string): Promise<void>;
   refund(externalId: string, orderId: string): Promise<void>;
 }

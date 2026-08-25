@@ -19,7 +19,7 @@ const SYNC_DEBOUNCE_MS = 500;
 function toSyncPayload(items: CartItem[]) {
   return items.map((item) => ({
     product_id: item.product_id,
-    variant_id: item.variant_id ?? null,
+    variant_id: item.variant_id,
     quantity: item.quantity,
   }));
 }

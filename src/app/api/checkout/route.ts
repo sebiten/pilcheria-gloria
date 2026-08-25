@@ -13,9 +13,15 @@ import { getOrderConfirmationCookieName } from "@/lib/orders/confirmation-access
 import { getCheckoutRouteCapability } from "@/lib/security/checkout-capability";
 import type { CheckoutRouteCapability } from "@/lib/security/checkout-capability";
 import { getEnabledPaymentProviders } from "@/lib/payments/providers";
+import {
+  MAX_ITEMS_PER_ORDER,
+  MAX_QUANTITY_PER_VARIANT,
+  PAYMENT_PROVIDER_VALUES,
+  SHIPPING_METHOD_VALUES,
+} from "@/lib/commerce/constants";
 
 const checkoutSchema = z.object({
-  paymentProvider: z.enum(["mercadopago", "viumi", "bank_transfer"]),
+  paymentProvider: z.enum(PAYMENT_PROVIDER_VALUES),
   deviceId: z
     .string()
     .trim()
@@ -29,18 +35,23 @@ const checkoutSchema = z.object({
       z.object({
         product_id: z.string().uuid(),
         variant_id: z.string().uuid(),
-        quantity: z.number().int().min(1).max(10),
+        quantity: z.number().int().min(1).max(MAX_QUANTITY_PER_VARIANT),
       })
     )
     .min(1)
-    .max(20)
+    .max(MAX_ITEMS_PER_ORDER)
     .refine(
-      (items) => items.reduce((total, item) => total + item.quantity, 0) <= 20,
-      { message: "El checkout admite hasta 20 prendas por pedido" }
+      (items) =>
+        items.reduce((total, item) => total + item.quantity, 0) <=
+        MAX_ITEMS_PER_ORDER,
+      { message: `El checkout admite hasta ${MAX_ITEMS_PER_ORDER} prendas por pedido` }
     ),
   expectedSubtotal: z.number().finite().nonnegative(),
+  expectedDiscount: z.number().finite().nonnegative(),
+  expectedShippingCost: z.number().finite().nonnegative(),
+  expectedTotal: z.number().finite().nonnegative(),
   analyticsSessionId: z.string().uuid().nullable().optional(),
-  shippingMethod: z.enum(["pickup", "local_delivery"]),
+  shippingMethod: z.enum(SHIPPING_METHOD_VALUES),
   shippingAddress: z.object({
     name: z.string().trim().min(2).max(120),
     email: z.string().trim().email().max(254).nullable().optional(),

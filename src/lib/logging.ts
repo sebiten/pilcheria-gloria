@@ -25,6 +25,7 @@ type CommerceLogEvent = {
   previousStatus?: string | null;
   newStatus?: string | null;
   externalId?: string | null;
+  providerCheckoutId?: string | null;
   reason?: unknown;
 };
 

@@ -23,6 +23,12 @@ export type AdminSaleNotification = {
   totalLabel: string;
   createdLabel: string;
   read: boolean;
+  eventKey:
+    | "sale_paid"
+    | "late_approved"
+    | "payment_persistence_failure"
+    | "bank_transfer_review_overdue"
+    | "bank_transfer_review_expired";
 };
 
 export type AdminNotificationState = {
@@ -33,6 +39,7 @@ export type AdminNotificationState = {
 type NotificationRow = {
   id: string;
   order_id: string;
+  event_key: AdminSaleNotification["eventKey"];
   read_at: string | null;
   created_at: string;
   orders:
@@ -46,14 +53,12 @@ export async function getAdminSaleNotifications(): Promise<AdminNotificationStat
   const [{ data, error }, { count, error: countError }] = await Promise.all([
     supabase
       .from("admin_notifications")
-      .select("id, order_id, read_at, created_at, orders!inner(total, shipping_address)")
-      .eq("event_key", "sale_paid")
+      .select("id, order_id, event_key, read_at, created_at, orders!inner(total, shipping_address)")
       .order("created_at", { ascending: false })
       .limit(12),
     supabase
       .from("admin_notifications")
       .select("id", { count: "exact", head: true })
-      .eq("event_key", "sale_paid")
       .is("read_at", null),
   ]);
 
@@ -84,6 +89,7 @@ export async function getAdminSaleNotifications(): Promise<AdminNotificationStat
       totalLabel: formatPrice(Number(order?.total ?? 0)),
       createdLabel: dateFormatter.format(new Date(row.created_at)),
       read: Boolean(row.read_at),
+      eventKey: row.event_key,
     };
   });
 
@@ -110,7 +116,6 @@ export async function markAllAdminSaleNotificationsRead() {
   const { error } = await supabase
     .from("admin_notifications")
     .update({ read_at: new Date().toISOString() })
-    .eq("event_key", "sale_paid")
     .is("read_at", null);
 
   if (error) throw new Error(error.message);

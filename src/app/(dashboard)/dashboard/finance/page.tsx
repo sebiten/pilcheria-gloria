@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/utils";
-import { formatVariantLabel } from "@/lib/variants";
+import { formatOrderItemVariantLabel } from "@/lib/variants";
 
 export default async function FinancePage() {
   const data = await getInventoryDashboard();
@@ -59,8 +59,8 @@ export default async function FinancePage() {
                   {data.pendingItems.map((item: any) => (
                     <tr key={item.id} className="border-b last:border-0">
                       <td className="p-3 font-mono" data-primary="true">Pedido {item.order.id.slice(0, 8).toUpperCase()}</td>
-                      <td className="p-3" data-label="Prenda">{item.product?.name}</td>
-                      <td className="p-3" data-label="Variante">{formatVariantLabel(item.variant)}</td>
+                      <td className="p-3" data-label="Prenda">{item.product_name || item.product?.name}</td>
+                      <td className="p-3" data-label="Variante">{formatOrderItemVariantLabel(item)}</td>
                       <td className="p-3" data-label="Cantidad">{item.quantity}</td>
                       <td className="p-3" data-label="Para tu abuela">{formatPrice(Number(item.partner_share ?? 0))}</td>
                       <td className="p-3 text-right" data-actions="true" data-label="Acción">
@@ -107,9 +107,9 @@ export default async function FinancePage() {
                         <p className="font-mono text-sm font-semibold">
                           Pedido {refund.order.id.slice(0, 8).toUpperCase()}
                         </p>
-                        <p className="mt-1 font-bold">{refund.item?.product?.name}</p>
+                        <p className="mt-1 font-bold">{refund.item?.product_name || refund.item?.product?.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {formatVariantLabel(refund.item?.variant)} · {refund.item?.quantity} unidad(es)
+                          {refund.item ? formatOrderItemVariantLabel(refund.item) : "Variante anterior"} · {refund.item?.quantity} unidad(es)
                         </p>
                       </div>
                       <p className="text-xl font-black">

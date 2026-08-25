@@ -4,7 +4,7 @@ import { getOrderById } from "@/actions/orders";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatPrice } from "@/lib/utils";
-import { formatVariantLabel } from "@/lib/variants";
+import { formatOrderItemVariantLabel } from "@/lib/variants";
 import {
   getDeliveryMethodLabel,
   getOrderStatusDescription,
@@ -166,9 +166,9 @@ export default async function AccountOrderDetailPage({
                   <tbody>
                     {order.items.map((item: any) => (
                       <tr key={item.id} className="border-b">
-                        <td className="p-4">{item.product?.name || "Producto eliminado"}</td>
+                        <td className="p-4">{item.product_name || item.product?.name || "Producto eliminado"}</td>
                         <td className="p-4">
-                          {formatVariantLabel(item.variant)}
+                          {formatOrderItemVariantLabel(item)}
                         </td>
                         <td className="p-4">{item.quantity}</td>
                         <td className="p-4">{formatPrice(Number(item.unit_price))}</td>
@@ -192,11 +192,11 @@ export default async function AccountOrderDetailPage({
                 {order.items.map((item: any) => (
                   <div key={item.id} className="rounded-lg border p-4 text-sm">
                     <p className="font-medium">
-                      {item.product?.name || "Producto eliminado"}
+                      {item.product_name || item.product?.name || "Producto eliminado"}
                     </p>
                     <p className="text-muted-foreground">
                       Variante:{" "}
-                      {formatVariantLabel(item.variant)}
+                      {formatOrderItemVariantLabel(item)}
                     </p>
                     <p className="text-muted-foreground">Cantidad: {item.quantity}</p>
                     <p className="text-muted-foreground">

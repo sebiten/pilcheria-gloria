@@ -225,6 +225,10 @@ export default async function OrderConfirmationPage({
   }
 
   if (order?.status === "payment_review") {
+    const bankTransferApprovedAfterRelease = Boolean(
+      latestAttempt?.provider === "bank_transfer" &&
+        latestAttempt.review_resolution === "approved_after_stock_release"
+    );
     return (
       <main className="mx-auto w-full max-w-xl px-4 py-12 text-center sm:py-16">
         <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-amber-100 text-amber-800">
@@ -234,8 +238,9 @@ export default async function OrderConfirmationPage({
           Estamos revisando tu pago
         </h1>
         <p className="mx-auto mt-4 max-w-md leading-7 text-muted-foreground">
-          El pedido quedó reservado, pero el pago todavía no está confirmado.
-          Te avisaremos cuando termine la verificación.
+          {bankTransferApprovedAfterRelease
+            ? "Confirmamos la acreditación, pero la reserva de stock ya había vencido. Te contactaremos para coordinar el cumplimiento o la devolución."
+            : "El pedido quedó reservado, pero el pago todavía no está confirmado. Te avisaremos cuando termine la verificación."}
         </p>
         <div className="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-left text-amber-950">
           <p className="font-bold">No vuelvas a pagar este pedido.</p>

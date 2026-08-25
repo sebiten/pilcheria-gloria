@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { updateOrderStatus } from "@/actions/orders";
 import type { OrderStatus } from "@/types";
 import { Button } from "@/components/ui/button";
+import { getOrderStatusLabel } from "@/lib/commerce";
+import { getAllowedOrderStatusTransitions } from "@/lib/orders/status";
 
 interface OrderStatusFormProps {
   orderId: string;
@@ -21,31 +23,12 @@ export function OrderStatusForm({
   const [status, setStatus] = useState<OrderStatus>(currentStatus);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const labels: Record<OrderStatus, string> = {
-    pending: "Pendiente de pago",
-    paid: "Pagada / por preparar",
-    payment_review: "Pago en revisión",
-    ready_for_pickup: "Lista para retirar",
-    shipped: "En camino",
-    delivered: "Entregada",
-    cancelled: "Cancelada",
-  };
-  const transitions: Record<OrderStatus, OrderStatus[]> = {
-    pending: ["pending", "cancelled"],
-    paid: [
-      "paid",
-      shippingMethod === "local_delivery" ? "shipped" : "ready_for_pickup",
-      "cancelled",
-    ],
-    payment_review: ["payment_review", "cancelled"],
-    ready_for_pickup: ["ready_for_pickup", "delivered", "cancelled"],
-    shipped: ["shipped", "delivered", "cancelled"],
-    delivered: ["delivered"],
-    cancelled: ["cancelled"],
-  };
-  const statusOptions = transitions[currentStatus].map((value) => ({
+  const statusOptions = getAllowedOrderStatusTransitions(
+    currentStatus,
+    shippingMethod
+  ).map((value) => ({
     value,
-    label: labels[value],
+    label: getOrderStatusLabel(value, shippingMethod),
   }));
 
   const handleSubmit = () => {

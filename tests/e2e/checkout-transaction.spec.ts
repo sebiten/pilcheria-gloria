@@ -22,6 +22,9 @@ function checkoutPayload(
       },
     ],
     expectedSubtotal: 125000,
+    expectedDiscount: 0,
+    expectedShippingCost: 0,
+    expectedTotal: 125000,
     shippingMethod: "pickup",
     shippingAddress: {
       name: "QA Checkout Atómico",
@@ -148,6 +151,7 @@ test("stock, precio u oferta inválidos revierten toda la creación", async ({
                 },
               ],
               expectedSubtotal: 250000,
+              expectedTotal: 250000,
             }
           : {};
       const response = await sendCheckout(
@@ -193,9 +197,13 @@ test("dos checkouts concurrentes no consumen dos veces el último uso del cupón
     const responses = await Promise.all([
       sendCheckout(request, firstSeed, randomUUID(), "10.23.0.1", {
         couponCode,
+        expectedDiscount: 1000,
+        expectedTotal: 124000,
       }),
       sendCheckout(request, secondSeed, randomUUID(), "10.23.0.2", {
         couponCode,
+        expectedDiscount: 1000,
+        expectedTotal: 124000,
       }),
     ]);
 

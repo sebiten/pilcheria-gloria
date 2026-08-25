@@ -3,12 +3,12 @@ import {
   getVariantPricingSegments,
   getVariantQuantityTotal,
 } from "@/lib/inventory";
+export { LOCAL_DELIVERY_MIN_ITEMS } from "@/lib/commerce/constants";
+import { LOCAL_DELIVERY_MIN_ITEMS } from "@/lib/commerce/constants";
 
 interface ShippingSettings {
   localDeliveryCost?: number;
 }
-
-export const LOCAL_DELIVERY_MIN_ITEMS = 2;
 
 export function getCartItemCount(
   items: ReadonlyArray<Pick<CartItem, "quantity">>
@@ -30,7 +30,7 @@ export function getVariantPrice(
 }
 
 export function getCartItemVariant(item: CartItem) {
-  if (!item.variant_id || !item.product?.variants) {
+  if (!item.product?.variants) {
     return null;
   }
 

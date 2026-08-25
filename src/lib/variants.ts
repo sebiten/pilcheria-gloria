@@ -38,3 +38,19 @@ export function formatVariantLabel(
 
   return parts.length ? parts.join(" · ") : "Variante anterior";
 }
+
+type OrderItemVariantSnapshotInput = {
+  product_name?: string | null;
+  variant_label?: string | null;
+  variant?: VariantLabelInput | null;
+};
+
+export function formatOrderItemVariantLabel(
+  item: OrderItemVariantSnapshotInput
+) {
+  if (item.product_name) {
+    return item.variant_label || "Variante anterior";
+  }
+
+  return formatVariantLabel(item.variant);
+}

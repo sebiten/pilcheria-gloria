@@ -12,26 +12,30 @@ import {
   PRODUCT_PRICE_GROUP_SELECT,
   sanitizeStorefrontProduct,
 } from "@/lib/inventory";
+import {
+  MAX_ITEMS_PER_ORDER,
+  MAX_QUANTITY_PER_VARIANT,
+} from "@/lib/commerce/constants";
 
 const cartItemInputSchema = z.object({
   product_id: z.string().uuid(),
-  variant_id: z.string().uuid().nullable(),
-  quantity: z.number().int().min(1).max(10),
+  variant_id: z.string().uuid(),
+  quantity: z.number().int().min(1).max(MAX_QUANTITY_PER_VARIANT),
 });
-const cartItemsInputSchema = z.array(cartItemInputSchema).max(20);
+const cartItemsInputSchema = z.array(cartItemInputSchema).max(MAX_ITEMS_PER_ORDER);
 
 type CartItemInput = z.infer<typeof cartItemInputSchema>;
 
 type CartRow = {
   id: string;
   product_id: string;
-  variant_id: string | null;
+  variant_id: string;
   quantity: number;
   product?: any;
 };
 
-function createCartKey(productId: string, variantId: string | null) {
-  return `${productId}:${variantId ?? "default"}`;
+function createCartKey(productId: string, variantId: string) {
+  return `${productId}:${variantId}`;
 }
 
 function mapProduct(product: any): ProductWithDetails {
@@ -134,7 +138,7 @@ function mergeCartCollections(remoteItems: CartItem[], localItems: CartItemInput
   for (const item of remoteItems) {
     merged.set(createCartKey(item.product_id, item.variant_id), {
       product_id: item.product_id,
-      variant_id: item.variant_id ?? null,
+      variant_id: item.variant_id,
       quantity: item.quantity,
     });
   }
@@ -159,7 +163,7 @@ function revalidateCartPaths() {
 
 export async function addToCart(
   productId: string,
-  variantId: string | null,
+  variantId: string,
   quantity: number
 ) {
   const { userId } = await auth();
@@ -169,14 +173,14 @@ export async function addToCart(
 
   const input = cartItemInputSchema.parse({
     product_id: productId,
-    variant_id: variantId ?? null,
+    variant_id: variantId,
     quantity,
   });
   const existingItems = await selectUserCart(userId);
   const existingItem = existingItems.find(
     (item) =>
       item.product_id === input.product_id &&
-      (item.variant_id ?? null) === input.variant_id
+      item.variant_id === input.variant_id
   );
 
   await replaceUserCart(userId, [
@@ -184,7 +188,7 @@ export async function addToCart(
       .filter((item) => item.id !== existingItem?.id)
       .map((item) => ({
         product_id: item.product_id,
-        variant_id: item.variant_id ?? null,
+        variant_id: item.variant_id,
         quantity: item.quantity,
       })),
     {

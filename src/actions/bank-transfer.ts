@@ -68,10 +68,20 @@ export async function approveBankTransfer(
   });
   if (error) throw new Error(error.message);
   if (changed) {
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .select("status")
+      .eq("id", orderId)
+      .single();
+    if (orderError) throw new Error(orderError.message);
     await Promise.allSettled([
-      sendOrderEmail(orderId, "payment-approved"),
-      sendAdminSalePush(orderId),
-      sendMetaPurchaseEvent(orderId),
+      sendOrderEmail(
+        orderId,
+        order.status === "paid" ? "payment-approved" : "payment-review"
+      ),
+      ...(order.status === "paid"
+        ? [sendAdminSalePush(orderId), sendMetaPurchaseEvent(orderId)]
+        : []),
     ]);
   }
   revalidateOrder(orderId);
@@ -79,11 +89,14 @@ export async function approveBankTransfer(
 
 export async function rejectBankTransfer(orderId: string, attemptId: string) {
   await requireAdmin();
+  const { userId } = await auth();
+  if (!userId) throw new Error("Administrador no autenticado");
   const supabase = getSupabaseAdmin();
   const { data: changed, error } = await supabase.rpc("reject_bank_transfer", {
     p_order_id: uuidSchema.parse(orderId),
     p_attempt_id: uuidSchema.parse(attemptId),
     p_reason: "Transferencia no recibida",
+    p_reviewed_by: userId,
   });
   if (error) throw new Error(error.message);
   if (changed) await sendOrderEmail(orderId, "cancelled").catch(console.error);

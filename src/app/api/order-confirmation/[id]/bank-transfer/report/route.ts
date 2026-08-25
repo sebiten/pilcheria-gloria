@@ -31,6 +31,7 @@ export async function POST(
     const { error } = await supabase.rpc("report_bank_transfer", {
       p_order_id: orderId,
       p_attempt_id: attempt.id,
+      p_proof_reference: null,
     });
     if (error) throw new Error(error.message);
 

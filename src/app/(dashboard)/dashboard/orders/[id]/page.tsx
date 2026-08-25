@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getOrderById } from "@/actions/orders";
+import { fulfillLateApprovedOrder, getOrderById } from "@/actions/orders";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageCircle } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
-import { formatVariantLabel } from "@/lib/variants";
+import { formatOrderItemVariantLabel } from "@/lib/variants";
 import {
   getDeliveryMethodLabel,
   getOrderStatusLabel,
@@ -91,24 +91,32 @@ export default async function DashboardOrderDetailPage({
         new Date(second.created_at).getTime() - new Date(first.created_at).getTime()
     )
     .find((attempt: any) => attempt.provider === "mercadopago");
-  const ambiguousPaymentReview = [...(order.reconciliation_events || [])]
+  const latestPaymentReviewEvent = [...(order.reconciliation_events || [])]
     .sort(
       (first: any, second: any) =>
         new Date(second.created_at).getTime() - new Date(first.created_at).getTime()
-    )
-    .find(
-      (event: any) =>
-        event.ambiguous &&
-        Array.isArray(event.candidate_payment_ids) &&
-        event.candidate_payment_ids.length > 1
-    );
+    )[0];
+  const ambiguousPaymentReview =
+    latestPaymentReviewEvent?.ambiguous &&
+    Array.isArray(latestPaymentReviewEvent.candidate_payment_ids) &&
+    latestPaymentReviewEvent.candidate_payment_ids.length > 1
+      ? latestPaymentReviewEvent
+      : null;
   const candidatePaymentIds = ambiguousPaymentReview
     ? (ambiguousPaymentReview.candidate_payment_ids as string[])
     : [];
   const bankReviewOverdue = Boolean(
     bankAttempt?.status === "review" &&
-      order.reservation_expires_at &&
-      new Date(order.reservation_expires_at).getTime() <= Date.now()
+      bankAttempt.review_deadline_at &&
+      new Date(bankAttempt.review_deadline_at).getTime() <= Date.now()
+  );
+  const bankReviewExpired =
+    bankAttempt?.review_resolution === "expired_stock_released";
+  const bankApprovedAfterRelease =
+    bankAttempt?.review_resolution === "approved_after_stock_release";
+  const lateApprovedPayment = Boolean(
+    mercadoPagoAttempt?.status === "approved" &&
+      mercadoPagoAttempt.status_detail?.startsWith("late_approved:")
   );
 
   return (
@@ -157,6 +165,23 @@ export default async function DashboardOrderDetailPage({
             <p>
               <strong>Mercado Pago:</strong> {mercadoPagoAttempt?.status || "Pendiente"}
             </p>
+            {mercadoPagoAttempt?.provider_checkout_id ? (
+              <p className="break-all">
+                <strong>ID de preferencia:</strong>{" "}
+                {mercadoPagoAttempt.provider_checkout_id}
+              </p>
+            ) : null}
+            {mercadoPagoAttempt?.external_id ? (
+              <p className="break-all">
+                <strong>ID de pago:</strong> {mercadoPagoAttempt.external_id}
+              </p>
+            ) : null}
+            {mercadoPagoAttempt?.provider_checkout_invalidation_status ? (
+              <p>
+                <strong>Invalidación del checkout:</strong>{" "}
+                {mercadoPagoAttempt.provider_checkout_invalidation_status}
+              </p>
+            ) : null}
             {order.refund_status && order.refund_status !== "none" ? (
               <p>
                 <strong>Devolución:</strong>{" "}
@@ -247,6 +272,32 @@ export default async function DashboardOrderDetailPage({
         </Card>
       </div>
 
+      {lateApprovedPayment ? (
+        <Card className="border-red-300">
+          <CardHeader>
+            <CardTitle>Pago aprobado después de liberar el stock</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <p className="rounded-xl border border-red-300 bg-red-50 p-3 font-semibold leading-6 text-red-950">
+              El cobro está registrado, pero el pedido no volvió a descontar stock.
+              Verificá disponibilidad para cumplirlo o cancelá la orden para iniciar
+              el reembolso.
+            </p>
+            <p className="break-all font-mono text-xs">
+              {mercadoPagoAttempt?.status_detail}
+            </p>
+            <form action={fulfillLateApprovedOrder.bind(null, order.id)}>
+              <ConfirmSubmitButton
+                className="min-h-11 w-full sm:w-auto"
+                confirmation="¿Confirmás que verificaste el stock actual? La operación volverá a reservarlo y marcará el pedido como pagado."
+              >
+                Reservar stock y cumplir pedido
+              </ConfirmSubmitButton>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {order.status === "payment_review" && ambiguousPaymentReview ? (
         <Card className="border-red-300">
           <CardHeader>
@@ -294,15 +345,26 @@ export default async function DashboardOrderDetailPage({
               <p><strong>Importe:</strong> {formatPrice(Number(bankAttempt.amount))}</p>
               <p><strong>Estado:</strong> {bankAttempt.status === "review" ? "Avisada · en revisión" : bankAttempt.status}</p>
               <p><strong>Fecha del aviso:</strong> {bankAttempt.transfer_notified_at ? new Date(bankAttempt.transfer_notified_at).toLocaleString("es-AR") : "Sin aviso"}</p>
+              <p><strong>Deadline operativo:</strong> {bankAttempt.review_deadline_at ? new Date(bankAttempt.review_deadline_at).toLocaleString("es-AR") : "No aplica"}</p>
+              <p><strong>Deadline máximo:</strong> {bankAttempt.review_max_deadline_at ? new Date(bankAttempt.review_max_deadline_at).toLocaleString("es-AR") : "No aplica"}</p>
+              <p><strong>Stock reservado:</strong> {order.stock_reserved ? "Sí" : "No"}</p>
+              <p><strong>Resolución:</strong> {bankAttempt.review_resolution || "Pendiente"}</p>
+              {bankAttempt.proof_reference ? <p><strong>Referencia informada:</strong> {bankAttempt.proof_reference}</p> : null}
               {bankAttempt.bank_reference ? <p><strong>Referencia bancaria:</strong> {bankAttempt.bank_reference}</p> : null}
               {bankAttempt.transfer_reviewed_at ? <p><strong>Confirmada:</strong> {new Date(bankAttempt.transfer_reviewed_at).toLocaleString("es-AR")}</p> : null}
+              {bankAttempt.transfer_reviewed_by ? <p><strong>Revisada por:</strong> {bankAttempt.transfer_reviewed_by}</p> : null}
             </div>
             <p className="rounded-xl border border-red-300 bg-red-50 p-3 font-semibold leading-6 text-red-950">
               Nunca apruebes una transferencia solo por una captura. Verificá el movimiento acreditado en la cuenta y que coincidan importe y titular.
             </p>
             {bankReviewOverdue ? (
               <p className="rounded-xl border border-amber-400 bg-amber-50 p-3 font-semibold leading-6 text-amber-950">
-                El plazo de revisión venció. La transferencia sigue reservada y requiere una decisión manual; no se cancelará automáticamente.
+                El SLA de revisión venció. El cron la escaló y conservará la reserva solamente hasta el deadline máximo.
+              </p>
+            ) : null}
+            {bankReviewExpired || bankApprovedAfterRelease ? (
+              <p className="rounded-xl border border-red-400 bg-red-50 p-3 font-semibold leading-6 text-red-950">
+                El deadline máximo venció y el stock ya fue liberado. Si confirmás la acreditación, la orden seguirá en revisión para decidir cumplimiento o reembolso; no se volverá a descontar stock automáticamente.
               </p>
             ) : null}
             {bankAttempt.status === "review" ? (
@@ -348,9 +410,9 @@ export default async function DashboardOrderDetailPage({
               <tbody>
                 {order.items?.map((item: any) => (
                   <tr key={item.id} className="border-b">
-                    <td className="p-4 font-medium" data-primary="true">{item.product?.name || "Producto eliminado"}</td>
+                    <td className="p-4 font-medium" data-primary="true">{item.product_name || item.product?.name || "Producto eliminado"}</td>
                     <td className="p-4" data-label="Variante">
-                      {formatVariantLabel(item.variant)}
+                      {formatOrderItemVariantLabel(item)}
                     </td>
                     <td className="p-4" data-label="Cantidad">{item.quantity}</td>
                     <td className="p-4" data-label="Unitario">{formatPrice(Number(item.unit_price))}</td>
