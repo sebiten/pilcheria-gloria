@@ -221,16 +221,19 @@ export async function addAddress(address: {
     is_default: Boolean(parsedAddress.isDefault),
   };
 
-  const { data: existingAddress, error: existingAddressError } = await supabase
+  let existingAddressQuery = supabase
     .from("addresses")
     .select("id")
     .eq("clerk_user_id", userId)
     .eq("name", normalizedAddress.name)
     .eq("street", normalizedAddress.street)
     .eq("city", normalizedAddress.city)
-    .eq("state", normalizedAddress.state)
-    .eq("zip", normalizedAddress.zip)
-    .maybeSingle();
+    .eq("state", normalizedAddress.state);
+  existingAddressQuery = normalizedAddress.zip
+    ? existingAddressQuery.eq("zip", normalizedAddress.zip)
+    : existingAddressQuery.is("zip", null);
+  const { data: existingAddress, error: existingAddressError } =
+    await existingAddressQuery.maybeSingle();
 
   if (existingAddressError) throw existingAddressError;
 

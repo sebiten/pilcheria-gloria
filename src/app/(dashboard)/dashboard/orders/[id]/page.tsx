@@ -19,6 +19,7 @@ import {
 } from "@/actions/inventory";
 import { ConfirmSubmitButton } from "@/components/dashboard/confirm-submit-button";
 import { approveBankTransfer, rejectBankTransfer } from "@/actions/bank-transfer";
+import { resolveMercadoPagoPaymentReview } from "@/actions/mercadopago-review";
 import { Input } from "@/components/ui/input";
 import {
   getGoogleMapsDirectionsUrl,
@@ -90,6 +91,25 @@ export default async function DashboardOrderDetailPage({
         new Date(second.created_at).getTime() - new Date(first.created_at).getTime()
     )
     .find((attempt: any) => attempt.provider === "mercadopago");
+  const ambiguousPaymentReview = [...(order.reconciliation_events || [])]
+    .sort(
+      (first: any, second: any) =>
+        new Date(second.created_at).getTime() - new Date(first.created_at).getTime()
+    )
+    .find(
+      (event: any) =>
+        event.ambiguous &&
+        Array.isArray(event.candidate_payment_ids) &&
+        event.candidate_payment_ids.length > 1
+    );
+  const candidatePaymentIds = ambiguousPaymentReview
+    ? (ambiguousPaymentReview.candidate_payment_ids as string[])
+    : [];
+  const bankReviewOverdue = Boolean(
+    bankAttempt?.status === "review" &&
+      order.reservation_expires_at &&
+      new Date(order.reservation_expires_at).getTime() <= Date.now()
+  );
 
   return (
     <div className="space-y-6">
@@ -157,11 +177,17 @@ export default async function DashboardOrderDetailPage({
               </p>
             ) : null}
             <div className="pt-3">
-              <OrderStatusForm
-                orderId={order.id}
-                currentStatus={order.status}
-                shippingMethod={order.shipping_method}
-              />
+              {order.status === "payment_review" && ambiguousPaymentReview ? (
+                <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 font-semibold text-amber-950">
+                  Resolvé los pagos múltiples antes de cambiar o cancelar el pedido.
+                </p>
+              ) : (
+                <OrderStatusForm
+                  orderId={order.id}
+                  currentStatus={order.status}
+                  shippingMethod={order.shipping_method}
+                />
+              )}
             </div>
             {whatsappHref ? (
               <div className="space-y-2 rounded-lg border border-green-200 bg-green-50 p-3">
@@ -221,6 +247,44 @@ export default async function DashboardOrderDetailPage({
         </Card>
       </div>
 
+      {order.status === "payment_review" && ambiguousPaymentReview ? (
+        <Card className="border-red-300">
+          <CardHeader>
+            <CardTitle>Pagos múltiples de Mercado Pago</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <p className="rounded-xl border border-red-300 bg-red-50 p-3 font-semibold leading-6 text-red-950">
+              Revisá cada movimiento directamente en Mercado Pago. Al elegir uno,
+              el sistema volverá a validarlo, devolverá los demás pagos aprobados
+              y sólo después confirmará el pedido.
+            </p>
+            <div className="grid gap-3">
+              {candidatePaymentIds.map((paymentId) => (
+                <form
+                  key={paymentId}
+                  action={resolveMercadoPagoPaymentReview.bind(null, order.id)}
+                  className="flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      ID de pago candidato
+                    </p>
+                    <p className="mt-1 break-all font-mono font-bold">{paymentId}</p>
+                  </div>
+                  <input type="hidden" name="selectedPaymentId" value={paymentId} />
+                  <ConfirmSubmitButton
+                    className="min-h-11 sm:w-auto"
+                    confirmation={`¿Confirmás que verificaste el pago ${paymentId} en Mercado Pago? Los otros pagos aprobados serán devueltos.`}
+                  >
+                    Conservar este pago
+                  </ConfirmSubmitButton>
+                </form>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {bankAttempt ? (
         <Card className="border-amber-300">
           <CardHeader><CardTitle>Transferencia bancaria</CardTitle></CardHeader>
@@ -236,6 +300,11 @@ export default async function DashboardOrderDetailPage({
             <p className="rounded-xl border border-red-300 bg-red-50 p-3 font-semibold leading-6 text-red-950">
               Nunca apruebes una transferencia solo por una captura. Verificá el movimiento acreditado en la cuenta y que coincidan importe y titular.
             </p>
+            {bankReviewOverdue ? (
+              <p className="rounded-xl border border-amber-400 bg-amber-50 p-3 font-semibold leading-6 text-amber-950">
+                El plazo de revisión venció. La transferencia sigue reservada y requiere una decisión manual; no se cancelará automáticamente.
+              </p>
+            ) : null}
             {bankAttempt.status === "review" ? (
               <div className="grid gap-3 lg:grid-cols-2">
                 <form action={approveBankTransfer.bind(null, order.id, bankAttempt.id)} className="space-y-2 rounded-xl border p-3">

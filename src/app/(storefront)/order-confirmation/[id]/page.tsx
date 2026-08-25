@@ -50,7 +50,6 @@ interface OrderConfirmationPageProps {
 
 const CONFIRMED_STATUSES = new Set([
   "paid",
-  "payment_review",
   "ready_for_pickup",
   "shipped",
   "delivered",
@@ -213,12 +212,7 @@ export default async function OrderConfirmationPage({
   );
 
   if (isActiveBankTransfer && order) {
-    const [details, enabledProviders] = await Promise.all([
-      getAuthorizedBankTransferDetails(),
-      getEnabledPaymentProviders(),
-    ]);
-    const canSwitchToMercadoPago =
-      latestAttempt.status === "pending" && enabledProviders.includes("mercadopago");
+    const details = await getAuthorizedBankTransferDetails();
 
     return (
       <BankTransferPanel
@@ -226,17 +220,34 @@ export default async function OrderConfirmationPage({
         total={Number(order.total)}
         details={details}
         notified={latestAttempt.status === "review"}
-        mercadoPagoFallback={
-          canSwitchToMercadoPago ? (
-            <RetryPaymentButton
-              orderId={id}
-              providers={["mercadopago"]}
-              previousProvider={"bank_transfer"}
-              appearance="mercadopago"
-            />
-          ) : undefined
-        }
       />
+    );
+  }
+
+  if (order?.status === "payment_review") {
+    return (
+      <main className="mx-auto w-full max-w-xl px-4 py-12 text-center sm:py-16">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+          <Clock3 className="size-8" />
+        </div>
+        <h1 className="mt-5 font-display text-4xl leading-none text-gloria-950">
+          Estamos revisando tu pago
+        </h1>
+        <p className="mx-auto mt-4 max-w-md leading-7 text-muted-foreground">
+          El pedido quedó reservado, pero el pago todavía no está confirmado.
+          Te avisaremos cuando termine la verificación.
+        </p>
+        <div className="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-left text-amber-950">
+          <p className="font-bold">No vuelvas a pagar este pedido.</p>
+          <p className="mt-2 text-sm leading-6">
+            Si ves más de un débito, esperá nuestro contacto: revisaremos todos
+            los pagos antes de confirmar o devolver cualquier importe.
+          </p>
+        </div>
+        <p className="mt-5 text-sm text-muted-foreground">
+          Código de pedido: <strong className="font-mono text-gloria-950">{orderCode}</strong>
+        </p>
+      </main>
     );
   }
 

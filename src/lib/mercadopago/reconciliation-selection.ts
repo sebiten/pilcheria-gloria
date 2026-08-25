@@ -4,7 +4,8 @@ export type MercadoPagoReconciliationSource =
   | "webhook"
   | "buyer_return"
   | "order_query"
-  | "expiration_cron";
+  | "expiration_cron"
+  | "admin_resolution";
 
 export type MercadoPagoPaymentCandidate = MercadoPagoPayment & {
   date_created?: string | null;

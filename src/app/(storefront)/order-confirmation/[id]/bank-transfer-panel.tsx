@@ -11,13 +11,11 @@ export function BankTransferPanel({
   total,
   details,
   notified,
-  mercadoPagoFallback,
 }: {
   orderId: string;
   total: number;
   details: BankTransferDetails;
   notified: boolean;
-  mercadoPagoFallback?: React.ReactNode;
 }) {
   const requestId = useRef(crypto.randomUUID());
   const [copied, setCopied] = useState("");
@@ -106,12 +104,6 @@ export function BankTransferPanel({
         ) : null}
         {error ? <p className="mt-3 text-sm font-semibold text-red-700" role="alert">{error}</p> : null}
 
-        {!notified && mercadoPagoFallback ? (
-          <div className="mt-6 border-t pt-5">
-            <p className="mb-3 text-sm text-muted-foreground">¿Preferís pagar online con tarjeta o dinero disponible?</p>
-            {mercadoPagoFallback}
-          </div>
-        ) : null}
       </section>
     </main>
   );

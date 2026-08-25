@@ -211,7 +211,7 @@ export async function refundPayment(paymentId: string, orderId: string) {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
-        "X-Idempotency-Key": orderId,
+        "X-Idempotency-Key": `${orderId}:${paymentId}`,
       },
       body: JSON.stringify({}),
       cache: "no-store",

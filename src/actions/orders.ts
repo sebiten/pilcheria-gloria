@@ -244,7 +244,6 @@ export async function createOrder(
   });
 
   revalidateProductCacheAfterStockChange();
-  await clearUserCart(userId);
   await sendOrderEmail(order.id, "order-created").catch((notificationError) => {
     console.error("No se pudo enviar el email de reserva:", notificationError);
   });
@@ -259,6 +258,7 @@ export async function startOrderPayment(
   deviceId?: string | null
 ) {
   assertCheckoutRouteCapability(capability);
+  const { userId } = await auth();
   const supabase = getSupabaseAdmin();
   const { data: order, error: orderError } = await supabase
     .from("orders")
@@ -303,18 +303,16 @@ export async function startOrderPayment(
     if (bankAttemptError || !bankAttempt) {
       throw bankAttemptError ?? new Error("No se pudo preparar la transferencia");
     }
+    await clearUserCart(userId).catch((cartError) => {
+      console.error("No se pudo limpiar el carrito después de iniciar el pago:", cartError);
+    });
     return bankAttempt;
   }
 
   if (currentAttempt?.provider === "bank_transfer") {
-    if (provider !== "mercadopago") {
-      throw new Error("La transferencia solo puede reemplazarse por Mercado Pago.");
-    }
-    const { error: replaceError } = await supabase.rpc(
-      "replace_bank_transfer_attempt",
-      { p_order_id: orderId, p_attempt_id: currentAttempt.id }
+    throw new Error(
+      "Los datos bancarios ya fueron informados. No inicies otro pago para este pedido."
     );
-    if (replaceError) throw new Error(replaceError.message);
   }
 
   const adapter = getPaymentAdapter(provider);
@@ -380,6 +378,9 @@ export async function startOrderPayment(
       activeAttempt.checkout_url &&
       activeAttempt.status !== "review"
     ) {
+      await clearUserCart(userId).catch((cartError) => {
+        console.error("No se pudo limpiar el carrito después de iniciar el pago:", cartError);
+      });
       return activeAttempt;
     }
     throw new Error(
@@ -442,6 +443,9 @@ export async function startOrderPayment(
     if (updateError || !updatedAttempt) {
       throw updateError ?? new Error("No se pudo guardar el enlace de pago");
     }
+    await clearUserCart(userId).catch((cartError) => {
+      console.error("No se pudo limpiar el carrito después de iniciar el pago:", cartError);
+    });
     return updatedAttempt;
   } catch (error) {
     await supabase
@@ -547,6 +551,15 @@ export async function getOrderById(id: string) {
         transfer_reviewed_at,
         transfer_reviewed_by,
         bank_reference
+      ),
+      reconciliation_events:order_payment_reconciliation_events(
+        id,
+        source,
+        payment_id,
+        payment_status,
+        ambiguous,
+        candidate_payment_ids,
+        created_at
       )
     `)
     .eq("id", id)
@@ -667,6 +680,22 @@ export async function updateOrderStatus(id: string, status: string) {
     cancelled: ["cancelled"],
   };
   const currentStatus = existingOrder.status as OrderStatus;
+  if (currentStatus === "payment_review" && status === "cancelled") {
+    const { data: ambiguousReview, error: ambiguousReviewError } = await supabase
+      .from("order_payment_reconciliation_events")
+      .select("id")
+      .eq("order_id", id)
+      .eq("ambiguous", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (ambiguousReviewError) throw ambiguousReviewError;
+    if (ambiguousReview) {
+      throw new Error(
+        "Resolvé los pagos múltiples antes de cancelar este pedido"
+      );
+    }
+  }
   if (!allowedTransitions[currentStatus]?.includes(status)) {
     throw new Error("Ese cambio de estado no es válido para esta orden");
   }

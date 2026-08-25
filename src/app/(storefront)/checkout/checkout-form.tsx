@@ -540,28 +540,6 @@ export function CheckoutForm({
         contentIds: Array.from(new Set(items.map((item) => item.product_id))),
       });
 
-      if (
-        profile &&
-        (formData.phone.trim() !== (profile.phone || "") ||
-          fullName !== (profile.full_name || "").trim())
-      ) {
-        await updateProfileContact({
-          fullName,
-          phone: formData.phone,
-        });
-      }
-
-      if (shouldOfferSaveAddress && saveAddress) {
-        await addAddress({
-          name: fullName,
-          street: formData.street.trim(),
-          city: formData.city.trim(),
-          state: formData.state.trim(),
-          zip: formData.zip.trim() || undefined,
-          isDefault: addresses.length === 0,
-        });
-      }
-
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: {
@@ -614,6 +592,30 @@ export function CheckoutForm({
         });
         throw new Error("El procesador no devolvió un enlace de pago");
       }
+
+      const accountUpdates: Promise<unknown>[] = [];
+      if (
+        profile &&
+        (formData.phone.trim() !== (profile.phone || "") ||
+          fullName !== (profile.full_name || "").trim())
+      ) {
+        accountUpdates.push(
+          updateProfileContact({ fullName, phone: formData.phone })
+        );
+      }
+      if (shouldOfferSaveAddress && saveAddress) {
+        accountUpdates.push(
+          addAddress({
+            name: fullName,
+            street: formData.street.trim(),
+            city: formData.city.trim(),
+            state: formData.state.trim(),
+            zip: formData.zip.trim() || undefined,
+            isDefault: addresses.length === 0,
+          })
+        );
+      }
+      await Promise.allSettled(accountUpdates);
 
       window.sessionStorage.removeItem(FACEBOOK_PROMOTION.storageKey);
       trackStorefrontEvent({

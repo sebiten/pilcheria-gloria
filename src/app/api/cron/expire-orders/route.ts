@@ -53,6 +53,7 @@ async function expireAbandonedOrders(request: Request) {
     expired: 0,
     reconciled: 0,
     extended: 0,
+    bankTransfersRequiringReview: 0,
     failed: 0,
   };
 
@@ -64,16 +65,22 @@ async function expireAbandonedOrders(request: Request) {
           ["pending", "review"].includes(attempt.status)
       );
       if (bankAttempt) {
-        const reason =
-          bankAttempt.status === "review"
-            ? "Revisión de transferencia vencida sin resolver"
-            : "Reserva de transferencia vencida sin aviso";
+        if (bankAttempt.status === "review") {
+          summary.bankTransfersRequiringReview += 1;
+          console.warn("Transferencia informada pendiente de revisión manual", {
+            event: "bank_transfer.review_overdue",
+            orderId: order.id,
+            attemptId: bankAttempt.id,
+          });
+          continue;
+        }
+
         const { data: cancelled, error: bankError } = await supabase.rpc(
           "reject_bank_transfer",
           {
             p_order_id: order.id,
             p_attempt_id: bankAttempt.id,
-            p_reason: reason,
+            p_reason: "Reserva de transferencia vencida sin aviso",
           }
         );
         if (bankError) throw bankError;
