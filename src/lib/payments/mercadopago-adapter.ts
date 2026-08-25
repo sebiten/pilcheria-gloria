@@ -101,7 +101,8 @@ export const mercadoPagoAdapter: PaymentAdapter = {
       items: [
         {
           id: input.orderId,
-          title: `Pedido ${input.orderId.slice(0, 8).toUpperCase()}`,
+          title: `Pilchería Gloria · Pedido ${input.orderId.slice(0, 8).toUpperCase()}`,
+          description: "Compra online de uniformes escolares",
           unit_price: input.amount,
           quantity: 1,
         },
