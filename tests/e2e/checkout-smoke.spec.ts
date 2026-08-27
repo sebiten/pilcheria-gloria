@@ -139,6 +139,12 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await expect(cartDrawer).not.toBeInViewport();
     await expect(page.locator("main")).toHaveCount(1);
     await expect(page.getByRole("heading", { name: "Finalizar compra" })).toBeVisible();
+    await expect(
+      page.getByText(
+        "Solo necesitás nombre y WhatsApp. No hace falta crear una cuenta.",
+        { exact: true }
+      )
+    ).toBeVisible();
     await expect(page.getByRole("heading", { name: "1. Entrega" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "2. Tus datos" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "3. Revisá y continuá al pago" })).toBeVisible();
@@ -152,7 +158,19 @@ test("guest user can go from product to checkout", async ({ page }) => {
         () => analyticsEvents.filter((event) => event.event === "checkout_ready").length
       )
       .toBe(1);
-    for (const width of [1440, 768, 390, 320]) {
+    await expect(
+      page.getByText("Retiro coordinado · sin costo", { exact: true }).first()
+    ).toBeVisible();
+    const pickupOption = page.getByRole("radio", {
+      name: /Retiro coordinado · sin costo/,
+    });
+    if (await pickupOption.count()) {
+      await expect(pickupOption).toBeChecked();
+    }
+    await expect(
+      page.locator('[data-testid^="checkout-disabled-reason"]:visible')
+    ).toHaveCount(0);
+    for (const width of [1440, 768, 430, 390, 320]) {
       await page.setViewportSize({ width, height: 800 });
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth)
@@ -163,8 +181,15 @@ test("guest user can go from product to checkout", async ({ page }) => {
       expect(submitBox).not.toBeNull();
       expect(submitBox!.x).toBeGreaterThanOrEqual(0);
       expect(submitBox!.x + submitBox!.width).toBeLessThanOrEqual(width);
-      await expect(visibleSubmit).toHaveAccessibleName("Continuar a Mercado Pago");
+      await expect(visibleSubmit).toHaveAccessibleName("Ir a Mercado Pago");
     }
+    const viumiOption = page.locator('label[for="payment-viumi"]');
+    if (await viumiOption.isVisible()) {
+      await viumiOption.click();
+      await expect(visibleCheckoutSubmit(page)).toHaveAccessibleName("Ir a viüMi");
+      await page.locator('label[for="payment-mercadopago"]').click();
+    }
+    await expect(page.getByLabel("Calle y número")).toHaveCount(0);
     await page.getByRole("button", { name: /cupón/i }).click();
     await expect(page.getByRole("button", { name: "Aplicar" })).toBeVisible();
 
@@ -250,6 +275,14 @@ test("guest local delivery asks only for the necessary address", async ({ page }
   const seed = await seedCheckoutSmokeProduct();
   let refreshAttempts = 0;
   const analyticsEvents: TrackedAnalyticsEvent[] = [];
+  let releaseFirstRefresh: (() => void) | undefined;
+  let markFirstRefreshIntercepted: (() => void) | undefined;
+  const firstRefreshIntercepted = new Promise<void>((resolve) => {
+    markFirstRefreshIntercepted = resolve;
+  });
+  const firstRefreshGate = new Promise<void>((resolve) => {
+    releaseFirstRefresh = resolve;
+  });
 
   try {
     await page.addInitScript(() => window.localStorage.clear());
@@ -268,6 +301,8 @@ test("guest local delivery asks only for the necessary address", async ({ page }
 
       refreshAttempts += 1;
       if (refreshAttempts === 1) {
+        markFirstRefreshIntercepted?.();
+        await firstRefreshGate;
         await route.abort("connectionfailed");
         return;
       }
@@ -292,10 +327,34 @@ test("guest local delivery asks only for the necessary address", async ({ page }
     });
 
     await openSeededProductInCart(page, seed, 2);
+    await firstRefreshIntercepted;
+    await expect(visibleCheckoutSubmit(page)).toBeDisabled();
+    await expect(
+      page.locator('[data-testid^="checkout-disabled-reason"]:visible')
+    ).toHaveText("Actualizando precios…");
+    for (const width of [430, 390, 320]) {
+      await page.setViewportSize({ width, height: 800 });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth)
+      ).toBeLessThanOrEqual(width);
+
+      const submitBox = await visibleCheckoutSubmit(page).boundingBox();
+      const reasonBox = await page
+        .locator('[data-testid^="checkout-disabled-reason"]:visible')
+        .boundingBox();
+      expect(submitBox).not.toBeNull();
+      expect(reasonBox).not.toBeNull();
+      expect(submitBox!.x + submitBox!.width).toBeLessThanOrEqual(width);
+      expect(reasonBox!.x + reasonBox!.width).toBeLessThanOrEqual(width);
+    }
+    releaseFirstRefresh?.();
     await expect(page.getByTestId("cart-refresh-status")).toContainText(
       "No pudimos actualizar el carrito"
     );
     await expect(visibleCheckoutSubmit(page)).toBeDisabled();
+    await expect(
+      page.locator('[data-testid^="checkout-disabled-reason"]:visible')
+    ).toHaveText("Reintentá la actualización para continuar");
     await expect
       .poll(
         () =>
@@ -310,6 +369,9 @@ test("guest local delivery asks only for the necessary address", async ({ page }
     await expect(page.getByTestId("cart-refresh-status")).toContainText(
       "Precios y disponibilidad actualizados"
     );
+    await expect(
+      page.locator('[data-testid^="checkout-disabled-reason"]:visible')
+    ).toHaveCount(0);
     await expect
       .poll(
         () => analyticsEvents.filter((event) => event.event === "checkout_ready").length
@@ -324,6 +386,9 @@ test("guest local delivery asks only for the necessary address", async ({ page }
       !(await localDelivery.isVisible()),
       "La configuración E2E actual no tiene habilitada la entrega local"
     );
+    await expect(
+      page.getByRole("radio", { name: /Retiro coordinado · sin costo/ })
+    ).toBeChecked();
     await page.locator('label[for="local_delivery"]').click();
     await expect(localDelivery.first()).toBeChecked();
 
@@ -357,6 +422,7 @@ test("guest local delivery asks only for the necessary address", async ({ page }
       },
     });
   } finally {
+    releaseFirstRefresh?.();
     await cleanupCheckoutSmokeProduct(seed);
   }
 });

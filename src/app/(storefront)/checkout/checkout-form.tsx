@@ -124,7 +124,7 @@ function PaymentButtonContent({
           ? provider === "bank_transfer" ? "Reservando…" : "Preparando el pago…"
           : provider === "bank_transfer"
             ? "Reservar y ver datos de transferencia"
-            : `Continuar a ${provider === "mercadopago" ? "Mercado Pago" : "viüMi"}`}
+            : `Ir a ${provider === "mercadopago" ? "Mercado Pago" : "viüMi"}`}
       </span>
     </>
   );
@@ -851,11 +851,17 @@ export function CheckoutForm({
     </div>
   );
 
-  const checkoutDisabled =
-    isProcessing ||
-    cartRefreshStatus !== "ready" ||
-    enabledPaymentProviders.length === 0 ||
-    !hasAvailableShippingMethod;
+  const checkoutDisabledReason =
+    cartRefreshStatus === "updating"
+      ? "Actualizando precios…"
+      : cartRefreshStatus === "error"
+        ? "Reintentá la actualización para continuar"
+        : !hasAvailableShippingMethod
+          ? "No hay una forma de entrega disponible"
+          : enabledPaymentProviders.length === 0
+            ? "Pago temporalmente no disponible"
+            : null;
+  const checkoutDisabled = isProcessing || checkoutDisabledReason !== null;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pb-44 pt-7 sm:px-6 sm:pt-10 lg:pb-16">
@@ -866,8 +872,8 @@ export function CheckoutForm({
         <h1 className="text-3xl font-black tracking-tight text-gloria-950 sm:text-4xl">
           Finalizar compra
         </h1>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Completá la entrega, tus datos y elegí cómo pagar.
+        <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-gloria-900 sm:text-base">
+          Solo necesitás nombre y WhatsApp. No hace falta crear una cuenta.
         </p>
         <ol className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-gloria-800" aria-label="Pasos para finalizar la compra">
           <li>Datos y entrega</li>
@@ -969,7 +975,7 @@ export function CheckoutForm({
                       }}
                       className="grid gap-3 sm:grid-cols-2"
                     >
-                      <DeliveryOption id="pickup" icon={Store} title="Retiro coordinado" description={pickupLocation} price="Sin costo" />
+                      <DeliveryOption id="pickup" icon={Store} title="Retiro coordinado · sin costo" description={pickupLocation} />
                       <DeliveryOption
                         id="local_delivery"
                         icon={Truck}
@@ -988,7 +994,7 @@ export function CheckoutForm({
                       <div>
                         <p className="font-black text-gloria-950">
                           {formData.shippingMethod === "pickup"
-                            ? "Retiro coordinado, sin costo"
+                            ? "Retiro coordinado · sin costo"
                             : freeLocalDelivery
                               ? "Envío local gratis"
                               : `Entrega local: ${formatPrice(localDeliveryCost)}`}
@@ -1216,9 +1222,20 @@ export function CheckoutForm({
                 data-testid="checkout-submit"
                 onClick={handleCheckoutCtaClick}
                 disabled={checkoutDisabled}
+                aria-describedby={checkoutDisabledReason ? "checkout-disabled-reason" : undefined}
               >
                 <PaymentButtonContent isProcessing={isProcessing} provider={paymentProvider} />
               </Button>
+              {checkoutDisabledReason ? (
+                <p
+                  id="checkout-disabled-reason"
+                  data-testid="checkout-disabled-reason"
+                  className="text-sm font-semibold leading-5 text-amber-800"
+                  role="status"
+                >
+                  {checkoutDisabledReason}
+                </p>
+              ) : null}
               <p className="text-xs leading-5 text-muted-foreground">
                 El stock se reserva durante {paymentProvider === "bank_transfer" ? "2 horas" : "30 minutos"}. Al continuar aceptás los <Link href="/terminos" className="font-semibold underline">términos de compra</Link> y la <Link href="/privacidad" className="font-semibold underline">política de privacidad</Link>.
               </p>
@@ -1233,6 +1250,16 @@ export function CheckoutForm({
             <span className="text-sm font-bold text-muted-foreground">Total</span>
             <strong className="text-xl font-black text-gloria-950">{formatPrice(total)}</strong>
           </div>
+          {checkoutDisabledReason ? (
+            <p
+              id="checkout-disabled-reason-mobile"
+              data-testid="checkout-disabled-reason-mobile"
+              className="px-1 text-center text-xs font-semibold leading-4 text-amber-800"
+              role="status"
+            >
+              {checkoutDisabledReason}
+            </p>
+          ) : null}
           <Button
             className="min-h-12 w-full rounded-xl border border-[#0089c7] bg-[#009ee3] px-3 text-sm font-extrabold text-white shadow-[0_8px_20px_-10px_rgba(0,158,227,0.9)] hover:bg-[#008fce] focus-visible:ring-2 focus-visible:ring-[#009ee3] focus-visible:ring-offset-2"
             type="submit"
@@ -1240,6 +1267,7 @@ export function CheckoutForm({
             data-testid="checkout-submit-mobile"
             onClick={handleCheckoutCtaClick}
             disabled={checkoutDisabled}
+            aria-describedby={checkoutDisabledReason ? "checkout-disabled-reason-mobile" : undefined}
           >
             <PaymentButtonContent isProcessing={isProcessing} provider={paymentProvider} />
           </Button>
@@ -1296,7 +1324,7 @@ function DeliveryOption({
   icon: typeof Store;
   title: string;
   description: string;
-  price: string;
+  price?: string;
 }) {
   return (
     <div>
@@ -1305,7 +1333,7 @@ function DeliveryOption({
         <Icon className="h-5 w-5 text-primary" />
         <span className="mt-4 text-base font-bold">{title}</span>
         <span className="mt-1 text-sm text-muted-foreground">{description}</span>
-        <span className="mt-auto pt-3 text-sm font-bold">{price}</span>
+        {price ? <span className="mt-auto pt-3 text-sm font-bold">{price}</span> : null}
       </Label>
     </div>
   );

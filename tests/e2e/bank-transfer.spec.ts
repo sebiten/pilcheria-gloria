@@ -23,7 +23,11 @@ test("checkout invitado reserva por transferencia e informa el pago una sola vez
     await page.getByLabel("Nombre y apellido").fill("Cliente Transferencia");
     await page.getByLabel("WhatsApp").fill("3884000000");
     await page.locator('label[for="payment-bank_transfer"]').click();
-    await page.locator('[data-testid^="checkout-submit"]:visible').click();
+    const checkoutSubmit = page.locator('[data-testid^="checkout-submit"]:visible');
+    await expect(checkoutSubmit).toHaveAccessibleName(
+      "Reservar y ver datos de transferencia"
+    );
+    await checkoutSubmit.click();
 
     await expect(page).toHaveURL(/\/order-confirmation\/[0-9a-f-]+$/, {
       timeout: 30_000,
