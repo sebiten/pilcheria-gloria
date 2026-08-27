@@ -8,13 +8,11 @@ import {
   CreditCard,
   CircleX,
   Clock3,
-  Eye,
   Lightbulb,
   MousePointerClick,
   PackageCheck,
   Send,
-  Ruler,
-  ShoppingCart,
+  ShieldCheck,
   Smartphone,
   Users,
   RadioTower,
@@ -58,6 +56,13 @@ const checkoutErrorLabels = {
   api_client_error: "Datos rechazados",
   api_server_error: "Error al iniciar el pago",
   missing_payment_link: "Faltó enlace de Mercado Pago",
+} as const;
+
+const checkoutBlockerLabels = {
+  cart_refresh_failed: "Falló la actualización del carrito",
+  item_unavailable: "Prenda o talle no disponible",
+  no_shipping_method: "Sin método de entrega",
+  no_payment_provider: "Sin procesador de pago",
 } as const;
 
 const rejectionCategoryLabels = {
@@ -144,16 +149,12 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const metaCapiConfigured = Boolean(process.env.META_CONVERSIONS_API_TOKEN);
   const { metrics } = data;
   const funnel = [
-    { label: "Entraron al catálogo", value: metrics.catalog_sessions, icon: Users },
-    { label: "Vieron una prenda", value: metrics.product_viewers, icon: Eye },
-    { label: "Eligieron un talle", value: metrics.size_selection_sessions, icon: Ruler },
-    { label: "Tocaron una compra", value: metrics.purchase_intent_sessions, icon: ShoppingCart },
     { label: "Llegaron al checkout", value: metrics.checkout_sessions, icon: CreditCard },
-    { label: "Tocaron “Ir a pagar”", value: metrics.checkout_cta_sessions, icon: MousePointerClick },
-    { label: "Fueron a Mercado Pago", value: metrics.payment_redirect_sessions, icon: Send },
-    { label: "Mercado Pago aprobó", value: metrics.payment_approved_sessions, icon: BadgeCheck },
-    { label: "Pedido confirmado", value: metrics.purchasing_sessions, icon: PackageCheck },
-    { label: "Vieron la confirmación", value: metrics.confirmation_sessions, icon: Banknote },
+    { label: "Checkout habilitado", value: metrics.checkout_ready_sessions, icon: ShieldCheck },
+    { label: "Tocaron el pago", value: metrics.checkout_cta_sessions, icon: MousePointerClick },
+    { label: "Datos válidos", value: metrics.checkout_submits, icon: BadgeCheck },
+    { label: "Fueron al procesador", value: metrics.payment_redirect_sessions, icon: Send },
+    { label: "Pago aprobado", value: metrics.payment_approved_sessions, icon: Banknote },
   ];
   const recommendations = getRecommendations(data);
   const trackingStartLabel = data.comparable_started_at
@@ -317,7 +318,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
                   <span className="truncate text-sm font-bold">{step.label}</span>
                 </div>
                 <div className="hidden h-2 overflow-hidden rounded-full bg-muted sm:block">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${percent(step.value, metrics.catalog_sessions)}%` }} />
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${percent(step.value, metrics.checkout_sessions)}%` }} />
                 </div>
                 <strong className="text-right text-lg">{step.value}</strong>
                 <span className="col-span-2 pl-12 text-xs font-semibold text-muted-foreground sm:col-span-1 sm:pl-0 sm:text-right">
@@ -328,6 +329,18 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           })}
         </CardContent>
       </Card>
+
+      <section className="flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div>
+          <p className="font-extrabold text-gloria-950">Empezaron a completar</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Indicador auxiliar: no es un paso obligatorio del embudo.
+          </p>
+        </div>
+        <strong className="text-3xl font-black text-primary">
+          {metrics.checkout_form_started_sessions}
+        </strong>
+      </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
         <Card className="min-w-0">
@@ -410,7 +423,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </p>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         <Distribution
           title="Motivos de rechazo"
           items={data.payment_rejection_reasons.map((item) => ({
@@ -428,6 +441,15 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           }))}
           max={Math.max(1, ...data.checkout_errors.map((item) => item.sessions))}
           icon={CreditCard}
+        />
+        <Distribution
+          title={`Bloqueos del checkout · ${metrics.checkout_blocked_sessions}`}
+          items={data.checkout_blockers.map((item) => ({
+            label: checkoutBlockerLabels[item.detail],
+            value: item.sessions,
+          }))}
+          max={Math.max(1, ...data.checkout_blockers.map((item) => item.sessions))}
+          icon={ShieldCheck}
         />
       </div>
 

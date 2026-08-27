@@ -54,6 +54,7 @@ import {
   getAnalyticsSessionId,
   trackStorefrontEvent,
 } from "@/lib/analytics/client";
+import type { CheckoutBlockedDetail } from "@/lib/analytics/types";
 import {
   getMercadoPagoDeviceId,
   MercadoPagoDeviceIdScript,
@@ -149,6 +150,9 @@ export function CheckoutForm({
   const checkoutRequestId = useRef<string | null>(null);
   const submitLock = useRef(false);
   const lastRefreshedCartSignature = useRef("");
+  const emittedCheckoutEvents = useRef(
+    new Set<"checkout_ready" | "checkout_blocked" | "checkout_form_started">()
+  );
   const [isMounted, setIsMounted] = useState(false);
   const defaultAddress = getDefaultAddress(addresses);
   const defaultFullName = (defaultAddress?.name || profile?.full_name || "").trim();
@@ -201,6 +205,18 @@ export function CheckoutForm({
       dedupe: true,
     });
   }, [cartSignature, isMounted, items]);
+  const trackCheckoutEventOnce = useCallback(
+    (
+      event: "checkout_ready" | "checkout_blocked" | "checkout_form_started",
+      quantity: number,
+      eventDetail?: CheckoutBlockedDetail
+    ) => {
+      if (emittedCheckoutEvents.current.has(event)) return;
+      emittedCheckoutEvents.current.add(event);
+      trackStorefrontEvent({ event, eventDetail, quantity });
+    },
+    []
+  );
   const refreshCart = useCallback(async () => {
     const currentItems = useCartStore.getState().items;
     if (!currentItems.length) return;
@@ -226,21 +242,64 @@ export function CheckoutForm({
         return !item.product || !variant || !variant.active || !variant.available;
       });
       if (hasUnavailableItem) {
+        trackCheckoutEventOnce(
+          "checkout_blocked",
+          getCartItemCount(refreshedItems),
+          "item_unavailable"
+        );
         setCartRefreshError(
           "Hay una prenda o un talle que ya no está disponible. Editá el carrito para continuar."
         );
         setCartRefreshStatus("error");
         return;
       }
+
+      const hasShippingMethod =
+        settings.pickup_enabled ||
+        (settings.local_delivery_enabled && canUseLocalDelivery(refreshedItems));
+      if (!hasShippingMethod) {
+        trackCheckoutEventOnce(
+          "checkout_blocked",
+          getCartItemCount(refreshedItems),
+          "no_shipping_method"
+        );
+        setCartRefreshStatus("ready");
+        return;
+      }
+      if (enabledPaymentProviders.length === 0) {
+        trackCheckoutEventOnce(
+          "checkout_blocked",
+          getCartItemCount(refreshedItems),
+          "no_payment_provider"
+        );
+        setCartRefreshStatus("ready");
+        return;
+      }
+
       setCartRefreshStatus("ready");
+      trackCheckoutEventOnce(
+        "checkout_ready",
+        getCartItemCount(refreshedItems)
+      );
     } catch (refreshError) {
       console.error("No se pudo actualizar el carrito:", refreshError);
+      trackCheckoutEventOnce(
+        "checkout_blocked",
+        getCartItemCount(currentItems),
+        "cart_refresh_failed"
+      );
       setCartRefreshError(
         "Revisá tu conexión y reintentá. No podés continuar con precios desactualizados."
       );
       setCartRefreshStatus("error");
     }
-  }, [setItems]);
+  }, [
+    enabledPaymentProviders.length,
+    setItems,
+    settings.local_delivery_enabled,
+    settings.pickup_enabled,
+    trackCheckoutEventOnce,
+  ]);
 
   useEffect(() => {
     if (!items.length || lastRefreshedCartSignature.current === cartSignature) {
@@ -326,6 +385,13 @@ export function CheckoutForm({
       ...current,
       [event.target.name]: event.target.value,
     }));
+  };
+
+  const handleFormInteraction = () => {
+    trackCheckoutEventOnce(
+      "checkout_form_started",
+      getCartItemCount(useCartStore.getState().items)
+    );
   };
 
   const handleApplyCoupon = async () => {
@@ -875,6 +941,7 @@ export function CheckoutForm({
           data-testid="checkout-form"
           noValidate
           onSubmit={handleSubmit}
+          onChangeCapture={handleFormInteraction}
           className="space-y-6"
         >
           <section

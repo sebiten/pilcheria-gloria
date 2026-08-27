@@ -1,4 +1,4 @@
-export const ANALYTICS_VERSION = 6;
+export const ANALYTICS_VERSION = 7;
 
 export const CLIENT_ANALYTICS_EVENT_NAMES = [
   "page_view",
@@ -9,6 +9,9 @@ export const CLIENT_ANALYTICS_EVENT_NAMES = [
   "add_to_cart",
   "buy_now",
   "checkout_view",
+  "checkout_ready",
+  "checkout_blocked",
+  "checkout_form_started",
   "checkout_cta_click",
   "checkout_validation_error",
   "checkout_submit",
@@ -31,7 +34,7 @@ export const ANALYTICS_EVENT_NAMES = [
   ...SERVER_ANALYTICS_EVENT_NAMES,
 ] as const;
 
-export const ANALYTICS_EVENT_DETAILS = [
+export const CHECKOUT_VALIDATION_ERROR_DETAILS = [
   "missing_name",
   "invalid_email",
   "invalid_phone",
@@ -43,10 +46,25 @@ export const ANALYTICS_EVENT_DETAILS = [
   "missing_payment_link",
 ] as const;
 
+export const CHECKOUT_BLOCKED_DETAILS = [
+  "cart_refresh_failed",
+  "item_unavailable",
+  "no_shipping_method",
+  "no_payment_provider",
+] as const;
+
+export const ANALYTICS_EVENT_DETAILS = [
+  ...CHECKOUT_VALIDATION_ERROR_DETAILS,
+  ...CHECKOUT_BLOCKED_DETAILS,
+] as const;
+
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];
 export type ClientAnalyticsEventName =
   (typeof CLIENT_ANALYTICS_EVENT_NAMES)[number];
 export type AnalyticsEventDetail = (typeof ANALYTICS_EVENT_DETAILS)[number];
+export type CheckoutValidationErrorDetail =
+  (typeof CHECKOUT_VALIDATION_ERROR_DETAILS)[number];
+export type CheckoutBlockedDetail = (typeof CHECKOUT_BLOCKED_DETAILS)[number];
 export type AnalyticsSource =
   | "direct"
   | "whatsapp"
@@ -73,6 +91,9 @@ export type AnalyticsDashboardData = {
     buy_now_sessions: number;
     cart_sessions: number;
     checkout_sessions: number;
+    checkout_ready_sessions: number;
+    checkout_blocked_sessions: number;
+    checkout_form_started_sessions: number;
     checkout_cta_sessions: number;
     checkout_submits: number;
     payment_redirect_sessions: number;
@@ -89,7 +110,11 @@ export type AnalyticsDashboardData = {
     whatsapp_sessions: number;
   };
   checkout_errors: Array<{
-    detail: AnalyticsEventDetail;
+    detail: CheckoutValidationErrorDetail;
+    sessions: number;
+  }>;
+  checkout_blockers: Array<{
+    detail: CheckoutBlockedDetail;
     sessions: number;
   }>;
   payment_rejection_reasons: Array<{

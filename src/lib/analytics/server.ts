@@ -24,7 +24,14 @@ export async function getAnalyticsDashboard(days: number) {
         dashboard.metrics.payment_rejected_sessions ?? 0,
       payment_pending_sessions:
         dashboard.metrics.payment_pending_sessions ?? 0,
+      checkout_ready_sessions:
+        dashboard.metrics.checkout_ready_sessions ?? 0,
+      checkout_blocked_sessions:
+        dashboard.metrics.checkout_blocked_sessions ?? 0,
+      checkout_form_started_sessions:
+        dashboard.metrics.checkout_form_started_sessions ?? 0,
     },
+    checkout_blockers: dashboard.checkout_blockers ?? [],
     payment_rejection_reasons: dashboard.payment_rejection_reasons ?? [],
     campaigns: attributionResult.data ?? [],
   } as AnalyticsDashboardData;

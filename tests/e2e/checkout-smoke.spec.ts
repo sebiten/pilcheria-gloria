@@ -7,6 +7,12 @@ import {
   seedCheckoutSmokeProduct,
 } from "./helpers/supabase";
 
+type TrackedAnalyticsEvent = {
+  event: string;
+  eventDetail?: string;
+  [key: string]: unknown;
+};
+
 async function openSeededProductInCart(
   page: Page,
   seed: Awaited<ReturnType<typeof seedCheckoutSmokeProduct>>,
@@ -37,14 +43,24 @@ test("guest user can go from product to checkout", async ({ page }) => {
   const seed = await seedCheckoutSmokeProduct();
   let checkoutRequests = 0;
   const checkoutIdempotencyKeys: string[] = [];
+  const analyticsEvents: TrackedAnalyticsEvent[] = [];
+  const requestTimeline: string[] = [];
 
   try {
     await page.addInitScript(() => {
       window.localStorage.clear();
     });
 
+    await page.route("**/api/analytics", async (route) => {
+      const payload = route.request().postDataJSON() as TrackedAnalyticsEvent;
+      analyticsEvents.push(payload);
+      requestTimeline.push(`analytics:${payload.event}`);
+      await route.fulfill({ status: 202 });
+    });
+
     await page.route("**/api/checkout", async (route) => {
       checkoutRequests += 1;
+      requestTimeline.push("checkout_api");
       const request = route.request();
       checkoutIdempotencyKeys.push(
         request.headers()["idempotency-key"] || ""
@@ -110,6 +126,11 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await expect(page.getByTestId("cart-refresh-status")).toContainText(
       "Precios y disponibilidad actualizados"
     );
+    await expect
+      .poll(
+        () => analyticsEvents.filter((event) => event.event === "checkout_ready").length
+      )
+      .toBe(1);
     for (const width of [1440, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 800 });
       expect(
@@ -128,6 +149,16 @@ test("guest user can go from product to checkout", async ({ page }) => {
 
     const submit = visibleCheckoutSubmit(page);
     await submit.click();
+    await expect
+      .poll(
+        () =>
+          analyticsEvents.filter((event) => event.event === "checkout_cta_click")
+            .length
+      )
+      .toBe(1);
+    expect(
+      analyticsEvents.filter((event) => event.event === "checkout_submit")
+    ).toHaveLength(0);
     await expect(page.getByLabel("Nombre y apellido")).toBeFocused();
     await expect(page.locator("#fullName-error")).toContainText("nombre y apellido");
 
@@ -149,6 +180,24 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await expect(page.locator("#email-error")).toContainText("email válido");
     await page.getByLabel("Email (opcional)").fill("qa.gloria@example.com");
 
+    await expect
+      .poll(
+        () =>
+          analyticsEvents.filter(
+            (event) => event.event === "checkout_form_started"
+          ).length
+      )
+      .toBe(1);
+    const formStarted = analyticsEvents.find(
+      (event) => event.event === "checkout_form_started"
+    );
+    expect(formStarted).not.toHaveProperty("eventDetail");
+    expect(JSON.stringify(formStarted)).not.toContain("QA Gloria");
+    expect(JSON.stringify(formStarted)).not.toContain("0388 15 4000000");
+    expect(JSON.stringify(formStarted)).not.toContain("qa.gloria@example.com");
+    expect(formStarted).not.toHaveProperty("field");
+    expect(formStarted).not.toHaveProperty("value");
+
     await submit.evaluate((button: HTMLButtonElement) => {
       button.click();
       button.click();
@@ -157,6 +206,12 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await expect(page.getByText("Tus datos siguen cargados")).toBeVisible();
     await expect(page.getByLabel("Nombre y apellido")).toHaveValue("QA Gloria");
     expect(checkoutRequests).toBe(1);
+    expect(
+      analyticsEvents.filter((event) => event.event === "checkout_submit")
+    ).toHaveLength(1);
+    expect(requestTimeline.indexOf("analytics:checkout_submit")).toBeLessThan(
+      requestTimeline.indexOf("checkout_api")
+    );
 
     await submit.click();
     await expect.poll(() => checkoutRequests).toBe(2);
@@ -173,9 +228,16 @@ test("guest user can go from product to checkout", async ({ page }) => {
 test("guest local delivery asks only for the necessary address", async ({ page }) => {
   const seed = await seedCheckoutSmokeProduct();
   let refreshAttempts = 0;
+  const analyticsEvents: TrackedAnalyticsEvent[] = [];
 
   try {
     await page.addInitScript(() => window.localStorage.clear());
+    await page.route("**/api/analytics", async (route) => {
+      analyticsEvents.push(
+        route.request().postDataJSON() as TrackedAnalyticsEvent
+      );
+      await route.fulfill({ status: 202 });
+    });
     await page.route("**/checkout", async (route) => {
       const request = route.request();
       if (request.method() !== "POST" || !request.headers()["next-action"]) {
@@ -213,10 +275,28 @@ test("guest local delivery asks only for the necessary address", async ({ page }
       "No pudimos actualizar el carrito"
     );
     await expect(visibleCheckoutSubmit(page)).toBeDisabled();
+    await expect
+      .poll(
+        () =>
+          analyticsEvents.filter(
+            (event) =>
+              event.event === "checkout_blocked" &&
+              event.eventDetail === "cart_refresh_failed"
+          ).length
+      )
+      .toBe(1);
     await page.getByRole("button", { name: "Reintentar actualización" }).click();
     await expect(page.getByTestId("cart-refresh-status")).toContainText(
       "Precios y disponibilidad actualizados"
     );
+    await expect
+      .poll(
+        () => analyticsEvents.filter((event) => event.event === "checkout_ready").length
+      )
+      .toBe(1);
+    expect(
+      analyticsEvents.filter((event) => event.event === "checkout_blocked")
+    ).toHaveLength(1);
 
     const localDelivery = page.getByRole("radio", { name: /Entrega local|Envío local gratis/ });
     test.skip(
