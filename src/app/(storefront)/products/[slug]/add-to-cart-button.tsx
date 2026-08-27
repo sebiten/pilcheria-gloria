@@ -206,15 +206,16 @@ export function AddToCartButton({
     });
   };
 
-  const handleBuyNow = () => {
+  const handleBuyNow = (quantityOverride?: number) => {
     if (!selectedVariant || isBuyingNow) return;
+    const purchaseQuantity = quantityOverride ?? quantity;
     setIsBuyingNow(true);
-    addItem(product, selectedVariant.id, quantity, { openCart: false });
+    addItem(product, selectedVariant.id, purchaseQuantity, { openCart: false });
     trackStorefrontEvent({
       event: "buy_now",
       productId: product.id,
-      quantity,
-      value: currentPrice,
+      quantity: purchaseQuantity,
+      value: getVariantQuantityTotal(selectedVariant, purchaseQuantity),
       contentName: product.name,
     });
     router.push("/checkout");
@@ -443,7 +444,8 @@ export function AddToCartButton({
           <Button
             className="min-h-14 text-base font-bold"
             size="lg"
-            onClick={handleBuyNow}
+            data-testid="buy-now-button-desktop"
+            onClick={() => handleBuyNow()}
             disabled={!canPurchase || isBuyingNow}
           >
             {isBuyingNow ? "Abriendo…" : "Comprar ahora"}
@@ -526,16 +528,30 @@ export function AddToCartButton({
 
       {hasPurchasableVariants ? (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gloria-200 bg-background/98 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-18px_45px_-28px_oklch(0.2_0.045_136/0.55)] backdrop-blur lg:hidden">
-          <div className="mx-auto max-w-md">
+          <div className="mx-auto max-w-md" data-testid="mobile-product-actions">
             {selectedVariant ? (
-              <Button
-                className="min-h-12 w-full px-3 text-base font-extrabold"
-                data-testid="add-to-cart-button-mobile"
-                onClick={handleMobileAddToCart}
-              >
-                <ShoppingBag className="mr-1 size-4" />
-                Agregar al carrito · {formatPrice(mobilePrice)}
-              </Button>
+              <div className="grid gap-2">
+                <Button
+                  className="min-h-12 w-full px-3 text-base font-extrabold"
+                  data-testid="buy-now-button-mobile"
+                  onClick={() => handleBuyNow(1)}
+                  disabled={isBuyingNow}
+                >
+                  {isBuyingNow
+                    ? "Abriendo…"
+                    : `Comprar ahora · ${formatPrice(mobilePrice)}`}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="min-h-12 w-full px-3 text-sm font-extrabold sm:text-base"
+                  data-testid="add-to-cart-button-mobile"
+                  onClick={handleMobileAddToCart}
+                  disabled={isBuyingNow}
+                >
+                  <ShoppingBag className="mr-1 size-4" />
+                  Agregar y seguir eligiendo
+                </Button>
+              </div>
             ) : (
               <Button
                 className="min-h-12 w-full justify-between px-5 text-base font-extrabold"

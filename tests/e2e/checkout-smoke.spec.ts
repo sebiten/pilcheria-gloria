@@ -39,6 +39,27 @@ function visibleCheckoutSubmit(page: Page) {
   return page.locator('[data-testid^="checkout-submit"]:visible');
 }
 
+async function selectFirstProductVariant(page: Page) {
+  await page
+    .locator('#elegir-talle [role="radiogroup"]')
+    .last()
+    .locator('[role="radio"]')
+    .first()
+    .click({ force: true });
+}
+
+async function getPersistedCartQuantities(page: Page) {
+  return page.evaluate(() => {
+    const persistedCart = window.localStorage.getItem("pilcheria-gloria-cart");
+    if (!persistedCart) return [];
+
+    const parsed = JSON.parse(persistedCart) as {
+      state?: { items?: Array<{ quantity?: number }> };
+    };
+    return (parsed.state?.items ?? []).map((item) => item.quantity);
+  });
+}
+
 test("guest user can go from product to checkout", async ({ page }) => {
   const seed = await seedCheckoutSmokeProduct();
   let checkoutRequests = 0;
@@ -392,6 +413,170 @@ test("repeated checkout request is idempotent", async ({ request }) => {
     await expect
       .poll(async () => getLatestOrderForProduct(seed.productId))
       .toMatchObject({ id: checkoutRequestId, status: "pending" });
+  } finally {
+    await cleanupCheckoutSmokeProduct(seed);
+  }
+});
+
+test("mobile buy now adds one unit without opening the cart", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "Este flujo pertenece exclusivamente a la barra móvil");
+
+  const seed = await seedCheckoutSmokeProduct();
+  const analyticsEvents: TrackedAnalyticsEvent[] = [];
+
+  try {
+    await page.addInitScript(() => window.localStorage.clear());
+    await page.route("**/api/analytics", async (route) => {
+      analyticsEvents.push(
+        route.request().postDataJSON() as TrackedAnalyticsEvent
+      );
+      await route.fulfill({ status: 202 });
+    });
+
+    await page.goto(`/uniformes/${seed.productSlug}`);
+    await selectFirstProductVariant(page);
+
+    const mobileActions = page.getByTestId("mobile-product-actions");
+    const buyNow = page.getByTestId("buy-now-button-mobile");
+    const keepShopping = page.getByTestId("add-to-cart-button-mobile");
+
+    await expect(mobileActions).toHaveCount(1);
+    await expect(buyNow).toHaveText(/Comprar ahora · \$.*125\.000,00/);
+    await expect(keepShopping).toHaveText("Agregar y seguir eligiendo");
+
+    for (const width of [320, 390, 430]) {
+      await page.setViewportSize({ width, height: 800 });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth)
+      ).toBeLessThanOrEqual(width);
+
+      for (const action of [buyNow, keepShopping]) {
+        const box = await action.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      }
+    }
+
+    await buyNow.click();
+
+    await expect(page).toHaveURL(/\/checkout$/);
+    await expect(page.getByTestId("cart-drawer")).not.toBeVisible();
+    await expect.poll(() => getPersistedCartQuantities(page)).toEqual([1]);
+    await expect
+      .poll(
+        () => analyticsEvents.filter((event) => event.event === "buy_now").length
+      )
+      .toBe(1);
+
+    expect(
+      analyticsEvents.filter((event) => event.event === "buy_now")
+    ).toEqual([
+      expect.objectContaining({
+        productId: seed.productId,
+        quantity: 1,
+      }),
+    ]);
+    expect(
+      analyticsEvents.filter((event) => event.event === "add_to_cart")
+    ).toHaveLength(0);
+  } finally {
+    await cleanupCheckoutSmokeProduct(seed);
+  }
+});
+
+test("mobile add and keep shopping opens the cart and stays on product", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "Este flujo pertenece exclusivamente a la barra móvil");
+
+  const seed = await seedCheckoutSmokeProduct();
+  const analyticsEvents: TrackedAnalyticsEvent[] = [];
+
+  try {
+    await page.addInitScript(() => window.localStorage.clear());
+    await page.route("**/api/analytics", async (route) => {
+      analyticsEvents.push(
+        route.request().postDataJSON() as TrackedAnalyticsEvent
+      );
+      await route.fulfill({ status: 202 });
+    });
+
+    await page.goto(`/uniformes/${seed.productSlug}`);
+    await selectFirstProductVariant(page);
+    await page.getByTestId("add-to-cart-button-mobile").click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/uniformes/${seed.productSlug}$`)
+    );
+    await expect(page.getByTestId("cart-drawer")).toBeVisible();
+    await expect.poll(() => getPersistedCartQuantities(page)).toEqual([1]);
+    await expect
+      .poll(
+        () =>
+          analyticsEvents.filter((event) => event.event === "add_to_cart").length
+      )
+      .toBe(1);
+
+    expect(
+      analyticsEvents.filter((event) => event.event === "add_to_cart")
+    ).toEqual([
+      expect.objectContaining({
+        productId: seed.productId,
+        quantity: 1,
+      }),
+    ]);
+    expect(
+      analyticsEvents.filter((event) => event.event === "buy_now")
+    ).toHaveLength(0);
+  } finally {
+    await cleanupCheckoutSmokeProduct(seed);
+  }
+});
+
+test("desktop buy now keeps the selected quantity", async ({ page, isMobile }) => {
+  test.skip(isMobile, "La comprobación corresponde al control de escritorio");
+
+  const seed = await seedCheckoutSmokeProduct();
+  const analyticsEvents: TrackedAnalyticsEvent[] = [];
+
+  try {
+    await page.addInitScript(() => window.localStorage.clear());
+    await page.route("**/api/analytics", async (route) => {
+      analyticsEvents.push(
+        route.request().postDataJSON() as TrackedAnalyticsEvent
+      );
+      await route.fulfill({ status: 202 });
+    });
+
+    await page.goto(`/uniformes/${seed.productSlug}`);
+    await selectFirstProductVariant(page);
+    await page.getByRole("button", { name: "Sumar una prenda" }).click();
+    await page.getByTestId("buy-now-button-desktop").click();
+
+    await expect(page).toHaveURL(/\/checkout$/);
+    await expect.poll(() => getPersistedCartQuantities(page)).toEqual([2]);
+    await expect
+      .poll(
+        () => analyticsEvents.filter((event) => event.event === "buy_now").length
+      )
+      .toBe(1);
+
+    expect(
+      analyticsEvents.filter((event) => event.event === "buy_now")
+    ).toEqual([
+      expect.objectContaining({
+        productId: seed.productId,
+        quantity: 2,
+      }),
+    ]);
+    expect(
+      analyticsEvents.filter((event) => event.event === "add_to_cart")
+    ).toHaveLength(0);
   } finally {
     await cleanupCheckoutSmokeProduct(seed);
   }
