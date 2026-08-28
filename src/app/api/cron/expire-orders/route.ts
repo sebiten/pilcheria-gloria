@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { revalidateProductCacheFromRouteHandler } from "@/lib/cache/products";
 import { hasCronSecret, isCronAuthorized } from "@/lib/cron/auth";
 import { findMercadoPagoPaymentForOrder } from "@/lib/mercadopago/reconciliation";
@@ -25,18 +25,7 @@ const TERMINAL_PAYMENT_STATUSES = new Set([
   "charged_back",
 ]);
 
-async function expireAbandonedOrders(request: Request) {
-  if (!hasCronSecret()) {
-    return NextResponse.json(
-      { error: "CRON_SECRET no está configurado" },
-      { status: 503 }
-    );
-  }
-
-  if (!isCronAuthorized(request)) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
+async function expireAbandonedOrders() {
   const supabase = getSupabaseAdmin();
   const { data: orders, error } = await supabase
     .from("orders")
@@ -300,25 +289,42 @@ async function expireAbandonedOrders(request: Request) {
 }
 
 export async function GET(request: Request) {
-  return runTrackedSweep(request);
+  return scheduleTrackedSweep(request);
 }
 
 export async function POST(request: Request) {
-  return runTrackedSweep(request);
+  return scheduleTrackedSweep(request);
 }
 
-async function runTrackedSweep(request: Request) {
-  if (!hasCronSecret() || !isCronAuthorized(request)) {
-    return expireAbandonedOrders(request);
+function scheduleTrackedSweep(request: Request) {
+  if (!hasCronSecret()) {
+    return NextResponse.json(
+      { error: "CRON_SECRET no está configurado" },
+      { status: 503 }
+    );
   }
 
+  if (!isCronAuthorized(request)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const source = request.headers.get("x-cron-source") || "external";
+  after(() => runTrackedSweep(source));
+
+  return NextResponse.json(
+    { accepted: true, job: JOB_NAME },
+    { status: 202 }
+  );
+}
+
+async function runTrackedSweep(source: string) {
   const supabase = getSupabaseAdmin();
   const startedAt = new Date().toISOString();
   const { data: run } = await supabase
     .from("cron_job_runs")
     .insert({
       job_name: JOB_NAME,
-      source: request.headers.get("x-cron-source") || "external",
+      source,
       status: "running",
       started_at: startedAt,
     })
@@ -326,7 +332,7 @@ async function runTrackedSweep(request: Request) {
     .single();
 
   try {
-    const response = await expireAbandonedOrders(request);
+    const response = await expireAbandonedOrders();
     const summary = await response.clone().json().catch(() => ({}));
 
     if (run?.id) {
