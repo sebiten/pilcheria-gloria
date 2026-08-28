@@ -8,9 +8,11 @@ import {
   CreditCard,
   CircleX,
   Clock3,
+  Eye,
   Lightbulb,
   MousePointerClick,
   PackageCheck,
+  Ruler,
   Send,
   ShieldCheck,
   Smartphone,
@@ -75,6 +77,81 @@ const rejectionCategoryLabels = {
 function percent(value: number, total: number) {
   if (!total) return 0;
   return Math.min(100, Math.round((value / total) * 100));
+}
+
+type FunnelStep = {
+  label: string;
+  value: number;
+  icon: LucideIcon;
+};
+
+function FunnelCard({
+  stage,
+  title,
+  description,
+  context,
+  steps,
+}: {
+  stage: string;
+  title: string;
+  description: string;
+  context?: string;
+  steps: FunnelStep[];
+}) {
+  const firstStepValue = steps[0]?.value ?? 0;
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="border-b bg-muted/20 p-4 sm:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wider text-primary">
+              {stage}
+            </p>
+            <CardTitle className="mt-1">{title}</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          </div>
+          {context ? (
+            <p className="max-w-md rounded-lg border bg-card px-3 py-2 text-xs leading-5 text-muted-foreground">
+              {context}
+            </p>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-1 p-4 sm:p-6">
+        {steps.map((step, index) => {
+          const previous = index === 0 ? step.value : steps[index - 1].value;
+          const Icon = step.icon;
+
+          return (
+            <div
+              key={step.label}
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-2 py-3 hover:bg-muted/50 sm:grid-cols-[13rem_minmax(8rem,1fr)_5rem_5rem]"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Icon className="size-4" />
+                </span>
+                <span className="truncate text-sm font-bold">{step.label}</span>
+              </div>
+              <div className="hidden h-2 overflow-hidden rounded-full bg-muted sm:block">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${percent(step.value, firstStepValue)}%` }}
+                />
+              </div>
+              <strong className="text-right text-lg">
+                {step.value.toLocaleString("es-AR")}
+              </strong>
+              <span className="col-span-2 pl-12 text-xs font-semibold text-muted-foreground sm:col-span-1 sm:pl-0 sm:text-right">
+                {index === 0 ? "100%" : `${percent(step.value, previous)}% pasa`}
+              </span>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
 }
 
 function getRecommendations(data: Awaited<ReturnType<typeof getAnalyticsDashboard>>) {
@@ -148,7 +225,25 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const metaPixelConfigured = Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID);
   const metaCapiConfigured = Boolean(process.env.META_CONVERSIONS_API_TOKEN);
   const { metrics } = data;
-  const funnel = [
+  const productFunnel = [
+    { label: "Vieron una prenda", value: metrics.product_viewers, icon: Eye },
+    {
+      label: "Eligieron un talle",
+      value: metrics.size_selection_sessions,
+      icon: Ruler,
+    },
+    {
+      label: "Intención de compra",
+      value: metrics.purchase_intent_sessions,
+      icon: MousePointerClick,
+    },
+    {
+      label: "Llegaron al checkout",
+      value: metrics.checkout_sessions,
+      icon: CreditCard,
+    },
+  ];
+  const checkoutFunnel = [
     { label: "Llegaron al checkout", value: metrics.checkout_sessions, icon: CreditCard },
     { label: "Checkout habilitado", value: metrics.checkout_ready_sessions, icon: ShieldCheck },
     { label: "Tocaron el pago", value: metrics.checkout_cta_sessions, icon: MousePointerClick },
@@ -302,33 +397,25 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         completo del período.
       </p>
 
-      <Card>
-        <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-2">
-          <CardTitle>Embudo de compra</CardTitle>
-          <p className="text-sm text-muted-foreground">Cada paso cuenta personas distintas, no cantidad de clics.</p>
-        </CardHeader>
-        <CardContent className="space-y-1 p-4 sm:p-6">
-          {funnel.map((step, index) => {
-            const previous = index === 0 ? step.value : funnel[index - 1].value;
-            const Icon = step.icon;
-            return (
-              <div key={step.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-2 py-3 hover:bg-muted/50 sm:grid-cols-[13rem_minmax(8rem,1fr)_5rem_5rem]">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="size-4" /></span>
-                  <span className="truncate text-sm font-bold">{step.label}</span>
-                </div>
-                <div className="hidden h-2 overflow-hidden rounded-full bg-muted sm:block">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${percent(step.value, metrics.checkout_sessions)}%` }} />
-                </div>
-                <strong className="text-right text-lg">{step.value}</strong>
-                <span className="col-span-2 pl-12 text-xs font-semibold text-muted-foreground sm:col-span-1 sm:pl-0 sm:text-right">
-                  {index === 0 ? "100%" : `${percent(step.value, previous)}% pasa`}
-                </span>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+      <section className="space-y-4" aria-label="Recorrido de compra">
+        <p className="text-sm text-muted-foreground">
+          Cada paso cuenta personas distintas, no cantidad de clics. Los dos embudos
+          representan etapas consecutivas del mismo recorrido.
+        </p>
+        <FunnelCard
+          stage="Etapa 1"
+          title="Embudo de producto"
+          description="Desde que ven una prenda hasta que llegan al checkout."
+          context={`Entraron al catálogo: ${metrics.catalog_sessions.toLocaleString("es-AR")}. Es una referencia previa y no limita a quienes llegaron directo a una ficha.`}
+          steps={productFunnel}
+        />
+        <FunnelCard
+          stage="Etapa 2"
+          title="Embudo de checkout"
+          description="Desde que llegan al checkout hasta el pago."
+          steps={checkoutFunnel}
+        />
+      </section>
 
       <section className="flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
