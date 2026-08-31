@@ -141,13 +141,13 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Finalizar compra" })).toBeVisible();
     await expect(
       page.getByText(
-        "Solo necesitás nombre y WhatsApp. No hace falta crear una cuenta.",
+        "Comprá sin crear una cuenta.",
         { exact: true }
       )
     ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "1. Entrega" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "2. Tus datos" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "3. Revisá y continuá al pago" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "1. Tus datos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "2. Entrega" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "3. Pago" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Navegación principal" })).toHaveCount(0);
     await expect(page.locator("footer")).toHaveCount(0);
     await expect(page.getByTestId("cart-refresh-status")).toContainText(

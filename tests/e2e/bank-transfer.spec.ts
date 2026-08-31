@@ -25,7 +25,7 @@ test("checkout invitado reserva por transferencia e informa el pago una sola vez
     await page.locator('label[for="payment-bank_transfer"]').click();
     const checkoutSubmit = page.locator('[data-testid^="checkout-submit"]:visible');
     await expect(checkoutSubmit).toHaveAccessibleName(
-      "Reservar y ver datos de transferencia"
+      "Ver datos para transferir"
     );
     await checkoutSubmit.click();
 
