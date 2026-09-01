@@ -70,7 +70,7 @@ atención del local.
 3. Configurá ese mismo `CRON_SECRET` en las variables del entorno de producción y desplegá.
 4. Ejecutá otra vez `pnpm cron:configure`. El keepalive directo de Supabase se activa de inmediato; el job de reservas se activa cuando `/api/cron/keepalive` valida el deploy y el secreto.
 5. Verificá en cron-job.org los jobs `Pilchería Gloria - Liberar reservas vencidas` y `Pilchería Gloria - Mantener Supabase activo`.
-6. Para emails, verificá un dominio en Resend y configurá `RESEND_API_KEY`, `ORDER_EMAIL_FROM` y `ORDER_NOTIFICATION_TO`.
+6. Para emails, verificá un dominio en Resend y configurá `RESEND_API_KEY`, `ORDER_EMAIL_FROM` y `ORDER_NOTIFICATION_TO`. Esta última acepta uno o varios correos separados por coma.
 
 La ruta `/api/cron/expire-orders` consulta Mercado Pago antes de cancelar. No liberes stock con un cron SQL directo porque un webhook retrasado podría corresponder a un pago aprobado.
 

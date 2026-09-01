@@ -20,6 +20,12 @@ type EmailInput = {
   eventKey?: string;
 };
 
+type OrderEmailItem = {
+  product_name: string;
+  variant_label: string | null;
+  quantity: number;
+};
+
 type OrderEmailEvent =
   | "order-created"
   | "payment-approved"
@@ -82,6 +88,30 @@ function escapeHtml(value: string) {
         "'": "&#039;",
       })[character] || character
   );
+}
+
+function getAdminNotificationRecipients() {
+  return Array.from(
+    new Set(
+      (process.env.ORDER_NOTIFICATION_TO || "")
+        .split(/[,;\n]/)
+        .map((email) => email.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+async function sendEmailsIndependently(inputs: EmailInput[]) {
+  const results = await Promise.allSettled(inputs.map(sendEmail));
+  const failures = results.filter(
+    (result): result is PromiseRejectedResult => result.status === "rejected"
+  );
+
+  if (failures.length) {
+    throw new Error(`Fallaron ${failures.length} de ${inputs.length} emails`, {
+      cause: failures[0].reason,
+    });
+  }
 }
 
 async function sendEmail(input: EmailInput) {
@@ -173,7 +203,9 @@ export async function sendOrderEmail(
   const supabase = getSupabaseAdmin();
   const { data: order, error } = await supabase
     .from("orders")
-    .select("id, total, shipping_address, guest_access_token, guest_access_token_hash")
+    .select(
+      "id, total, shipping_method, shipping_address, guest_access_token, guest_access_token_hash, order_items(product_name, variant_label, quantity)"
+    )
     .eq("id", orderId)
     .single();
 
@@ -184,12 +216,38 @@ export async function sendOrderEmail(
   const shippingAddress = order.shipping_address as {
     name?: string;
     email?: string;
+    phone?: string;
+    street?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
   } | null;
   const customerEmail = shippingAddress?.email?.trim();
+  const adminEmails = getAdminNotificationRecipients();
+  const orderItems = (order.order_items || []) as OrderEmailItem[];
 
   const copy = ORDER_EMAIL_COPY[event];
   const orderCode = order.id.slice(0, 8).toUpperCase();
-  const customerName = escapeHtml(shippingAddress?.name || "Hola");
+  const customerName = escapeHtml(shippingAddress?.name || "cliente");
+  const orderItemsHtml = orderItems.length
+    ? `
+      <div style="margin:24px 0;padding:18px;border:1px solid #d8e8c5;border-radius:14px">
+        <p style="margin:0 0 12px"><strong>Prendas:</strong></p>
+        <ul style="margin:0;padding-left:20px;line-height:1.7">
+          ${orderItems
+            .map(
+              (item) =>
+                `<li>${item.quantity} × ${escapeHtml(item.product_name)}${
+                  item.variant_label
+                    ? ` — ${escapeHtml(item.variant_label)}`
+                    : ""
+                }</li>`
+            )
+            .join("")}
+        </ul>
+      </div>
+    `
+    : "";
   let pickupDetailsHtml = "";
 
   if (event === "ready-for-pickup") {
@@ -255,14 +313,16 @@ export async function sendOrderEmail(
         <p style="margin:0 0 8px"><strong>Pedido:</strong> ${orderCode}</p>
         <p style="margin:0"><strong>Total:</strong> ${escapeHtml(formatPrice(Number(order.total)))}</p>
       </div>
+      ${orderItemsHtml}
       ${pickupDetailsHtml}
       ${guestOrderHtml}
       ${reviewInvitationHtml}
     </div>
   `;
 
+  const emails: EmailInput[] = [];
   if (customerEmail) {
-    await sendEmail({
+    emails.push({
       to: customerEmail,
       subject: `${copy.subject} · ${SITE_NAME}`,
       html,
@@ -272,17 +332,52 @@ export async function sendOrderEmail(
     });
   }
 
-  const adminEmail = process.env.ORDER_NOTIFICATION_TO?.trim();
-  if (adminEmail && event === "payment-approved") {
-    await sendEmail({
-      to: adminEmail,
-      subject: `Nueva venta pagada ${orderCode}`,
-      html,
-      idempotencyKey: `${event}-admin/${orderId}/${adminEmail}`,
-      orderId,
-      eventKey: `${event}-admin`,
-    });
+  if (event === "payment-approved") {
+    const deliveryMethod =
+      order.shipping_method === "local_delivery"
+        ? "Envío local"
+        : "Retiro en el local";
+    const deliveryAddress = [
+      shippingAddress?.street,
+      shippingAddress?.city,
+      shippingAddress?.state,
+      shippingAddress?.zip,
+    ]
+      .filter(Boolean)
+      .map((value) => escapeHtml(String(value)))
+      .join(", ");
+    const adminHtml = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#17210f">
+        <p style="font-size:14px;color:#54703a">${escapeHtml(SITE_NAME)}</p>
+        <h1 style="font-size:28px">Nueva venta pagada</h1>
+        <div style="margin:24px 0;padding:18px;border:1px solid #d8e8c5;border-radius:14px">
+          <p style="margin:0 0 8px"><strong>Pedido:</strong> ${orderCode}</p>
+          <p style="margin:0 0 8px"><strong>Total:</strong> ${escapeHtml(formatPrice(Number(order.total)))}</p>
+          <p style="margin:0"><strong>Entrega:</strong> ${deliveryMethod}</p>
+        </div>
+        <div style="margin:24px 0;padding:18px;border:1px solid #d8e8c5;border-radius:14px">
+          <p style="margin:0 0 8px"><strong>Comprador:</strong> ${customerName}</p>
+          <p style="margin:0 0 8px"><strong>Email:</strong> ${escapeHtml(customerEmail || "No informado")}</p>
+          <p style="margin:0 0 8px"><strong>Teléfono:</strong> ${escapeHtml(shippingAddress?.phone || "No informado")}</p>
+          ${deliveryAddress ? `<p style="margin:0"><strong>Dirección:</strong> ${deliveryAddress}</p>` : ""}
+        </div>
+        ${orderItemsHtml}
+      </div>
+    `;
+
+    for (const adminEmail of adminEmails) {
+      emails.push({
+        to: adminEmail,
+        subject: `Nueva venta pagada ${orderCode}`,
+        html: adminHtml,
+        idempotencyKey: `${event}-admin/${orderId}/${adminEmail}`,
+        orderId,
+        eventKey: `${event}-admin`,
+      });
+    }
   }
+
+  await sendEmailsIndependently(emails);
 }
 
 export async function sendWithdrawalReceipt(input: {
@@ -300,20 +395,18 @@ export async function sendWithdrawalReceipt(input: {
     </div>
   `;
 
-  await sendEmail({
-    to: input.email,
-    subject: `Solicitud de arrepentimiento ${input.requestCode}`,
-    html,
-    idempotencyKey: `withdrawal/${input.requestCode}/${input.email}`,
-  });
-
-  const adminEmail = process.env.ORDER_NOTIFICATION_TO?.trim();
-  if (adminEmail) {
-    await sendEmail({
+  await sendEmailsIndependently([
+    {
+      to: input.email,
+      subject: `Solicitud de arrepentimiento ${input.requestCode}`,
+      html,
+      idempotencyKey: `withdrawal/${input.requestCode}/${input.email}`,
+    },
+    ...getAdminNotificationRecipients().map((adminEmail) => ({
       to: adminEmail,
       subject: `Nueva solicitud de arrepentimiento ${input.requestCode}`,
       html,
       idempotencyKey: `withdrawal-admin/${input.requestCode}/${adminEmail}`,
-    });
-  }
+    })),
+  ]);
 }
