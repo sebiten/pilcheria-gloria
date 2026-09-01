@@ -141,7 +141,7 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Finalizar compra" })).toBeVisible();
     await expect(
       page.getByText(
-        "Comprá sin crear una cuenta.",
+        "Completá tus datos y elegí cómo recibir el pedido. No necesitás crear una cuenta.",
         { exact: true }
       )
     ).toBeVisible();
@@ -170,6 +170,8 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await expect(
       page.locator('[data-testid^="checkout-disabled-reason"]:visible')
     ).toHaveCount(0);
+    await expect(page.getByLabel("Nombre y apellido")).toHaveAttribute("required");
+    await expect(page.getByLabel("WhatsApp")).toHaveAttribute("required");
     for (const width of [1440, 768, 430, 390, 320]) {
       await page.setViewportSize({ width, height: 800 });
       expect(
@@ -181,12 +183,18 @@ test("guest user can go from product to checkout", async ({ page }) => {
       expect(submitBox).not.toBeNull();
       expect(submitBox!.x).toBeGreaterThanOrEqual(0);
       expect(submitBox!.x + submitBox!.width).toBeLessThanOrEqual(width);
-      await expect(visibleSubmit).toHaveAccessibleName("Ir a Mercado Pago");
+      await expect(visibleSubmit).toHaveAccessibleName("Revisar datos para continuar");
+      if (width < 1024) {
+        await expect(page.getByTestId("checkout-incomplete-fields-mobile")).toContainText(
+          "nombre y apellido, WhatsApp"
+        );
+      }
     }
     const viumiOption = page.locator('label[for="payment-viumi"]');
     if (await viumiOption.isVisible()) {
       await viumiOption.click();
-      await expect(visibleCheckoutSubmit(page)).toHaveAccessibleName("Ir a viüMi");
+      await expect(visibleCheckoutSubmit(page)).toHaveAccessibleName("Revisar datos para continuar");
+      await expect(page.getByText("Los datos de la tarjeta se completan después, dentro de viüMi.")).toBeVisible();
       await page.locator('label[for="payment-mercadopago"]').click();
     }
     await expect(page.getByLabel("Calle y número")).toHaveCount(0);
@@ -208,6 +216,9 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await expect(page.getByLabel("Nombre y apellido")).toBeFocused();
     await expect(page.locator("#fullName-error")).toContainText("nombre y apellido");
 
+    await page.getByLabel("Nombre y apellido").fill("Gloria");
+    await page.getByLabel("Nombre y apellido").blur();
+    await expect(page.locator("#fullName-error")).toContainText("nombre y apellido");
     await page.getByLabel("Nombre y apellido").fill("QA Gloria");
     await page.getByRole("button", { name: "Agregar email (opcional)" }).click();
     await expect(page.getByLabel("Email (opcional)")).not.toHaveAttribute(
@@ -225,6 +236,16 @@ test("guest user can go from product to checkout", async ({ page }) => {
     await page.getByLabel("Email (opcional)").blur();
     await expect(page.locator("#email-error")).toContainText("email válido");
     await page.getByLabel("Email (opcional)").fill("qa.gloria@example.com");
+    await expect(visibleCheckoutSubmit(page)).toHaveAccessibleName("Continuar a Mercado Pago");
+    await expect(page.getByText("Vas a Mercado Pago para elegir el medio y confirmar el pago.").last()).toBeVisible();
+
+    const bankTransferOption = page.locator('label[for="payment-bank_transfer"]');
+    if (await bankTransferOption.isVisible()) {
+      await bankTransferOption.click();
+      await expect(visibleCheckoutSubmit(page)).toHaveAccessibleName("Ver datos para transferir");
+      await expect(page.getByText("Los datos para transferir se muestran después de reservar el pedido.")).toBeVisible();
+      await page.locator('label[for="payment-mercadopago"]').click();
+    }
 
     await expect
       .poll(
@@ -391,6 +412,10 @@ test("guest local delivery asks only for the necessary address", async ({ page }
     ).toBeChecked();
     await page.locator('label[for="local_delivery"]').click();
     await expect(localDelivery.first()).toBeChecked();
+
+    await expect(page.getByTestId("checkout-incomplete-fields-mobile")).toContainText(
+      "nombre y apellido, WhatsApp, calle y número"
+    );
 
     await expect(page.getByLabel("Provincia")).toHaveCount(0);
     await expect(page.getByLabel("Código postal")).toHaveCount(0);

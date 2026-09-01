@@ -56,6 +56,36 @@ function sendCheckout(
   });
 }
 
+test("el checkout rechaza un comprador sin apellido antes de crear el pedido", async ({
+  request,
+}) => {
+  const seed = await seedCheckoutSmokeProduct({ stock: 1 });
+
+  try {
+    const payload = checkoutPayload(seed);
+    const response = await sendCheckout(
+      request,
+      seed,
+      randomUUID(),
+      "10.19.0.1",
+      {
+        shippingAddress: {
+          ...payload.shippingAddress,
+          name: "Gloria",
+        },
+      }
+    );
+
+    expect(response.status()).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Los datos del checkout no son válidos.",
+    });
+    expect(await getVariantStock(seed.variantId)).toBe(1);
+  } finally {
+    await cleanupCheckoutSmokeProduct(seed);
+  }
+});
+
 test("dos checkouts concurrentes no venden dos veces la última unidad", async ({
   request,
 }) => {

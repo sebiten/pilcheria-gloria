@@ -7,6 +7,7 @@ import {
 } from "@/lib/security/checkout-rate-limit";
 import {
   isValidArgentinaContactPhone,
+  isValidFullName,
   normalizeArgentinaWhatsAppPhone,
 } from "@/lib/contact";
 import { getOrderConfirmationCookieName } from "@/lib/orders/confirmation-access";
@@ -53,7 +54,14 @@ const checkoutSchema = z.object({
   analyticsSessionId: z.string().uuid().nullable().optional(),
   shippingMethod: z.enum(SHIPPING_METHOD_VALUES),
   shippingAddress: z.object({
-    name: z.string().trim().min(2).max(120),
+    name: z
+      .string()
+      .trim()
+      .min(2)
+      .max(120)
+      .refine(isValidFullName, {
+        message: "Ingresá nombre y apellido.",
+      }),
     email: z.string().trim().email().max(254).nullable().optional(),
     phone: z
       .string()

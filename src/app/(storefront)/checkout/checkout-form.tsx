@@ -32,7 +32,7 @@ import {
   LOCAL_DELIVERY_MIN_ITEMS,
 } from "@/lib/commerce";
 import { formatStorefrontVariantSize } from "@/lib/inventory";
-import { formatPrice } from "@/lib/utils";
+import { cn, formatPrice } from "@/lib/utils";
 import type {
   Address,
   PaymentProvider,
@@ -41,7 +41,7 @@ import type {
 } from "@/types";
 import { PaymentConfidence } from "@/components/storefront/payment-confidence";
 import { hasPickupAddress } from "@/lib/maps";
-import { isValidArgentinaContactPhone } from "@/lib/contact";
+import { isValidArgentinaContactPhone, isValidFullName } from "@/lib/contact";
 import { FACEBOOK_PROMOTION } from "@/lib/promotions";
 import { validateCouponForCheckout } from "@/actions/coupons";
 import { refreshCheckoutCart } from "@/actions/cart";
@@ -92,9 +92,11 @@ type CartRefreshStatus = "updating" | "ready" | "error";
 function PaymentButtonContent({
   isProcessing,
   provider,
+  hasIncompleteFields,
 }: {
   isProcessing: boolean;
   provider: PaymentProvider;
+  hasIncompleteFields: boolean;
 }) {
   return (
     <>
@@ -117,9 +119,11 @@ function PaymentButtonContent({
       <span>
         {isProcessing
           ? provider === "bank_transfer" ? "Reservando…" : "Preparando el pago…"
+          : hasIncompleteFields
+            ? "Revisar datos para continuar"
           : provider === "bank_transfer"
             ? "Ver datos para transferir"
-            : `Ir a ${provider === "mercadopago" ? "Mercado Pago" : "viüMi"}`}
+            : `Continuar a ${provider === "mercadopago" ? "Mercado Pago" : "viüMi"}`}
       </span>
     </>
   );
@@ -500,10 +504,10 @@ export function CheckoutForm({
 
     const fullName = formData.fullName.trim();
 
-    if (fullName.length < 2) {
+    if (!isValidFullName(fullName)) {
       showFieldError(
         "fullName",
-        "Escribí tu nombre y apellido para identificar el pedido.",
+        "Escribí tu nombre y apellido para continuar.",
         "missing_name"
       );
       return;
@@ -740,6 +744,13 @@ export function CheckoutForm({
     );
   }
 
+  const validateFullNameField = () => {
+    const message = isValidFullName(formData.fullName)
+      ? undefined
+      : "Escribí tu nombre y apellido para continuar.";
+    setFieldErrors((current) => ({ ...current, fullName: message }));
+  };
+
   if (items.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
@@ -858,9 +869,20 @@ export function CheckoutForm({
             ? "Pago temporalmente no disponible"
             : null;
   const checkoutDisabled = isProcessing || checkoutDisabledReason !== null;
+  const missingRequiredFields = [
+    !isValidFullName(formData.fullName) ? "nombre y apellido" : null,
+    !isValidArgentinaContactPhone(formData.phone) ? "WhatsApp" : null,
+    needsAddress && formData.street.trim().length < 3 ? "calle y número" : null,
+    needsAddress && formData.city.trim().length < 2 ? "localidad" : null,
+  ].filter((field): field is string => Boolean(field));
+  const hasIncompleteFields = missingRequiredFields.length > 0;
+  const paymentNextStep =
+    paymentProvider === "bank_transfer"
+      ? "Al continuar reservamos el pedido y te mostramos los datos para transferir."
+      : `Vas a ${paymentProvider === "mercadopago" ? "Mercado Pago" : "viüMi"} para elegir el medio y confirmar el pago.`;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-44 pt-7 sm:px-6 sm:pt-10 lg:pb-16">
+    <main className="mx-auto w-full max-w-6xl px-4 pb-52 pt-7 sm:px-6 sm:pt-10 lg:pb-16">
       {enabledPaymentProviders.includes("mercadopago") ? (
         <MercadoPagoDeviceIdScript />
       ) : null}
@@ -869,14 +891,14 @@ export function CheckoutForm({
           Finalizar compra
         </h1>
         <p className="mt-2 max-w-xl text-sm font-semibold leading-5 text-gloria-900 sm:text-base">
-          Comprá sin crear una cuenta.
+          Completá tus datos y elegí cómo recibir el pedido. No necesitás crear una cuenta.
         </p>
         <ol className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-gloria-800" aria-label="Pasos para finalizar la compra">
-          <li>Datos</li>
+          <li>1. Tus datos</li>
           <li aria-hidden="true">→</li>
-          <li>Pago</li>
+          <li>2. Entrega</li>
           <li aria-hidden="true">→</li>
-          <li>Confirmación</li>
+          <li>3. Pago</li>
         </ol>
       </div>
 
@@ -954,18 +976,20 @@ export function CheckoutForm({
                 <h2 id="checkout-contact-title" className="text-xl font-black leading-none tracking-tight text-gloria-950">
                   1. Tus datos
                 </h2>
-                <p className="text-sm leading-5 text-muted-foreground">Los usamos para validar el pago y coordinar tu pedido.</p>
+                <p className="text-sm leading-5 text-muted-foreground">Los usamos para identificar el pedido y escribirte por WhatsApp.</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-start gap-3 rounded-xl border border-gloria-200 bg-gloria-50 p-3 text-sm leading-5 text-gloria-950">
                   <ShieldCheck className="mt-0.5 size-4 shrink-0 text-gloria-700" aria-hidden="true" />
                   <p>
-                    <strong>Si pagás con tarjeta,</strong> ingresá el nombre del titular. Si no coincide, Mercado Pago puede rechazar el pago por seguridad.
+                    {paymentProvider === "bank_transfer"
+                      ? "Los datos para transferir se muestran después de reservar el pedido."
+                      : `Los datos de la tarjeta se completan después, dentro de ${paymentProvider === "mercadopago" ? "Mercado Pago" : "viüMi"}.`}
                   </p>
                 </div>
-                <FormField label="Nombre y apellido de quien realiza el pago" name="fullName" value={formData.fullName} onChange={handleInputChange} autoComplete="name" error={fieldErrors.fullName} placeholder="Ej. María López" />
+                <FormField label="Nombre y apellido" name="fullName" value={formData.fullName} onChange={handleInputChange} onBlur={validateFullNameField} autoComplete="name" error={fieldErrors.fullName} hint="De la persona que hace el pedido." placeholder="Ej. María López" required />
                 <FormField
-                  label="WhatsApp de contacto"
+                  label="WhatsApp"
                   name="phone"
                   type="tel"
                   value={formData.phone}
@@ -974,8 +998,9 @@ export function CheckoutForm({
                   autoComplete="tel"
                   inputMode="tel"
                   placeholder="Ej. 388 4123456"
-                  hint="Incluí el código de área. Aceptamos +54 9 y formatos antiguos con 0 y 15."
+                  hint="Te enviamos la confirmación y coordinamos la entrega. Escribilo con código de área."
                   error={fieldErrors.phone}
+                  required
                 />
                 <button type="button" onClick={() => setIsEmailOpen((open) => !open)} aria-expanded={isEmailOpen} aria-controls="checkout-email-field" className="flex min-h-11 items-center gap-2 rounded-lg text-sm font-bold text-gloria-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                   <ChevronDown className={`size-4 transition-transform ${isEmailOpen ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -1095,9 +1120,9 @@ export function CheckoutForm({
                     {selectedAddressId === "manual" ? (
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                          <FormField label="Calle y número" name="street" value={formData.street} onChange={handleInputChange} error={fieldErrors.street} autoComplete="street-address" />
+                          <FormField label="Calle y número" name="street" value={formData.street} onChange={handleInputChange} error={fieldErrors.street} autoComplete="street-address" required />
                         </div>
-                        <FormField label="Localidad" name="city" value={formData.city} onChange={handleInputChange} error={fieldErrors.city} autoComplete="address-level2" />
+                        <FormField label="Localidad" name="city" value={formData.city} onChange={handleInputChange} error={fieldErrors.city} autoComplete="address-level2" required />
                         <FormField label="Referencia (opcional)" name="references" value={formData.references} onChange={handleInputChange} error={fieldErrors.references} placeholder="Barrio, entre calles..." />
                         {shouldOfferSaveAddress ? (
                           <label className="flex min-h-11 items-center gap-3 text-sm sm:col-span-2">
@@ -1221,9 +1246,9 @@ export function CheckoutForm({
                 data-testid="checkout-submit"
                 onClick={handleCheckoutCtaClick}
                 disabled={checkoutDisabled}
-                aria-describedby={checkoutDisabledReason ? "checkout-disabled-reason" : undefined}
+                aria-describedby={[checkoutDisabledReason ? "checkout-disabled-reason" : null, "checkout-payment-next-step"].filter(Boolean).join(" ")}
               >
-                <PaymentButtonContent isProcessing={isProcessing} provider={paymentProvider} />
+                <PaymentButtonContent isProcessing={isProcessing} provider={paymentProvider} hasIncompleteFields={hasIncompleteFields} />
               </Button>
               {checkoutDisabledReason ? (
                 <p
@@ -1235,6 +1260,9 @@ export function CheckoutForm({
                   {checkoutDisabledReason}
                 </p>
               ) : null}
+              <p id="checkout-payment-next-step" className="text-sm font-semibold leading-5 text-gloria-900">
+                {paymentNextStep}
+              </p>
               <p className="text-xs leading-5 text-muted-foreground">
                 El stock se reserva durante {paymentProvider === "bank_transfer" ? "2 horas" : "30 minutos"}. Al continuar aceptás los <Link href="/terminos" className="font-semibold underline">términos de compra</Link> y la <Link href="/privacidad" className="font-semibold underline">política de privacidad</Link>.
               </p>
@@ -1258,6 +1286,15 @@ export function CheckoutForm({
             >
               {checkoutDisabledReason}
             </p>
+          ) : hasIncompleteFields ? (
+            <p
+              id="checkout-incomplete-fields-mobile"
+              data-testid="checkout-incomplete-fields-mobile"
+              className="px-1 text-center text-xs font-bold leading-4 text-gloria-900"
+              role="status"
+            >
+              Falta completar: {missingRequiredFields.join(", ")}.
+            </p>
           ) : null}
           <Button
             className="min-h-12 w-full rounded-xl border border-[#0089c7] bg-[#009ee3] px-3 text-sm font-extrabold text-white shadow-[0_8px_20px_-10px_rgba(0,158,227,0.9)] hover:bg-[#008fce] focus-visible:ring-2 focus-visible:ring-[#009ee3] focus-visible:ring-offset-2"
@@ -1266,10 +1303,20 @@ export function CheckoutForm({
             data-testid="checkout-submit-mobile"
             onClick={handleCheckoutCtaClick}
             disabled={checkoutDisabled}
-            aria-describedby={checkoutDisabledReason ? "checkout-disabled-reason-mobile" : undefined}
+            aria-describedby={[
+              checkoutDisabledReason
+                ? "checkout-disabled-reason-mobile"
+                : hasIncompleteFields
+                  ? "checkout-incomplete-fields-mobile"
+                  : null,
+              "checkout-payment-next-step-mobile",
+            ].filter(Boolean).join(" ")}
           >
-            <PaymentButtonContent isProcessing={isProcessing} provider={paymentProvider} />
+            <PaymentButtonContent isProcessing={isProcessing} provider={paymentProvider} hasIncompleteFields={hasIncompleteFields} />
           </Button>
+          <p id="checkout-payment-next-step-mobile" className="px-1 text-center text-xs font-semibold leading-4 text-gloria-900">
+            {paymentNextStep}
+          </p>
         </div>
       </div>
     </main>
@@ -1356,6 +1403,7 @@ function FormField({
   name,
   hint,
   error,
+  className,
   ...props
 }: React.ComponentProps<typeof Input> & {
   label: string;
@@ -1369,13 +1417,22 @@ function FormField({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={name} className="text-base font-semibold">{label}</Label>
+      <Label htmlFor={name} className="text-base font-semibold">
+        {label}
+        {props.required ? (
+          <span className="ml-1 text-sm font-bold text-gloria-800">(obligatorio)</span>
+        ) : null}
+      </Label>
       <Input
         id={name}
         name={name}
         aria-describedby={describedBy}
         aria-invalid={Boolean(error)}
-        className="min-h-12 text-base"
+        className={cn(
+          "min-h-12 text-base",
+          error && "border-destructive ring-1 ring-destructive/20 focus-visible:ring-destructive",
+          className
+        )}
         {...props}
       />
       {hint ? (

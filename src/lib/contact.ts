@@ -2,6 +2,10 @@ function getPhoneDigits(phone: string) {
   return phone.replace(/\D/g, "").replace(/^00/, "");
 }
 
+export function isValidFullName(fullName: string) {
+  return fullName.trim().split(/\s+/).filter(Boolean).length >= 2;
+}
+
 function getArgentinaNationalNumber(phone: string) {
   const digits = getPhoneDigits(phone);
   const withoutCountryCode = digits.startsWith("54")
