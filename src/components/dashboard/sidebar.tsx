@@ -26,6 +26,7 @@ import type { AdminNotificationState } from "@/actions/admin-notifications";
 const sidebarItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/dashboard/analytics", icon: BarChart3, label: "Estadísticas" },
+  { href: "/dashboard/survey", icon: BarChart3, label: "Encuesta" },
   { href: "/dashboard/products", icon: Package, label: "Productos" },
   { href: "/dashboard/pricing", icon: Tags, label: "Precios" },
   { href: "/dashboard/orders", icon: ShoppingCart, label: "Órdenes" },

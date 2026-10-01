@@ -1233,3 +1233,20 @@ export type StorefrontAnalyticsEvent = typeof storefrontAnalyticsEvents.$inferSe
 export type NewStorefrontAnalyticsEvent = typeof storefrontAnalyticsEvents.$inferInsert;
 export type CartItem = typeof cartItems.$inferSelect;
 export type NewCartItem = typeof cartItems.$inferInsert;
+
+export const productInterestResponses = pgTable("product_interest_responses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  surveyKey: text("survey_key").notNull().default("uniforms-v1"),
+  visitorId: uuid("visitor_id").notNull(),
+  firstChoice: text("first_choice").notNull(),
+  secondChoice: text("second_choice"),
+  placement: text("placement").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  unique("product_interest_one_response_per_browser").on(table.surveyKey, table.visitorId),
+  check("product_interest_survey_key_check", sql`${table.surveyKey} = 'uniforms-v1'`),
+  check("product_interest_first_choice_check", sql`${table.firstChoice} in ('dress_pants', 'skirts', 'socks')`),
+  check("product_interest_second_choice_check", sql`${table.secondChoice} is null or ${table.secondChoice} in ('dress_pants', 'skirts', 'socks')`),
+  check("product_interest_distinct_choices_check", sql`${table.secondChoice} is null or ${table.firstChoice} <> ${table.secondChoice}`),
+  check("product_interest_placement_check", sql`${table.placement} in ('home', 'catalog', 'product')`),
+]).enableRLS();

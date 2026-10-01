@@ -15,7 +15,7 @@ export default async function PrivacyPage() {
     <LegalPage
       eyebrow="Tus datos"
       title="Política de privacidad"
-      intro="Usamos únicamente la información necesaria para procesar compras, coordinar entregas y atender consultas."
+      intro="Usamos información para procesar compras, coordinar entregas, atender consultas y mejorar el catálogo con tus respuestas voluntarias."
     >
       <LegalSection title="Datos que tratamos">
         <p>
@@ -51,6 +51,10 @@ export default async function PrivacyPage() {
           pago, enviamos a Meta el valor de la compra y datos de contacto
           transformados mediante hash; no enviamos datos de tarjeta.
         </p>
+      </LegalSection>
+      <LegalSection title="Encuesta de prendas">
+        <p>Podés participar de forma voluntaria para indicar qué prendas te gustaría encontrar en la tienda. Guardamos tus opciones y la sección desde la que respondiste, sin pedir nombre ni contacto.</p>
+        <p>Usamos un identificador aleatorio del navegador para evitar respuestas repetidas. El navegador recuerda si ya respondiste o si preferís ocultar la encuesta durante siete días.</p>
       </LegalSection>
       <LegalSection title="Proveedores">
         <p>

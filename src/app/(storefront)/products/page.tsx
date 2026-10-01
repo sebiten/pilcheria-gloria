@@ -1,3 +1,4 @@
+import { ProductInterestSurvey } from "@/components/storefront/product-interest-survey";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { MessageCircle, ShieldCheck, UserRoundCheck, X } from "lucide-react";
@@ -326,6 +327,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </div>
           )}
         </section>
+        <ProductInterestSurvey placement="catalog" />
       </div>
     </main>
   );

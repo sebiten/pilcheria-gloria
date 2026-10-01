@@ -1,3 +1,4 @@
+import { ProductInterestSurvey } from "@/components/storefront/product-interest-survey";
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
@@ -353,6 +354,8 @@ export default async function HomePage() {
           </div>
         </section>
       ) : null}
+
+      <div className="container mx-auto px-4"><ProductInterestSurvey placement="home" /></div>
 
       <section className="relative overflow-hidden bg-gloria-100 py-16 sm:py-20">
         <div className="absolute -right-20 top-0 size-72 rounded-full bg-gloria-300/35 blur-3xl" />
