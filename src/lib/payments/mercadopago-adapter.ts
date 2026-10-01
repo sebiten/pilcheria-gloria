@@ -15,21 +15,13 @@ import type {
   StartPaymentInput,
 } from "@/lib/payments/types";
 import type { PaymentAttemptStatus } from "@/types";
+import { getPayerAddress } from "./preference-details";
 
 function getAppUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(
     /\/+$/,
     ""
   );
-}
-
-function splitStreet(value?: string | null) {
-  const street = value?.trim() || "";
-  const match = street.match(/^(.*?)(?:\s+(\d+))$/);
-  return {
-    name: match?.[1]?.trim() || street || undefined,
-    number: match?.[2] ? Number(match[2]) : undefined,
-  };
 }
 
 function mapStatus(status: string): PaymentAttemptStatus {
@@ -96,13 +88,13 @@ export const mercadoPagoAdapter: PaymentAdapter = {
   async start(input: StartPaymentInput) {
     const appUrl = getAppUrl();
     const names = input.buyer.name.trim().split(/\s+/);
-    const street = splitStreet(input.buyer.street);
+    const payerAddress = getPayerAddress(input.buyer);
     const preference = await createPreference({
       items: [
         {
           id: input.orderId,
           title: `Pilchería Gloria · Pedido ${input.orderId.slice(0, 8).toUpperCase()}`,
-          description: "Compra online de uniformes escolares",
+          description: input.description || "Compra online de prendas en Pilchería Gloria",
           unit_price: input.amount,
           quantity: 1,
         },
@@ -112,20 +104,14 @@ export const mercadoPagoAdapter: PaymentAdapter = {
         surname: names.slice(1).join(" "),
         ...(input.buyer.email ? { email: input.buyer.email } : {}),
         phone: { number: input.buyer.phone },
-        address: {
-          ...(input.buyer.zip ? { zip_code: input.buyer.zip } : {}),
-          ...(street.name ? { street_name: street.name } : {}),
-          ...(street.number ? { street_number: street.number } : {}),
-        },
+        ...(payerAddress ? { address: payerAddress } : {}),
       },
-      ...(input.buyer.street
+      ...(input.buyer.street?.trim()
         ? {
             shipments: {
               mode: "not_specified",
               receiver_address: {
-                ...(input.buyer.zip ? { zip_code: input.buyer.zip } : {}),
-                ...(street.name ? { street_name: street.name } : {}),
-                ...(street.number ? { street_number: street.number } : {}),
+                ...payerAddress,
                 ...(input.buyer.city ? { city_name: input.buyer.city } : {}),
                 ...(input.buyer.state ? { state_name: input.buyer.state } : {}),
                 country_name: "Argentina",

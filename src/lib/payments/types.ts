@@ -14,6 +14,7 @@ export type StartPaymentInput = {
   attemptId: string;
   orderId: string;
   amount: number;
+  description?: string;
   currency: "ARS";
   reservationExpiresAt: string;
   deviceId?: string | null;

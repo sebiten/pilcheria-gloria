@@ -1,5 +1,6 @@
 "use server";
 
+import { describeOrderItems } from "@/lib/payments/preference-details";
 import { auth } from "@clerk/nextjs/server";
 import { createHmac } from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -415,11 +416,18 @@ export async function startOrderPayment(
 
   let startedPayment: StartedPayment | null = null;
   try {
+    const { data: orderItems, error: itemsError } = await supabase
+      .from("order_items")
+      .select("product_name, quantity, variant_label, variant_size, variant_color")
+      .eq("order_id", orderId);
+    if (itemsError) throw itemsError;
+
     startedPayment = await adapter.start({
       attemptId: attempt.id,
       orderId,
       amount: Number(order.total),
       currency: "ARS",
+      description: describeOrderItems(orderItems || []),
       reservationExpiresAt: order.reservation_expires_at,
       deviceId,
       buyer: {
